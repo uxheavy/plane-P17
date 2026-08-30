@@ -27,7 +27,10 @@
 
 Frontend tests for `apps/web` live under `apps/web/tests` and mirror the source path beneath `apps/web`. Keep production helpers beside their owning source when they are not reusable application primitives.
 
+Reference-consumer scenarios live under `apps/web/tests/reference` and exercise production entry points through deterministic representative stores or services.
+
 - Run all web tests: `pnpm --filter=web test`
+- Run web reference tests: `pnpm --filter=web test:reference`
 - Run one web test: `pnpm --filter=web test -- <path-under-apps/web>`
 
 ## Backend tests (Docker)
