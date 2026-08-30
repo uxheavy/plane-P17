@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { createPopper } from "@popperjs/core";
 import { observer } from "mobx-react";
 import { CalendarDays } from "lucide-react";
 import { Combobox } from "@headlessui/react";
@@ -73,15 +74,31 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const popperRef = useRef<HTMLDivElement | null>(null);
   // hooks
   const { data } = useUserProfile();
   const startOfWeek = data?.start_of_the_week;
-  const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !popperRef.current) return;
+    const referenceElement = dropdownRef.current?.querySelector("button");
+    if (!referenceElement) return;
+    const popper = createPopper(referenceElement, popperRef.current, {
+      placement: placement ?? "bottom-start",
+      strategy: "fixed",
+      modifiers: [
+        { name: "offset", options: { offset: [0, 4] } },
+        { name: "preventOverflow", options: { padding: 12 } },
+      ],
+    });
+    popper.forceUpdate();
+    return () => popper.destroy();
+  }, [isOpen, placement]);
 
   const isDateSelected = value && value.toString().trim() !== "";
 
   const onOpen = () => {
-    if (referenceElement) referenceElement.focus();
+    dropdownRef.current?.querySelector("button")?.focus();
   };
 
   const { handleClose, handleKeyDown, handleOnClick } = useDropdown({
@@ -96,7 +113,7 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
     onChange(val);
     if (closeOnSelect) {
       handleClose();
-      referenceElement?.blur();
+      dropdownRef.current?.querySelector("button")?.blur();
     }
   };
 
@@ -115,7 +132,6 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
         },
         buttonContainerClassName
       )}
-      ref={setReferenceElement}
       onClick={handleOnClick}
       disabled={disabled}
     >
@@ -151,9 +167,10 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
   return (
     <ComboDropDown
       as="div"
+      role="group"
       ref={dropdownRef}
       tabIndex={tabIndex}
-      className={cn("relative h-full", className)}
+      className={cn("h-full", className)}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           if (!isOpen) handleKeyDown(e);
@@ -165,13 +182,16 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
     >
       {isOpen && (
         <Combobox.Options
+          as="div"
           className={cn(
-            "absolute z-30 overflow-hidden rounded-md border-[0.5px] border-strong bg-surface-1 shadow-raised-200",
-            placement?.endsWith("end") ? "right-0" : "left-0",
-            placement?.startsWith("top") ? "bottom-full mb-1" : "top-full mt-1",
+            "z-30 overflow-hidden rounded-md border-[0.5px] border-strong bg-surface-1 shadow-raised-200",
             optionsClassName
           )}
           data-prevent-outside-click
+          modal={false}
+          portal
+          ref={popperRef}
+          static
         >
           <Calendar
             className="rounded-md border border-subtle p-3"

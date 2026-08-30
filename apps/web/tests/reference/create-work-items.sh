@@ -13,6 +13,9 @@ fixture="$repo_root/apps/web/tests/reference/provision_create_work_items.py"
 audit_dir=${PLANE_REFERENCE_AUDIT_DIR:-$repo_root/output/playwright}
 correlation_id="create-work-items-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 audit_log="$audit_dir/$correlation_id.jsonl"
+reference_run_id=${PLANE_REFERENCE_RUN_ID:-$correlation_id}
+reference_email=${PLANE_REFERENCE_EMAIL:-$reference_run_id@example.test}
+reference_password=${PLANE_REFERENCE_PASSWORD:-PickerReference-2026}
 preview_pid=""
 current_stage="suite.bootstrap"
 stage_open=0
@@ -40,9 +43,13 @@ complete_stage() {
 run_django() {
   local action=$1
   if [[ -n "$api_container" ]]; then
-    docker exec -i -e "PLANE_REFERENCE_ACTION=$action" "$api_container" python manage.py shell < "$fixture"
+    docker exec -i -e "PLANE_REFERENCE_ACTION=$action" -e "PLANE_REFERENCE_RUN_ID=$reference_run_id" \
+      -e "PLANE_REFERENCE_EMAIL=$reference_email" \
+      -e "PLANE_REFERENCE_PASSWORD=$reference_password" "$api_container" python manage.py shell < "$fixture"
   else
-    docker compose exec -T -e "PLANE_REFERENCE_ACTION=$action" api python manage.py shell < "$fixture"
+    docker compose exec -T -e "PLANE_REFERENCE_ACTION=$action" -e "PLANE_REFERENCE_RUN_ID=$reference_run_id" \
+      -e "PLANE_REFERENCE_EMAIL=$reference_email" \
+      -e "PLANE_REFERENCE_PASSWORD=$reference_password" api python manage.py shell < "$fixture"
   fi
 }
 
@@ -81,10 +88,16 @@ if [[ ! -d "$repo_root/node_modules" ]]; then
 fi
 
 begin_stage "web.build"
-VITE_API_BASE_URL="$api_url" VITE_WEB_BASE_URL="$web_url" pnpm --dir "$repo_root" --filter=web build
+(
+  cd "$repo_root/apps/web"
+  VITE_API_BASE_URL="$api_url" VITE_WEB_BASE_URL="$web_url" ./node_modules/.bin/react-router build
+)
 complete_stage
 begin_stage "web.preview"
-pnpm --dir "$repo_root" --filter=web exec vite preview --host 127.0.0.1 --port "${web_url##*:}" >/tmp/plane-reference-preview.log 2>&1 &
+(
+  cd "$repo_root/apps/web"
+  ./node_modules/.bin/vite preview --host 127.0.0.1 --port "${web_url##*:}"
+) >/tmp/plane-reference-preview.log 2>&1 &
 preview_pid=$!
 for _ in {1..60}; do
   curl -fsS "$web_url" >/dev/null 2>&1 && break
@@ -97,13 +110,14 @@ begin_stage "fixture.provision"
 fixture_json=$(run_django setup | tail -1)
 project_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])' <<< "$fixture_json")
 workspace_slug=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["workspace_slug"])' <<< "$fixture_json")
-email=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["email"])' <<< "$fixture_json")
-password=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["password"])' <<< "$fixture_json")
 project_url="$web_url/$workspace_slug/projects/$project_id/issues/"
 complete_stage
 
 begin_stage "browser.install"
-pnpm --dir "$repo_root" --filter=web exec playwright install chromium
+(
+  cd "$repo_root/apps/web"
+  ./node_modules/.bin/playwright install chromium
+)
 complete_stage
 
 playwright_args=(
@@ -117,13 +131,16 @@ if [[ ${PLANE_REFERENCE_HEADED:-0} == 1 ]]; then
 fi
 
 begin_stage "browser.ui-journey"
-PLANE_REFERENCE_AUDIT_LOG="$audit_log" \
-PLANE_REFERENCE_CORRELATION_ID="$correlation_id" \
-PLANE_REFERENCE_WEB_URL="$web_url" \
-PLANE_REFERENCE_PROJECT_URL="$project_url" \
-PLANE_REFERENCE_EMAIL="$email" \
-PLANE_REFERENCE_PASSWORD="$password" \
-  pnpm --dir "$repo_root" --filter=web exec playwright "${playwright_args[@]}"
+(
+  cd "$repo_root/apps/web"
+  PLANE_REFERENCE_AUDIT_LOG="$audit_log" \
+  PLANE_REFERENCE_CORRELATION_ID="$correlation_id" \
+  PLANE_REFERENCE_WEB_URL="$web_url" \
+  PLANE_REFERENCE_PROJECT_URL="$project_url" \
+  PLANE_REFERENCE_EMAIL="$reference_email" \
+  PLANE_REFERENCE_PASSWORD="$reference_password" \
+    ./node_modules/.bin/playwright "${playwright_args[@]}"
+)
 complete_stage
 
 begin_stage "fixture.assert-persisted"

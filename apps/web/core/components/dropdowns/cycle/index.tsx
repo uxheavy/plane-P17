@@ -74,12 +74,21 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
 
   const selectedName = value ? getCycleNameById(value) : null;
 
-  const { handleClose, handleKeyDown, handleOnClick } = useDropdown({
+  const {
+    handleClose: closeDropdown,
+    handleKeyDown,
+    handleOnClick,
+  } = useDropdown({
     dropdownRef,
     isOpen,
     onClose,
     setIsOpen,
   });
+
+  const handleClose = () => {
+    setQuery("");
+    closeDropdown();
+  };
 
   const dropdownOnChange = (val: string | null) => {
     onChange(val);
@@ -97,7 +106,6 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
   useEffect(() => {
     if (isOpen && workspaceSlug && projectId && projectCycleIds === null)
       fetchAllCycles(workspaceSlug.toString(), projectId);
-    if (!isOpen) setQuery("");
   }, [fetchAllCycles, isOpen, projectCycleIds, projectId, workspaceSlug]);
 
   const comboButton = button ? (

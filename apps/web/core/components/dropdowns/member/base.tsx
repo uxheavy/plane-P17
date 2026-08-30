@@ -85,14 +85,13 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
     multiple,
   };
 
-  const memberOptions = (memberIds ?? [])
-    .filter((memberId) => {
-      const member = getUserDetails(memberId);
-      return `${member?.display_name} ${member?.first_name} ${member?.last_name}`
-        .toLowerCase()
-        .includes(query.toLowerCase());
-    })
-    .map((memberId) => ({ value: memberId }));
+  const normalizedQuery = query.toLowerCase();
+  const memberOptions = (memberIds ?? []).reduce<{ value: string }[]>((options, memberId) => {
+    const member = getUserDetails(memberId);
+    if (`${member?.display_name} ${member?.first_name} ${member?.last_name}`.toLowerCase().includes(normalizedQuery))
+      options.push({ value: memberId });
+    return options;
+  }, []);
   const virtualOptions =
     sortByCurrentUserThenSelected(memberOptions, value, currentUser?.id)?.map((option) => option.value) ?? [];
 

@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useProjectEstimates } from "./store/estimates";
+import { useProjectEstimates } from "./store/estimates/use-project-estimate";
 import { useCycle } from "./store/use-cycle";
 import { useLabel } from "./store/use-label";
 import { useMember } from "./store/use-member";

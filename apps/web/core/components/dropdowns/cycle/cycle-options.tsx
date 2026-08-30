@@ -51,6 +51,7 @@ export const CycleOptions = observer(function CycleOptions(props: CycleOptionsPr
   // popper-js init
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     placement: placement ?? "bottom-start",
+    strategy: "fixed",
     modifiers: [
       {
         name: "preventOverflow",

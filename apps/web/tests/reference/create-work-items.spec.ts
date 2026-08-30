@@ -107,11 +107,19 @@ async function selectTodayAsStartDate(page: Page) {
 
     const calendar = page.locator(".rdp-root");
     await expect(calendar).toBeVisible();
-    const calendarBox = await calendar.boundingBox();
     expect(triggerBox, "date trigger must be rendered").toBeTruthy();
-    expect(calendarBox, "calendar must be rendered").toBeTruthy();
-    expect(Math.abs(calendarBox!.x - triggerBox!.x)).toBeLessThanOrEqual(2);
-    expect(calendarBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height);
+    await expect
+      .poll(async () => {
+        const calendarBox = await calendar.boundingBox();
+        return calendarBox ? Math.abs(calendarBox.x - triggerBox!.x) : Number.POSITIVE_INFINITY;
+      })
+      .toBeLessThanOrEqual(2);
+    await expect
+      .poll(async () => {
+        const calendarBox = await calendar.boundingBox();
+        return calendarBox ? calendarBox.y : Number.NEGATIVE_INFINITY;
+      })
+      .toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height);
 
     await calendar.locator(".rdp-today button").click();
     await expect(trigger).toHaveCount(0);

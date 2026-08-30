@@ -107,9 +107,11 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
     multiple,
   };
 
-  const moduleOptions: { value: string | null }[] = (moduleIds ?? [])
-    .filter((moduleId) => getModuleById(moduleId)?.name.toLowerCase().includes(query.toLowerCase()))
-    .map((moduleId) => ({ value: moduleId }));
+  const normalizedQuery = query.toLowerCase();
+  const moduleOptions = (moduleIds ?? []).reduce<{ value: string | null }[]>((options, moduleId) => {
+    if (getModuleById(moduleId)?.name.toLowerCase().includes(normalizedQuery)) options.push({ value: moduleId });
+    return options;
+  }, []);
   if (!multiple && t("module.no_module").toLowerCase().includes(query.toLowerCase()))
     moduleOptions.unshift({ value: null });
   const virtualOptions = sortBySelectedFirst(moduleOptions, value)?.map((option) => option.value) ?? [];

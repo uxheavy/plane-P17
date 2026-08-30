@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import hashlib
 import json
 import os
 
@@ -26,10 +27,11 @@ from plane.db.models import (
 
 
 ACTION = os.environ.get("PLANE_REFERENCE_ACTION", "setup")
-SLUG = "picker-reference-options"
-EMAIL = "picker-reference-options@example.test"
-PASSWORD = "PickerReference-2026"
-MEMBER_PREFIX = "picker-reference-member-"
+RUN_KEY = hashlib.sha256(os.environ["PLANE_REFERENCE_RUN_ID"].encode()).hexdigest()[:12]
+SLUG = f"picker-reference-{RUN_KEY}"
+EMAIL = os.environ["PLANE_REFERENCE_EMAIL"]
+PASSWORD = os.environ["PLANE_REFERENCE_PASSWORD"]
+MEMBER_PREFIX = f"picker-reference-member-{RUN_KEY}-"
 COUNTS = {
     "members": 500,
     "labels": 1000,
@@ -74,7 +76,7 @@ def setup():
             },
         )
 
-        workspace = Workspace.objects.create(name="Picker Reference Options", slug=SLUG, owner=owner)
+        workspace = Workspace.objects.create(name=f"Picker Reference {RUN_KEY}", slug=SLUG, owner=owner)
         WorkspaceMember.objects.create(workspace=workspace, member=owner, role=20)
         project = Project.objects.create(
             name="High Cardinality Options",
@@ -190,8 +192,6 @@ def setup():
     return {
         "workspace_slug": workspace.slug,
         "project_id": str(project.id),
-        "email": EMAIL,
-        "password": PASSWORD,
         "counts": COUNTS,
         "total_options": sum(COUNTS.values()),
     }

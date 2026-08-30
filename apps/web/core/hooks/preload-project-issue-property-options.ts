@@ -11,7 +11,9 @@ type TProjectIssuePropertyPreload = {
 };
 
 export const preloadMissingProjectIssuePropertyOptions = async (options: TProjectIssuePropertyPreload[]) => {
-  await Promise.allSettled(
-    options.filter(({ isEnabled = true, isLoaded }) => isEnabled && !isLoaded).map(({ load }) => load())
-  );
+  const pendingLoads: Promise<unknown>[] = [];
+  for (const { isEnabled = true, isLoaded, load } of options) {
+    if (isEnabled && !isLoaded) pendingLoads.push(load());
+  }
+  await Promise.allSettled(pendingLoads);
 };
