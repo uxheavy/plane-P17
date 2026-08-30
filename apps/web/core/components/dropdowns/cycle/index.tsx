@@ -5,8 +5,9 @@
  */
 
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 import { useTranslation } from "@plane/i18n";
 // ui
 import { CycleIcon, ChevronDownIcon } from "@plane/propel/icons";
@@ -63,7 +64,9 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
   // states
 
   const [isOpen, setIsOpen] = useState(false);
-  const { getCycleNameById } = useCycle();
+  const [query, setQuery] = useState("");
+  const { workspaceSlug } = useParams();
+  const { fetchAllCycles, getCycleById, getCycleNameById, getProjectCycleIds } = useCycle();
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   // popper-js refs
@@ -82,6 +85,20 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
     onChange(val);
     handleClose();
   };
+
+  const projectCycleIds = projectId ? getProjectCycleIds(projectId) : null;
+  const virtualOptions: (string | null)[] = (projectCycleIds ?? []).filter((cycleId) => {
+    const cycle = getCycleById(cycleId);
+    if (currentCycleId === cycleId || cycle?.status?.toLowerCase() === "completed") return false;
+    return cycle?.name.toLowerCase().includes(query.toLowerCase());
+  });
+  if (canRemoveCycle && t("cycle.no_cycle").toLowerCase().includes(query.toLowerCase())) virtualOptions.unshift(null);
+
+  useEffect(() => {
+    if (isOpen && workspaceSlug && projectId && projectCycleIds === null)
+      fetchAllCycles(workspaceSlug.toString(), projectId);
+    if (!isOpen) setQuery("");
+  }, [fetchAllCycles, isOpen, projectCycleIds, projectId, workspaceSlug]);
 
   const comboButton = button ? (
     <button
@@ -133,23 +150,26 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
   return (
     <ComboDropDown
       as="div"
+      role="group"
       ref={dropdownRef}
       className={cn("h-full", className)}
       value={value}
       onChange={dropdownOnChange}
       disabled={disabled}
       onKeyDown={handleKeyDown}
+      onClose={handleClose}
       button={comboButton}
       renderByDefault={renderByDefault}
+      virtual={{ options: virtualOptions }}
     >
       {isOpen && projectId && (
         <CycleOptions
           isOpen={isOpen}
-          projectId={projectId}
           placement={placement}
           referenceElement={referenceElement}
-          canRemoveCycle={canRemoveCycle}
-          currentCycleId={currentCycleId}
+          options={virtualOptions}
+          query={query}
+          setQuery={setQuery}
         />
       )}
     </ComboDropDown>

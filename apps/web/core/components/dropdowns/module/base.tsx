@@ -11,7 +11,7 @@ import { observer } from "mobx-react";
 import { useTranslation } from "@plane/i18n";
 import type { IModule } from "@plane/types";
 import { ComboDropDown } from "@plane/ui";
-import { cn } from "@plane/utils";
+import { cn, sortBySelectedFirst } from "@plane/utils";
 // hooks
 import { useDropdown } from "@/hooks/use-dropdown";
 import { usePlatformOS } from "@/hooks/use-platform-os";
@@ -78,6 +78,7 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
   const { t } = useTranslation();
   // states
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -106,11 +107,22 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
     multiple,
   };
 
+  const moduleOptions: { value: string | null }[] = (moduleIds ?? [])
+    .filter((moduleId) => getModuleById(moduleId)?.name.toLowerCase().includes(query.toLowerCase()))
+    .map((moduleId) => ({ value: moduleId }));
+  if (!multiple && t("module.no_module").toLowerCase().includes(query.toLowerCase()))
+    moduleOptions.unshift({ value: null });
+  const virtualOptions = sortBySelectedFirst(moduleOptions, value)?.map((option) => option.value) ?? [];
+
   useEffect(() => {
     if (isOpen && inputRef.current && !isMobile) {
       inputRef.current.focus();
     }
   }, [isOpen, isMobile]);
+
+  useEffect(() => {
+    if (!isOpen) setQuery("");
+  }, [isOpen]);
 
   const comboButton = button ? (
     <button
@@ -177,11 +189,14 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <ComboDropDown
       as="div"
+      role="group"
       ref={dropdownRef}
       className={cn("h-full", className)}
       onKeyDown={handleKeyDown}
+      onClose={handleClose}
       button={comboButton}
       renderByDefault={renderByDefault}
+      virtual={{ options: virtualOptions }}
       {...comboboxProps}
     >
       {isOpen && projectId && (
@@ -189,11 +204,11 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
           isOpen={isOpen}
           placement={placement}
           referenceElement={referenceElement}
-          multiple={multiple}
           getModuleById={getModuleById}
-          moduleIds={moduleIds}
           onDropdownOpen={onDropdownOpen}
-          value={value}
+          options={virtualOptions}
+          query={query}
+          setQuery={setQuery}
         />
       )}
     </ComboDropDown>
