@@ -64,6 +64,7 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
     multiple,
     onChange,
     onClose,
+    onDropdownOpen,
     placeholder = "",
     placement,
     projectId,
@@ -172,6 +173,8 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
   );
 
   return (
+    // The Headless UI combobox owns the interactive semantics; this wrapper only forwards keyboard events.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <ComboDropDown
       as="div"
       ref={dropdownRef}
@@ -189,6 +192,7 @@ export const ModuleDropdownBase = observer(function ModuleDropdownBase(props: TM
           multiple={multiple}
           getModuleById={getModuleById}
           moduleIds={moduleIds}
+          onDropdownOpen={onDropdownOpen}
           value={value}
         />
       )}

@@ -23,6 +23,13 @@
 - **Testing**: All features require unit tests, use existing test framework per package
 - **Components**: Build in `@plane/ui` with Storybook for isolated development
 
+## Web tests
+
+Frontend tests for `apps/web` live under `apps/web/tests` and mirror the source path beneath `apps/web`. Keep production helpers beside their owning source when they are not reusable application primitives.
+
+- Run all web tests: `pnpm --filter=web test`
+- Run one web test: `pnpm --filter=web test -- <path-under-apps/web>`
+
 ## Backend tests (Docker)
 
 The Django/pytest suite for `apps/api` runs in an isolated stack defined by `docker-compose-test.yml` at the repo root.

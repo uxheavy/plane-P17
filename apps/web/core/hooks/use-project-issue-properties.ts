@@ -9,17 +9,20 @@ import { useCycle } from "./store/use-cycle";
 import { useLabel } from "./store/use-label";
 import { useMember } from "./store/use-member";
 import { useModule } from "./store/use-module";
+import { useProject } from "./store/use-project";
 import { useProjectState } from "./store/use-project-state";
+import { preloadMissingProjectIssuePropertyOptions } from "./preload-project-issue-property-options";
 
 export const useProjectIssueProperties = () => {
-  const { fetchProjectStates } = useProjectState();
+  const { fetchProjectStates, getProjectStateIds } = useProjectState();
   const {
-    project: { fetchProjectMembers },
+    project: { fetchProjectMembers, getProjectMemberFetchStatus },
   } = useMember();
-  const { fetchProjectLabels } = useLabel();
-  const { fetchAllCycles: fetchProjectAllCycles } = useCycle();
-  const { fetchModules: fetchProjectAllModules } = useModule();
-  const { getProjectEstimates } = useProjectEstimates();
+  const { fetchProjectLabels, getProjectLabelIds } = useLabel();
+  const { fetchAllCycles: fetchProjectAllCycles, getProjectCycleIds } = useCycle();
+  const { fetchModules: fetchProjectAllModules, getModulesFetchStatusByProjectId } = useModule();
+  const { getProjectEstimates, getEstimateById } = useProjectEstimates();
+  const { getProjectById } = useProject();
 
   // fetching project states
   const fetchStates = async (
@@ -79,12 +82,29 @@ export const useProjectIssueProperties = () => {
 
   const fetchAll = async (workspaceSlug: string | string[] | undefined, projectId: string | string[] | undefined) => {
     if (workspaceSlug && projectId) {
-      await fetchStates(workspaceSlug, projectId);
-      await fetchMembers(workspaceSlug, projectId);
-      await fetchLabels(workspaceSlug, projectId);
-      await fetchCycles(workspaceSlug, projectId);
-      await fetchModules(workspaceSlug, projectId);
-      await fetchEstimates(workspaceSlug, projectId);
+      const projectKey = projectId.toString();
+      const project = getProjectById(projectKey);
+
+      await preloadMissingProjectIssuePropertyOptions([
+        { isLoaded: getProjectStateIds(projectKey) !== undefined, load: () => fetchStates(workspaceSlug, projectId) },
+        { isLoaded: getProjectMemberFetchStatus(projectKey), load: () => fetchMembers(workspaceSlug, projectId) },
+        { isLoaded: getProjectLabelIds(projectKey) !== undefined, load: () => fetchLabels(workspaceSlug, projectId) },
+        {
+          isEnabled: project?.cycle_view !== false,
+          isLoaded: getProjectCycleIds(projectKey) !== null,
+          load: () => fetchCycles(workspaceSlug, projectId),
+        },
+        {
+          isEnabled: project?.module_view !== false,
+          isLoaded: getModulesFetchStatusByProjectId(projectKey),
+          load: () => fetchModules(workspaceSlug, projectId),
+        },
+        {
+          isEnabled: Boolean(project?.estimate),
+          isLoaded: !project?.estimate || getEstimateById(project.estimate) !== undefined,
+          load: () => fetchEstimates(workspaceSlug, projectId),
+        },
+      ]);
     }
   };
 
