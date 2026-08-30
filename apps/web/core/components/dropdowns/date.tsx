@@ -76,7 +76,6 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
   // hooks
   const { data } = useUserProfile();
   const startOfWeek = data?.start_of_the_week;
-  // dropdown refs
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
 
   const isDateSelected = value && value.toString().trim() !== "";

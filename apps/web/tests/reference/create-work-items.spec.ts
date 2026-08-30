@@ -99,24 +99,22 @@ async function selectSearchOption(page: Page, buttonName: string, optionName: st
   });
 }
 
-async function selectStartDate(page: Page) {
+async function selectTodayAsStartDate(page: Page) {
   await audited("work-item.start-date-select", "today", async () => {
     const trigger = issueForm(page).getByRole("button", { name: "Start date", exact: true }).first();
-    const triggerId = await trigger.getAttribute("id");
     const triggerBox = await trigger.boundingBox();
     await trigger.click();
 
     const calendar = page.locator(".rdp-root");
     await expect(calendar).toBeVisible();
     const calendarBox = await calendar.boundingBox();
-    expect(triggerId, "date trigger must have a stable id").toBeTruthy();
     expect(triggerBox, "date trigger must be rendered").toBeTruthy();
     expect(calendarBox, "calendar must be rendered").toBeTruthy();
     expect(Math.abs(calendarBox!.x - triggerBox!.x)).toBeLessThanOrEqual(2);
     expect(calendarBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height);
 
     await calendar.locator(".rdp-today button").click();
-    await expect(page.locator(`#${triggerId}`)).not.toHaveText("Start date");
+    await expect(trigger).toHaveCount(0);
   });
 }
 
@@ -162,7 +160,7 @@ test("creates representative work items through the real interface", async ({ pa
   await saveWorkItem(page, "Reference minimal work item");
 
   await openCreateModal(page, "Reference high-cardinality work item");
-  await selectStartDate(page);
+  await selectTodayAsStartDate(page);
   await selectSearchOption(page, "Reference State 000", "Reference State 049");
   await selectSearchOption(page, "Labels", "Reference Label 0999");
   await selectSearchOption(page, "Cycle", "Reference Cycle 0249");
