@@ -24,6 +24,7 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
 )
+from plane.license.models import Instance
 
 
 ACTION = os.environ.get("PLANE_REFERENCE_ACTION", "setup")
@@ -31,6 +32,7 @@ RUN_KEY = hashlib.sha256(os.environ["PLANE_REFERENCE_RUN_ID"].encode()).hexdiges
 SLUG = f"picker-reference-{RUN_KEY}"
 EMAIL = os.environ["PLANE_REFERENCE_EMAIL"]
 PASSWORD = os.environ["PLANE_REFERENCE_PASSWORD"]
+INSTANCE_SETUP_WAS_DONE = os.environ.get("PLANE_REFERENCE_INSTANCE_SETUP_WAS_DONE", "")
 MEMBER_PREFIX = f"picker-reference-member-{RUN_KEY}-"
 COUNTS = {
     "members": 500,
@@ -46,11 +48,24 @@ def cleanup():
     Workspace.objects.filter(slug=SLUG).delete(soft=False)
     User.objects.filter(email=EMAIL).delete()
     User.objects.filter(email__startswith=MEMBER_PREFIX).delete()
+    if INSTANCE_SETUP_WAS_DONE in {"true", "false"}:
+        instance = Instance.objects.first()
+        if instance is not None:
+            instance.is_setup_done = INSTANCE_SETUP_WAS_DONE == "true"
+            instance.save(update_fields=["is_setup_done", "updated_at"])
 
 
 def setup():
     with transaction.atomic():
         cleanup()
+
+        instance = Instance.objects.select_for_update().first()
+        if instance is None:
+            raise RuntimeError("Plane instance is not registered")
+        instance_setup_was_done = instance.is_setup_done
+        if not instance_setup_was_done:
+            instance.is_setup_done = True
+            instance.save(update_fields=["is_setup_done", "updated_at"])
 
         owner = User(
             email=EMAIL,
@@ -192,6 +207,7 @@ def setup():
     return {
         "workspace_slug": workspace.slug,
         "project_id": str(project.id),
+        "instance_setup_was_done": instance_setup_was_done,
         "counts": COUNTS,
         "total_options": sum(COUNTS.values()),
     }

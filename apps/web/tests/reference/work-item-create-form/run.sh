@@ -16,6 +16,7 @@ audit_log="$audit_dir/$correlation_id.jsonl"
 reference_run_id=${PLANE_REFERENCE_RUN_ID:-$correlation_id}
 reference_email=${PLANE_REFERENCE_EMAIL:-$reference_run_id@example.test}
 reference_password=${PLANE_REFERENCE_PASSWORD:-PickerReference-2026}
+instance_setup_was_done=""
 preview_pid=""
 web_port=""
 port_lock=""
@@ -47,11 +48,15 @@ run_django() {
   if [[ -n "$api_container" ]]; then
     docker exec -i -e "PLANE_REFERENCE_ACTION=$action" -e "PLANE_REFERENCE_RUN_ID=$reference_run_id" \
       -e "PLANE_REFERENCE_EMAIL=$reference_email" \
-      -e "PLANE_REFERENCE_PASSWORD=$reference_password" "$api_container" python manage.py shell < "$fixture"
+      -e "PLANE_REFERENCE_PASSWORD=$reference_password" \
+      -e "PLANE_REFERENCE_INSTANCE_SETUP_WAS_DONE=$instance_setup_was_done" \
+      "$api_container" python manage.py shell < "$fixture"
   else
     docker compose exec -T -e "PLANE_REFERENCE_ACTION=$action" -e "PLANE_REFERENCE_RUN_ID=$reference_run_id" \
       -e "PLANE_REFERENCE_EMAIL=$reference_email" \
-      -e "PLANE_REFERENCE_PASSWORD=$reference_password" api python manage.py shell < "$fixture"
+      -e "PLANE_REFERENCE_PASSWORD=$reference_password" \
+      -e "PLANE_REFERENCE_INSTANCE_SETUP_WAS_DONE=$instance_setup_was_done" \
+      api python manage.py shell < "$fixture"
   fi
 }
 
@@ -153,6 +158,7 @@ begin_stage "fixture.provision"
 fixture_json=$(run_django setup | tail -1)
 project_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["project_id"])' <<< "$fixture_json")
 workspace_slug=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["workspace_slug"])' <<< "$fixture_json")
+instance_setup_was_done=$(python3 -c 'import json,sys; print(str(json.load(sys.stdin)["instance_setup_was_done"]).lower())' <<< "$fixture_json")
 project_url="$web_url/$workspace_slug/projects/$project_id/issues/"
 complete_stage
 
