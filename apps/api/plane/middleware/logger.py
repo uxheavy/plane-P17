@@ -5,6 +5,7 @@
 # Python imports
 import hashlib
 import hmac
+import json
 import logging
 import time
 
@@ -127,6 +128,18 @@ class APITokenLogMiddleware:
         }
         return str(redacted)
 
+    def _redacted_response_body(self, content):
+        decoded = self._safe_decode_body(content)
+        if not decoded or decoded.startswith("["):
+            return decoded
+        try:
+            value = json.loads(decoded)
+        except json.JSONDecodeError:
+            return decoded
+        if isinstance(value, dict) and "credential" in value:
+            value["credential"] = "[REDACTED]"
+        return json.dumps(value)
+
     def process_request(self, request, response, request_body):
         api_key_header = "X-Api-Key"
         api_key = request.headers.get(api_key_header)
@@ -149,7 +162,7 @@ class APITokenLogMiddleware:
                 "query_params": request.META.get("QUERY_STRING", ""),
                 "headers": self._redacted_headers(request),
                 "body": self._safe_decode_body(request_body) if request_body else None,
-                "response_body": self._safe_decode_body(response.content) if response.content else None,
+                "response_body": self._redacted_response_body(response.content) if response.content else None,
                 "response_code": response.status_code,
                 "ip_address": get_client_ip(request=request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", None),

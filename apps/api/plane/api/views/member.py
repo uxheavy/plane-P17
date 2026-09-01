@@ -88,12 +88,11 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        workspace_members = WorkspaceMember.objects.filter(
-            Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
-            workspace__slug=slug,
-            is_active=True,
-            member__is_active=True,
-        ).select_related("member")
+        workspace_members = (
+            WorkspaceMember.objects.filter(workspace__slug=slug)
+            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT", is_active=True, member__is_active=True))
+            .select_related("member")
+        )
 
         # Get all the users with their roles
         users_with_roles = []

@@ -39,8 +39,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT"))
-            .filter(is_active=True, member__is_active=True)
+            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT", is_active=True, member__is_active=True))
             .select_related("member", "member__avatar_asset")
         )
 

@@ -166,6 +166,9 @@ class Migration(migrations.Migration):
                     IF NOT lifecycle_on THEN
                         RAISE EXCEPTION 'Agent membership is lifecycle-managed';
                     END IF;
+                    IF membership_row.deleted_at IS NOT NULL THEN
+                        RETURN membership_row;
+                    END IF;
                     SELECT workspace_id INTO owner_workspace
                     FROM workspace_agent_memberships
                     WHERE user_id = membership_row.member_id AND deleted_at IS NULL;

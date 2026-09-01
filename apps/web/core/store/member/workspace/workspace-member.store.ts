@@ -137,7 +137,10 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
       (m) => m.member !== this.userStore?.data?.id,
       (m) => this.memberRoot?.memberMap?.[m.member]?.display_name?.toLowerCase(),
     ]);
-    const memberIds = members.filter(this.isVisibleMember).map((m) => m.member);
+    const memberIds = members.reduce<string[]>((ids, member) => {
+      if (this.isVisibleMember(member)) ids.push(member.member);
+      return ids;
+    }, []);
     return memberIds;
   });
 

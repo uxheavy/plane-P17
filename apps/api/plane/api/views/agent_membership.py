@@ -39,10 +39,10 @@ class WorkspaceAgentMembershipEndpoint(BaseAPIView):
                 idempotency_key=request.headers.get("Idempotency-Key", ""),
                 actor=request.user,
             )
-        except PermissionError as error:
-            return Response({"error": str(error)}, status=status.HTTP_403_FORBIDDEN)
-        except AgentMembershipConflict as error:
-            return Response({"error": str(error)}, status=status.HTTP_409_CONFLICT)
-        except AgentMembershipError as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        except PermissionError:
+            return Response({"error": "Workspace admin role 20 is required"}, status=status.HTTP_403_FORBIDDEN)
+        except AgentMembershipConflict:
+            return Response({"error": "Idempotency conflict"}, status=status.HTTP_409_CONFLICT)
+        except AgentMembershipError:
+            return Response({"error": "Invalid agent membership request"}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_200_OK)

@@ -20,7 +20,7 @@ from plane.api.middleware.api_authentication import APIKeyAuthentication
 from plane.api.services import AgentMembershipConflict, AgentMembershipError, WorkspaceAgentMemberships
 from plane.api.serializers import IssueCommentSerializer
 from plane.bgtasks.webhook_task import get_model_data, webhook_send_task
-from plane.bgtasks.deletion_task import hard_delete
+from plane.bgtasks.deletion_task import hard_delete, soft_delete_related_objects
 from plane.db.models import (
     APIToken,
     BotTypeEnum,
@@ -403,6 +403,8 @@ class TestWorkspaceAgentMemberships:
         WorkspaceMemberFactory(workspace=self.workspace, member=seed, role=15)
         ProjectMemberFactory(project=self.project, member=self.admin, role=20)
         ProjectMemberFactory(project=self.project, member=seed, role=15)
+        suspended = UserFactory(username="suspended-human", is_active=False)
+        WorkspaceMemberFactory(workspace=self.workspace, member=suspended, role=15, is_active=False)
         client = APIClient()
         client.force_authenticate(self.admin)
 
@@ -425,6 +427,13 @@ class TestWorkspaceAgentMemberships:
             assert str(agent.id) in body, path
             assert str(disabled.id) not in body, path
             assert str(seed.id) not in body, path
+
+        for path in (
+            f"/api/v1/workspaces/{self.workspace.slug}/members/",
+            f"/api/workspaces/{self.workspace.slug}/members/",
+        ):
+            members = client.get(path)
+            assert str(suspended.id) in json.dumps(members.data, default=str)
 
     def test_agent_author_overrides_are_rejected_on_v1_creation_paths(self):
         created = self.apply()
@@ -537,6 +546,8 @@ class TestWorkspaceAgentMemberships:
             actor=self.admin,
         )
         workspace.delete()
+        soft_delete_related_objects("db", "workspace", workspace.id)
+        assert WorkspaceAgentMembership.all_objects.get(id=workspace_agent["membership_id"]).deleted_at is not None
         type(workspace).all_objects.filter(id=workspace.id).update(
             deleted_at=timezone.now() - timedelta(days=settings.HARD_DELETE_AFTER_DAYS + 1)
         )
