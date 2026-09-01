@@ -5,7 +5,7 @@
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Min
+from django.db.models import Min, Q
 
 # Module imports
 from .base import BaseViewSet, BaseAPIView
@@ -18,7 +18,7 @@ from plane.app.serializers import (
 
 from plane.app.permissions import WorkspaceUserPermission
 
-from plane.db.models import Project, ProjectMember, ProjectUserProperty, WorkspaceMember
+from plane.db.models import Project, ProjectMember, ProjectUserProperty, User, WorkspaceMember
 from plane.bgtasks.project_add_user_email_task import project_add_user_email
 from plane.utils.host import base_host
 from plane.app.permissions.base import allow_permission, ROLE
@@ -36,7 +36,7 @@ class ProjectMemberViewSet(BaseViewSet):
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
-            .filter(member__is_bot=False)
+            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT"))
             .filter()
             .select_related("project")
             .select_related("member")
@@ -47,6 +47,12 @@ class ProjectMemberViewSet(BaseViewSet):
     def create(self, request, slug, project_id):
         # Get the list of members to be added to the project and their roles i.e. the user_id and the role
         members = request.data.get("members", [])
+        member_ids = [member.get("member_id") for member in members]
+        if User.objects.filter(id__in=member_ids, is_bot=True, bot_type="AGENT").exists():
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # get the project
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
@@ -157,9 +163,9 @@ class ProjectMemberViewSet(BaseViewSet):
     def list(self, request, slug, project_id):
         # Get the list of project members for the project
         project_members = ProjectMember.objects.filter(
+            Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
             project_id=project_id,
             workspace__slug=slug,
-            member__is_bot=False,
             is_active=True,
             member__member_workspace__workspace__slug=slug,
             member__member_workspace__is_active=True,
@@ -179,10 +185,10 @@ class ProjectMemberViewSet(BaseViewSet):
 
         project_member = (
             ProjectMember.objects.filter(
+                Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
                 pk=pk,
                 project_id=project_id,
                 workspace__slug=slug,
-                member__is_bot=False,
                 is_active=True,
             )
             .select_related("project", "member", "workspace")
@@ -205,6 +211,11 @@ class ProjectMemberViewSet(BaseViewSet):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def partial_update(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(pk=pk, workspace__slug=slug, project_id=project_id, is_active=True)
+        if project_member.member.is_bot and project_member.member.bot_type == "AGENT":
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # Fetch the target's workspace role (used to cap the new project role)
         target_workspace_role = WorkspaceMember.objects.get(

@@ -28,6 +28,10 @@ class ProjectMemberSerializer(BaseSerializer):
             raise serializers.ValidationError("Slug is required", code="INVALID_SLUG")
         if not value:
             raise serializers.ValidationError("Member is required", code="INVALID_MEMBER")
+        if value.is_bot and value.bot_type == "AGENT":
+            raise serializers.ValidationError(
+                "Agent membership is lifecycle-managed", code="AGENT_LIFECYCLE_MANAGED"
+            )
         if not WorkspaceMember.objects.filter(workspace__slug=slug, member=value).exists():
             raise serializers.ValidationError("Member not found in workspace", code="INVALID_MEMBER")
         return value
@@ -54,6 +58,7 @@ class BaseMemberLiteAPISerializer(BaseSerializer):
     avatar_url = serializers.CharField(source="member.avatar_url", read_only=True, allow_null=True)
     display_name = serializers.CharField(source="member.display_name", read_only=True)
     is_bot = serializers.BooleanField(source="member.is_bot", read_only=True)
+    bot_type = serializers.CharField(source="member.bot_type", read_only=True, allow_null=True)
 
     class Meta:
         fields = [
@@ -67,6 +72,7 @@ class BaseMemberLiteAPISerializer(BaseSerializer):
             "role",
             "is_active",
             "is_bot",
+            "bot_type",
         ]
         read_only_fields = fields
 

@@ -61,31 +61,23 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
     workspace: { isUserSuspended },
   } = useMember();
   const { isMobile } = usePlatformOS();
-  // popper-js init
+
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     placement: placement ?? "bottom-start",
-    modifiers: [
-      {
-        name: "preventOverflow",
-        options: {
-          padding: 12,
-        },
-      },
-    ],
+    modifiers: [{ name: "preventOverflow", options: { padding: 12 } }],
   });
-
   useEffect(() => {
     if (isOpen) {
       onDropdownOpen?.();
-      if (!isMobile) {
-        inputRef.current && inputRef.current.focus();
-      }
+      if (!isMobile) inputRef.current?.focus();
     }
   }, [isOpen, isMobile]);
 
   const searchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (query !== "" && e.key === "Escape") {
+    if (e.key !== "Escape") return;
+    if (query !== "") {
       e.stopPropagation();
+      e.preventDefault();
       setQuery("");
     }
   };
@@ -126,17 +118,20 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
   );
 
   return createPortal(
-    <Combobox.Options as="ul" data-prevent-outside-click static>
+    <Combobox.Options
+      as="div"
+      ref={setPopperElement}
+      className="z-30 w-fit"
+      data-prevent-outside-click
+      static
+      style={styles.popper}
+      {...attributes.popper}
+    >
       <div
         className={cn(
           "z-30 my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none",
           optionsClassName
         )}
-        ref={setPopperElement}
-        style={{
-          ...styles.popper,
-        }}
-        {...attributes.popper}
       >
         <div className="flex items-center gap-1.5 rounded-sm border border-subtle bg-surface-2 px-2">
           <SearchIcon className="h-3.5 w-3.5 text-placeholder" strokeWidth={1.5} />
@@ -147,8 +142,9 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("search")}
+            aria-label={t("search")}
             displayValue={(assigned: any) => assigned?.name}
-            onKeyDown={searchInputKeyDown}
+            onKeyDownCapture={searchInputKeyDown}
           />
         </div>
         <div className="mt-2 max-h-48 space-y-1 overflow-y-scroll">
@@ -158,7 +154,7 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
                 (option) =>
                   option && (
                     <Combobox.Option
-                      as="li"
+                      as="div"
                       key={option.value}
                       value={option.value}
                       className={({ active, selected }) =>

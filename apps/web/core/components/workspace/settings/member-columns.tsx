@@ -23,10 +23,9 @@ import { getFileURL } from "@plane/utils";
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 
-export interface RowData {
-  member: IWorkspaceMember;
+export interface RowData extends Omit<IWorkspaceMember, "member" | "role"> {
+  member: IWorkspaceMember["member"] & Pick<IWorkspaceMember, "last_login_medium">;
   role: EUserPermissions;
-  is_active: boolean;
 }
 
 type NameProps = {
@@ -47,6 +46,7 @@ export function NameColumn(props: NameProps) {
   // derived values
   const { avatar_url, display_name, email, first_name, id, last_name } = rowData.member;
   const isSuspended = rowData.is_active === false;
+  const isAgent = rowData.member.bot_type === "AGENT";
 
   return (
     <Disclosure>
@@ -80,7 +80,7 @@ export function NameColumn(props: NameProps) {
               </span>
             </div>
 
-            {!isSuspended && (isAdmin || id === currentUser?.id) && (
+            {!isSuspended && !isAgent && (isAdmin || id === currentUser?.id) && (
               <PopoverMenu
                 data={[""]}
                 keyExtractor={(item) => item}
@@ -128,13 +128,20 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
 
   // derived values
   const isCurrentUser = currentUser?.id === rowData.member.id;
+  const isAgent = rowData.member.bot_type === "AGENT";
   const isAdminRole = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const isRoleNonEditable = isCurrentUser || !isAdminRole;
+  const isRoleNonEditable = isAgent || isCurrentUser || !isAdminRole;
   const isSuspended = rowData.is_active === false;
 
   return (
     <>
-      {isSuspended ? (
+      {isAgent ? (
+        <div className="flex w-32">
+          <Pill variant={EPillVariant.DEFAULT} size={EPillSize.SM} className="border-none">
+            Agent
+          </Pill>
+        </div>
+      ) : isSuspended ? (
         <div className="flex w-32">
           <Pill variant={EPillVariant.DEFAULT} size={EPillSize.SM} className="border-none">
             Suspended

@@ -64,7 +64,6 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
   } = props;
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-  // popper-js refs
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
   // states
   const [isOpen, setIsOpen] = useState(false);
@@ -166,6 +165,7 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
       {...comboboxProps}
       className={cn("h-full", className)}
       onChange={dropdownOnChange}
+      onClose={handleClose}
       onKeyDown={handleKeyDown}
       button={comboButton}
       renderByDefault={renderByDefault}
