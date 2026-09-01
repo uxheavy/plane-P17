@@ -6,6 +6,7 @@ import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -41,6 +42,15 @@ from plane.tests.factories import (
     WorkspaceFactory,
     WorkspaceMemberFactory,
 )
+
+
+def install_agent_membership_guards():
+    operation = import_module(
+        "plane.db.migrations.0123_workspace_agent_membership"
+    ).Migration.operations[-1]
+    with connection.cursor() as cursor:
+        cursor.execute(operation.reverse_sql)
+        cursor.execute(operation.sql)
 
 
 @pytest.mark.django_db
@@ -498,6 +508,7 @@ class TestWorkspaceAgentMemberships:
         assert created.data["credential"].startswith("plane_api_")
 
     def test_database_guard_rejects_ordinary_agent_membership_deletes(self):
+        install_agent_membership_guards()
         created = self.apply()
         user_id = created["user_id"]
 
@@ -511,6 +522,7 @@ class TestWorkspaceAgentMemberships:
             assert model.objects.filter(**filters).exists()
 
     def test_database_guard_allows_lifecycle_and_parent_cascade_deletes(self):
+        install_agent_membership_guards()
         lifecycle_project = ProjectFactory(workspace=self.workspace)
         lifecycle = self.apply(
             {
