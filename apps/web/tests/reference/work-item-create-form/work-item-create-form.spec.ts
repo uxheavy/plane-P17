@@ -164,7 +164,7 @@ test("creates representative work items through the real interface", async ({ pa
     const signInResponse = page.waitForResponse(
       (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/auth/sign-in/"
     );
-    await page.getByRole("button", { name: "Go to workspace", exact: true }).click();
+    await page.getByRole("button", { name: /^(Continue|Go to workspace)$/ }).click();
     expect((await signInResponse).status()).toBe(302);
   });
 
