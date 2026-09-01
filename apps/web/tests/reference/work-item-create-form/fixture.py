@@ -24,7 +24,8 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
 )
-from plane.license.models import Instance
+from plane.license.models import Instance, InstanceConfiguration
+from plane.utils.cache import invalidate_cache_directly
 
 
 ACTION = os.environ.get("PLANE_REFERENCE_ACTION", "setup")
@@ -32,8 +33,8 @@ RUN_KEY = hashlib.sha256(os.environ["PLANE_REFERENCE_RUN_ID"].encode()).hexdiges
 SLUG = f"picker-reference-{RUN_KEY}"
 EMAIL = os.environ["PLANE_REFERENCE_EMAIL"]
 PASSWORD = os.environ["PLANE_REFERENCE_PASSWORD"]
-INSTANCE_SETUP_WAS_DONE = os.environ.get("PLANE_REFERENCE_INSTANCE_SETUP_WAS_DONE", "")
 MEMBER_PREFIX = f"picker-reference-member-{RUN_KEY}-"
+LOCK_KEY = "reference_work_item_create_form_lock"
 COUNTS = {
     "members": 500,
     "labels": 1000,
@@ -45,27 +46,82 @@ COUNTS = {
 
 
 def cleanup():
-    Workspace.objects.filter(slug=SLUG).delete(soft=False)
-    User.objects.filter(email=EMAIL).delete()
-    User.objects.filter(email__startswith=MEMBER_PREFIX).delete()
-    if INSTANCE_SETUP_WAS_DONE in {"true", "false"}:
-        instance = Instance.objects.first()
-        if instance is not None:
-            instance.is_setup_done = INSTANCE_SETUP_WAS_DONE == "true"
-            instance.save(update_fields=["is_setup_done", "updated_at"])
+    with transaction.atomic():
+        instance = Instance.objects.select_for_update().first()
+        claim = (
+            InstanceConfiguration.all_objects.select_for_update()
+            .filter(key=LOCK_KEY, deleted_at__isnull=True)
+            .first()
+        )
+        if claim is None:
+            return False
+
+        owner = json.loads(claim.value)
+        if owner["run_key"] != RUN_KEY:
+            raise RuntimeError(f"Reference fixture is owned by run {owner['run_key']}")
+        if instance is None or str(instance.id) != owner["instance_id"]:
+            raise RuntimeError("Reference fixture instance changed during the run")
+
+        Workspace.objects.filter(slug=SLUG).delete(soft=False)
+        User.objects.filter(email=EMAIL).delete()
+        User.objects.filter(email__startswith=MEMBER_PREFIX).delete()
+        instance.is_setup_done = owner["instance_setup_was_done"]
+        instance.save(update_fields=["is_setup_done", "updated_at"])
+        invalidate_cache_directly(path="/api/instances/", user=False)
+        claim.delete(soft=False)
+        return True
 
 
 def setup():
     with transaction.atomic():
-        cleanup()
-
         instance = Instance.objects.select_for_update().first()
         if instance is None:
             raise RuntimeError("Plane instance is not registered")
+        claim = (
+            InstanceConfiguration.all_objects.select_for_update()
+            .filter(key=LOCK_KEY)
+            .first()
+        )
+        if claim is not None:
+            if claim.deleted_at is None:
+                owner = json.loads(claim.value)
+                raise RuntimeError(
+                    f"Reference fixture is owned by run {owner['run_key']}"
+                )
+            claim.delete(soft=False)
+        collisions = [
+            name
+            for name, exists in (
+                ("workspace slug", Workspace.objects.filter(slug=SLUG).exists()),
+                ("reference email", User.objects.filter(email=EMAIL).exists()),
+                (
+                    "member email prefix",
+                    User.objects.filter(email__startswith=MEMBER_PREFIX).exists(),
+                ),
+            )
+            if exists
+        ]
+        if collisions:
+            raise RuntimeError(
+                f"Reference fixture identifiers already exist: {', '.join(collisions)}"
+            )
+
         instance_setup_was_done = instance.is_setup_done
+        InstanceConfiguration.objects.create(
+            key=LOCK_KEY,
+            value=json.dumps(
+                {
+                    "run_key": RUN_KEY,
+                    "instance_id": str(instance.id),
+                    "instance_setup_was_done": instance_setup_was_done,
+                }
+            ),
+            category="REFERENCE_TEST",
+        )
         if not instance_setup_was_done:
             instance.is_setup_done = True
             instance.save(update_fields=["is_setup_done", "updated_at"])
+            invalidate_cache_directly(path="/api/instances/", user=False)
 
         owner = User(
             email=EMAIL,
@@ -91,7 +147,9 @@ def setup():
             },
         )
 
-        workspace = Workspace.objects.create(name=f"Picker Reference {RUN_KEY}", slug=SLUG, owner=owner)
+        workspace = Workspace.objects.create(
+            name=f"Picker Reference {RUN_KEY}", slug=SLUG, owner=owner
+        )
         WorkspaceMember.objects.create(workspace=workspace, member=owner, role=20)
         project = Project.objects.create(
             name="High Cardinality Options",
@@ -101,7 +159,9 @@ def setup():
             module_view=True,
             cycle_view=True,
         )
-        ProjectMember.objects.create(project=project, workspace=workspace, member=owner, role=20)
+        ProjectMember.objects.create(
+            project=project, workspace=workspace, member=owner, role=20
+        )
 
         users = [
             User(
@@ -118,13 +178,25 @@ def setup():
             for index in range(COUNTS["members"] - 1)
         ]
         User.objects.bulk_create(users)
-        users = list(User.objects.filter(email__startswith=MEMBER_PREFIX).order_by("email"))
-        Profile.objects.bulk_create([Profile(user=user, is_onboarded=True) for user in users])
+        users = list(
+            User.objects.filter(email__startswith=MEMBER_PREFIX).order_by("email")
+        )
+        Profile.objects.bulk_create(
+            [Profile(user=user, is_onboarded=True) for user in users]
+        )
         WorkspaceMember.objects.bulk_create(
-            [WorkspaceMember(workspace=workspace, member=user, role=15) for user in users]
+            [
+                WorkspaceMember(workspace=workspace, member=user, role=15)
+                for user in users
+            ]
         )
         ProjectMember.objects.bulk_create(
-            [ProjectMember(project=project, workspace=workspace, member=user, role=15) for user in users]
+            [
+                ProjectMember(
+                    project=project, workspace=workspace, member=user, role=15
+                )
+                for user in users
+            ]
         )
 
         State.all_state_objects.bulk_create(
@@ -136,13 +208,17 @@ def setup():
                     slug=f"reference-state-{index:03d}",
                     color="#60646C",
                     sequence=index * 1000,
-                    group=["backlog", "unstarted", "started", "completed", "cancelled"][index % 5],
+                    group=["backlog", "unstarted", "started", "completed", "cancelled"][
+                        index % 5
+                    ],
                     default=index == 0,
                 )
                 for index in range(COUNTS["states"])
             ]
         )
-        project.default_state = State.objects.filter(project=project).order_by("sequence").first()
+        project.default_state = (
+            State.objects.filter(project=project).order_by("sequence").first()
+        )
 
         Label.objects.bulk_create(
             [
@@ -216,16 +292,24 @@ def setup():
 def assert_created_work_items():
     project = Project.objects.get(workspace__slug=SLUG, identifier="REF")
     minimal = Issue.objects.get(project=project, name="Reference minimal work item")
-    rich = Issue.objects.get(project=project, name="Reference high-cardinality work item")
+    rich = Issue.objects.get(
+        project=project, name="Reference high-cardinality work item"
+    )
     child = Issue.objects.get(project=project, name="Reference child work item")
 
     assert child.parent_id == minimal.id
     assert rich.state.name == "Reference State 049"
     assert rich.estimate_point.value == "49"
     assert list(rich.labels.values_list("name", flat=True)) == ["Reference Label 0999"]
-    assert list(rich.assignees.values_list("display_name", flat=True)) == ["Picker Member 0498"]
-    assert list(rich.issue_module.values_list("module__name", flat=True)) == ["Reference Module 0499"]
-    assert list(rich.issue_cycle.values_list("cycle__name", flat=True)) == ["Reference Cycle 0249"]
+    assert list(rich.assignees.values_list("display_name", flat=True)) == [
+        "Picker Member 0498"
+    ]
+    assert list(rich.issue_module.values_list("module__name", flat=True)) == [
+        "Reference Module 0499"
+    ]
+    assert list(rich.issue_cycle.values_list("cycle__name", flat=True)) == [
+        "Reference Cycle 0249"
+    ]
 
     return {
         "created": [minimal.name, rich.name, child.name],
@@ -246,8 +330,7 @@ if ACTION == "setup":
 elif ACTION == "assert":
     result = assert_created_work_items()
 elif ACTION == "cleanup":
-    cleanup()
-    result = {"cleaned": SLUG}
+    result = {"cleaned": SLUG, "owned": cleanup()}
 else:
     raise ValueError(f"Unknown PLANE_REFERENCE_ACTION: {ACTION}")
 

@@ -29,6 +29,7 @@ catalog:
   "@hypermod/utils": "^0.7.1"
   "@makeplane/propel": "0.2.0"
   "@popperjs/core": "^2.11.8"
+  "@playwright/test": "^1.62.1"
   "@radix-ui/react-scroll-area": "^1.2.3"
   "@react-pdf/renderer": "^4.8.1"
   "@react-pdf/types": "^2.13.1"

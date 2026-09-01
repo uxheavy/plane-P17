@@ -78,6 +78,9 @@ catalogs:
     '@popperjs/core':
       specifier: ^2.11.8
       version: 2.11.8
+    '@playwright/test':
+      specifier: ^1.62.1
+      version: 1.62.1
     '@react-pdf/renderer':
       specifier: ^4.8.1
       version: 4.8.1
@@ -1176,7 +1179,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@playwright/test':
-        specifier: ^1.62.1
+        specifier: 'catalog:'
         version: 1.62.1
       '@react-router/dev':
         specifier: 'catalog:'
