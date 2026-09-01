@@ -33,6 +33,23 @@ Reference-consumer scenarios live under `apps/web/tests/reference` and exercise 
 - Run web reference tests: `pnpm --filter=web test:reference`
 - Run one web test: `pnpm --filter=web test -- <path-under-apps/web>`
 
+## Feature shape acceptance
+
+- Green behavior, tests, and builds are necessary but not sufficient for a new
+  feature or material restructuring. Before handoff, inspect the actual source
+  owner and at least one adjacent Plane precedent for placement, naming, and
+  dependency direction.
+- Keep refining the affected feature until the diff introduces no known
+  structural debt: reusable names describe durable Plane capabilities, each
+  module has one coherent reason to change, route-facing interfaces stay small,
+  and vague helpers or pass-through modules do not hide ownership.
+- Split only when the implementation demonstrates distinct stable owners. Do
+  not split a cohesive module to meet a line-count target, invent speculative
+  layers, or refactor unrelated legacy code in pursuit of an abstract ideal.
+- A nested `AGENTS.md` is navigation only. Treat it as effective only when it
+  exists, and verify its owner pointers against the current source before
+  relying on them.
+
 ## Backend tests (Docker)
 
 The Django/pytest suite for `apps/api` runs in an isolated stack defined by `docker-compose-test.yml` at the repo root.
