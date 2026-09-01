@@ -52,7 +52,7 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   // states
   const [query, setQuery] = useState("");
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+  const [popperElement, setPopperElement] = useState<HTMLElement | null>(null);
   // plane hooks
   const { t } = useTranslation();
   // store hooks
