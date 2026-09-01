@@ -39,6 +39,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT", is_active=True, member__is_active=True))
             .select_related("member", "member__avatar_asset")
         )
 
@@ -75,9 +76,12 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
-        workspace_member = WorkspaceMember.objects.get(
-            pk=pk, workspace__slug=slug, member__is_bot=False, is_active=True
-        )
+        workspace_member = WorkspaceMember.objects.get(pk=pk, workspace__slug=slug, is_active=True)
+        if workspace_member.member.is_bot and workspace_member.member.bot_type == "AGENT":
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
         if request.user.id == workspace_member.member_id:
             return Response(
                 {"error": "You cannot update your own role"},
@@ -98,9 +102,12 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, slug, pk):
         # Check the user role who is deleting the user
-        workspace_member = WorkspaceMember.objects.get(
-            workspace__slug=slug, pk=pk, member__is_bot=False, is_active=True
-        )
+        workspace_member = WorkspaceMember.objects.get(workspace__slug=slug, pk=pk, is_active=True)
+        if workspace_member.member.is_bot and workspace_member.member.bot_type == "AGENT":
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # check requesting user role
         requesting_workspace_member = WorkspaceMember.objects.get(

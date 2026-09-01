@@ -6,7 +6,7 @@
 from django.utils import timezone
 from django.apps import apps
 from django.conf import settings
-from django.db import models
+from django.db import connection, models, transaction
 from django.db.models.fields.related import OneToOneRel
 
 
@@ -16,6 +16,16 @@ from celery import shared_task
 
 @shared_task
 def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
+    model_class = apps.get_model(app_label, model_name)
+    if model_class._meta.label_lower in {"db.workspace", "db.project"}:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+            return _soft_delete_related_objects(app_label, model_name, instance_pk, using)
+    return _soft_delete_related_objects(app_label, model_name, instance_pk, using)
+
+
+def _soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
     """
     Soft delete related objects for a given model instance
     """
@@ -135,10 +145,16 @@ def hard_delete():
 
     days = settings.HARD_DELETE_AFTER_DAYS
     # check delete workspace
-    _ = Workspace.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+        _ = Workspace.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
 
     # check delete project
-    _ = Project.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+        _ = Project.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
 
     # check delete cycle
     _ = Cycle.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()

@@ -230,7 +230,6 @@ class WorkspaceMember(BaseModel):
         """Return members of the workspace"""
         return f"{self.member.email} <{self.workspace.name}>"
 
-
 class WorkspaceMemberInvite(BaseModel):
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workspace_member_invite")
     email = models.CharField(max_length=255)

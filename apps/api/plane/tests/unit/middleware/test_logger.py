@@ -56,9 +56,7 @@ class TestAPITokenLogMiddleware:
     def test_token_identifier_is_hashed_not_plaintext(self, middleware, request_factory):
         log_data = self._captured_log_data(middleware, request_factory)
 
-        expected_hash = hmac.new(
-            settings.SECRET_KEY.encode(), self.API_KEY.encode(), hashlib.sha256
-        ).hexdigest()
+        expected_hash = hmac.new(settings.SECRET_KEY.encode(), self.API_KEY.encode(), hashlib.sha256).hexdigest()
         assert log_data["token_identifier"] == expected_hash
         assert self.API_KEY not in log_data["token_identifier"]
 
@@ -77,3 +75,14 @@ class TestAPITokenLogMiddleware:
         with patch("plane.middleware.logger.process_logs") as process_logs:
             middleware.process_request(request, HttpResponse(b"{}"), request_body=b"")
             assert not process_logs.delay.called
+
+    def test_response_credential_is_redacted(self, middleware, request_factory):
+        request = request_factory.get("/api/v1/workspaces/", HTTP_X_API_KEY=self.API_KEY)
+        request.user = AnonymousUser()
+        response = HttpResponse(b'{"credential":"plaintext","replayed":false}')
+        with patch("plane.middleware.logger.process_logs") as process_logs:
+            middleware.process_request(request, response, request_body=b"")
+
+        response_body = process_logs.delay.call_args.kwargs["log_data"]["response_body"]
+        assert "plaintext" not in response_body
+        assert "[REDACTED]" in response_body

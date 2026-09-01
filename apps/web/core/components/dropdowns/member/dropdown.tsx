@@ -30,7 +30,7 @@ export const MemberDropdown = observer(function MemberDropdown(props: TMemberDro
   const {
     getUserDetails,
     project: { getProjectMemberIds, fetchProjectMembers },
-    workspace: { workspaceMemberIds },
+    workspace: { workspaceMemberIds, fetchWorkspaceMembers },
   } = useMember();
 
   const memberIds = propsMemberIds
@@ -40,7 +40,11 @@ export const MemberDropdown = observer(function MemberDropdown(props: TMemberDro
       : workspaceMemberIds;
 
   const onDropdownOpen = () => {
-    if (!memberIds && projectId && workspaceSlug) fetchProjectMembers(workspaceSlug.toString(), projectId);
+    if (!workspaceSlug) return;
+    if (projectId) {
+      void fetchWorkspaceMembers(workspaceSlug.toString());
+      void fetchProjectMembers(workspaceSlug.toString(), projectId, true);
+    } else if (!propsMemberIds) void fetchWorkspaceMembers(workspaceSlug.toString());
   };
 
   return (

@@ -161,6 +161,15 @@ from plane.utils.openapi import (
 from plane.bgtasks.work_item_link_task import crawl_work_item_link_title
 
 
+def agent_author_override_error(request, *fields):
+    if request.user.is_bot and request.user.bot_type == "AGENT" and any(field in request.data for field in fields):
+        return Response(
+            {"error": "Agent authorship is derived from the authenticated user"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
+
+
 def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=None, allow_creator=True):
     if allow_creator and issue is not None and user_id == issue.created_by_id:
         return True
@@ -452,6 +461,8 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         Create a new work item in the specified project with the provided details.
         Supports external ID tracking for integration purposes.
         """
+        if error := agent_author_override_error(request, "created_by", "actor"):
+            return error
         project = Project.objects.get(pk=project_id)
 
         serializer = IssueSerializer(
@@ -1193,6 +1204,8 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
         Add a new external link to a work item with URL, title, and metadata.
         Automatically tracks link creation activity.
         """
+        if error := agent_author_override_error(request, "created_by", "actor"):
+            return error
         serializer = IssueLinkCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(project_id=project_id, issue_id=issue_id)
@@ -1452,6 +1465,8 @@ class IssueCommentListCreateAPIEndpoint(BaseAPIView):
         Add a new comment to a work item with HTML content.
         Supports external ID tracking for integration purposes.
         """
+        if error := agent_author_override_error(request, "created_by", "actor"):
+            return error
         # Validation check if the issue already exists
         if (
             request.data.get("external_id")

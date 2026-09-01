@@ -13,12 +13,11 @@ transformations.
 
 def preprocess_filter_api_v1_paths(endpoints):
     """
-    Filter OpenAPI endpoints to only include /api/v1/ paths and exclude PUT methods.
+    Filter OpenAPI endpoints to only include public /api/v1/ paths.
     """
     filtered = []
     for path, path_regex, method, callback in endpoints:
-        # Only include paths that start with /api/v1/ and exclude PUT methods
-        if path.startswith("/api/v1/") and method.upper() != "PUT" and "server" not in path.lower():
+        if path.startswith("/api/v1/") and "server" not in path.lower():
             filtered.append((path, path_regex, method, callback))
     return filtered
 

@@ -67,9 +67,11 @@ export const ActivityList = observer(function ActivityList(props: Props) {
                     <div className="min-w-0 flex-1">
                       <div>
                         <div className="text-11">
-                          {activityItem.actor_detail.is_bot
-                            ? activityItem.actor_detail.first_name + " Bot"
-                            : activityItem.actor_detail.display_name}
+                          {activityItem.actor_detail.bot_type === "AGENT"
+                            ? activityItem.actor_detail.display_name
+                            : activityItem.actor_detail.is_bot
+                              ? activityItem.actor_detail.first_name + " Bot"
+                              : activityItem.actor_detail.display_name}
                         </div>
                         <p className="mt-0.5 text-11 text-secondary">
                           Commented {calculateTimeAgo(activityItem.created_at)}
@@ -146,6 +148,8 @@ export const ActivityList = observer(function ActivityList(props: Props) {
                           <div className="text-13 break-words text-secondary">
                             {activityItem.field === "archived_at" && activityItem.new_value !== "restore" ? (
                               <span className="text-gray font-medium">Plane</span>
+                            ) : activityItem.actor_detail.bot_type === "AGENT" ? (
+                              <span className="text-gray font-medium">{activityItem.actor_detail.display_name}</span>
                             ) : activityItem.actor_detail.is_bot ? (
                               <span className="text-gray font-medium">{activityItem.actor_detail.first_name} Bot</span>
                             ) : (

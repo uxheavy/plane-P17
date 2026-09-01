@@ -29,6 +29,7 @@ export interface IUserLite {
   first_name: string;
   id: string;
   is_bot: boolean;
+  bot_type?: "AGENT" | "WORKSPACE_SEED" | null;
   last_name: string;
   joining_date?: string;
 }

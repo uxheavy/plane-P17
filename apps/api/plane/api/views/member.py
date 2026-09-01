@@ -5,6 +5,7 @@
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import Q
 from drf_spectacular.utils import (
     extend_schema,
     OpenApiResponse,
@@ -87,7 +88,11 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        workspace_members = WorkspaceMember.objects.filter(workspace__slug=slug).select_related("member")
+        workspace_members = (
+            WorkspaceMember.objects.filter(workspace__slug=slug)
+            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT", is_active=True, member__is_active=True))
+            .select_related("member")
+        )
 
         # Get all the users with their roles
         users_with_roles = []
@@ -140,12 +145,18 @@ class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
             )
 
         # Get the workspace members that are present inside the workspace
-        project_members = ProjectMember.objects.filter(project_id=project_id, workspace__slug=slug).values_list(
-            "member_id", flat=True
-        )
+        project_members = ProjectMember.objects.filter(
+            project_id=project_id,
+            workspace__slug=slug,
+            is_active=True,
+            member__is_active=True,
+        ).values_list("member_id", flat=True)
 
         # Get all the users that are present inside the workspace
-        users = UserLiteSerializer(User.objects.filter(id__in=project_members), many=True).data
+        users = UserLiteSerializer(
+            User.objects.filter(Q(is_bot=False) | Q(bot_type="AGENT"), id__in=project_members, is_active=True),
+            many=True,
+        ).data
         return Response(users, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -210,6 +221,11 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
     )
     def patch(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
+        if project_member.member.is_bot and project_member.member.bot_type == "AGENT":
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
         serializer = ProjectMemberSerializer(project_member, data=request.data, partial=True, context={"slug": slug})
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -225,6 +241,11 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
     )
     def delete(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
+        if project_member.member.is_bot and project_member.member.bot_type == "AGENT":
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
         project_member.is_active = False
         project_member.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -268,7 +289,14 @@ class WorkspaceMemberLiteAPIEndpoint(BaseAPIView):
             )
 
         workspace_members = (
-            WorkspaceMember.objects.filter(workspace__slug=slug).select_related("member").order_by("-created_at")
+            WorkspaceMember.objects.filter(
+                Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                workspace__slug=slug,
+                is_active=True,
+                member__is_active=True,
+            )
+            .select_related("member")
+            .order_by("-created_at")
         )
         return self.paginate(
             request=request,
@@ -321,7 +349,13 @@ class ProjectMemberLiteAPIEndpoint(BaseAPIView):
             )
 
         project_members = (
-            ProjectMember.objects.filter(project_id=project_id, workspace__slug=slug)
+            ProjectMember.objects.filter(
+                Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                project_id=project_id,
+                workspace__slug=slug,
+                is_active=True,
+                member__is_active=True,
+            )
             .select_related("member")
             .order_by("-created_at")
         )
