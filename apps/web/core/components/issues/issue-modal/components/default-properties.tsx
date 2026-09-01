@@ -25,7 +25,7 @@ import { ModuleDropdown } from "@/components/dropdowns/module/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 import { ParentIssuesListModal } from "@/components/issues/parent-issues-list-modal";
-import { IssueLabelSelect } from "@/components/issues/select";
+import { LabelDropdown } from "@/components/dropdowns/label";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
 import { useProjectEstimates } from "@/hooks/store/estimates";
@@ -147,7 +147,7 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
         name="label_ids"
         render={({ field: { value, onChange } }) => (
           <div className="h-7">
-            <IssueLabelSelect
+            <LabelDropdown
               value={value}
               onChange={(labelIds) => {
                 onChange(labelIds);

@@ -20,7 +20,7 @@ import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { ModuleDropdown } from "@/components/dropdowns/module/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { ParentIssuesListModal } from "@/components/issues/parent-issues-list-modal";
-import { IssueLabelSelect } from "@/components/issues/select";
+import { LabelDropdown } from "@/components/dropdowns/label";
 // helpers
 // hooks
 import { useProjectEstimates } from "@/hooks/store/estimates";
@@ -93,7 +93,7 @@ export const InboxIssueProperties = observer(function InboxIssueProperties(props
 
       {/* labels */}
       <div className="h-7">
-        <IssueLabelSelect
+        <LabelDropdown
           value={data?.label_ids || []}
           onChange={(labelIds) => handleData("label_ids", labelIds)}
           projectId={projectId}

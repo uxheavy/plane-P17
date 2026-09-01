@@ -44,7 +44,7 @@ import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
 import { useWorkspaceDraftIssues } from "@/hooks/store/workspace-draft";
 import { usePlatformOS } from "@/hooks/use-platform-os";
-import { useProjectIssueProperties } from "@/hooks/use-project-issue-properties";
+import { useProjectIssueProperties } from "@/hooks/project-issue-properties/use-project-issue-properties";
 
 export interface IssueFormProps {
   data?: Partial<TIssue>;

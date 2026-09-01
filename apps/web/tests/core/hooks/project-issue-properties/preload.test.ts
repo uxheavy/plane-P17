@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { preloadMissingProjectIssuePropertyOptions } from "../../../core/hooks/preload-project-issue-property-options";
+import { preloadMissingProjectIssuePropertyOptions } from "../../../../core/hooks/project-issue-properties/preload";
 
 const optionNames = ["states", "members", "labels", "cycles", "modules", "estimates"];
 

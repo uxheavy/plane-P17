@@ -4,14 +4,14 @@
  * See the LICENSE file for details.
  */
 
-import { useProjectEstimates } from "./store/estimates/use-project-estimate";
-import { useCycle } from "./store/use-cycle";
-import { useLabel } from "./store/use-label";
-import { useMember } from "./store/use-member";
-import { useModule } from "./store/use-module";
-import { useProject } from "./store/use-project";
-import { useProjectState } from "./store/use-project-state";
-import { preloadMissingProjectIssuePropertyOptions } from "./preload-project-issue-property-options";
+import { useProjectEstimates } from "../store/estimates/use-project-estimate";
+import { useCycle } from "../store/use-cycle";
+import { useLabel } from "../store/use-label";
+import { useMember } from "../store/use-member";
+import { useModule } from "../store/use-module";
+import { useProject } from "../store/use-project";
+import { useProjectState } from "../store/use-project-state";
+import { preloadMissingProjectIssuePropertyOptions } from "./preload";
 
 export const useProjectIssueProperties = () => {
   const { fetchProjectStates, getProjectStateIds } = useProjectState();

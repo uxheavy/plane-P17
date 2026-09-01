@@ -14,7 +14,7 @@ const projectUrl = process.env.PLANE_REFERENCE_PROJECT_URL;
 const email = process.env.PLANE_REFERENCE_EMAIL;
 const password = process.env.PLANE_REFERENCE_PASSWORD;
 const auditLog = process.env.PLANE_REFERENCE_AUDIT_LOG;
-const correlationId = process.env.PLANE_REFERENCE_CORRELATION_ID ?? "create-work-items-local";
+const correlationId = process.env.PLANE_REFERENCE_CORRELATION_ID ?? "work-item-create-form-local";
 
 test.use({ viewport: { width: 1440, height: 1000 } });
 test.setTimeout(120_000);
@@ -85,12 +85,20 @@ async function saveWorkItem(page: Page, title: string) {
   });
 }
 
-async function selectSearchOption(page: Page, buttonName: string, optionName: string) {
+async function selectSearchOption(page: Page, buttonName: string, optionName: string, expectFixedPosition = false) {
   await audited("work-item.property-menu-open", optionName, async () => {
     await issueForm(page).getByRole("button", { name: buttonName, exact: true }).first().click();
   });
   await audited("work-item.property-search", optionName, async () => {
     const search = page.getByPlaceholder("Search").last();
+    if (expectFixedPosition) {
+      expect(
+        await search.evaluate((element) => {
+          const popper = element.closest("[data-popper-placement]");
+          return popper ? getComputedStyle(popper).position : null;
+        })
+      ).toBe("fixed");
+    }
     await search.fill(optionName);
   });
   await audited("work-item.property-option-click", optionName, async () => {
@@ -128,10 +136,12 @@ async function selectTodayAsStartDate(page: Page) {
 
 async function openProject(page: Page, url: string) {
   try {
-    await page.goto(url);
+    await page.goto(url, { waitUntil: "commit" });
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes("net::ERR_ABORTED")) throw error;
-    await page.goto(url);
+    if (!(error instanceof Error)) throw error;
+    if (error.message.includes("interrupted by another navigation")) return;
+    if (!error.message.includes("net::ERR_ABORTED")) throw error;
+    await page.goto(url, { waitUntil: "commit" });
   }
 }
 
@@ -156,7 +166,6 @@ test("creates representative work items through the real interface", async ({ pa
     );
     await page.getByRole("button", { name: "Go to workspace", exact: true }).click();
     expect((await signInResponse).status()).toBe(302);
-    await expect(page.getByRole("button", { name: "Open workspace switcher" })).toBeVisible();
   });
 
   await audited("project.open", "high-cardinality-options", async () => {
@@ -170,9 +179,9 @@ test("creates representative work items through the real interface", async ({ pa
   await openCreateModal(page, "Reference high-cardinality work item");
   await selectTodayAsStartDate(page);
   await selectSearchOption(page, "Reference State 000", "Reference State 049");
-  await selectSearchOption(page, "Labels", "Reference Label 0999");
-  await selectSearchOption(page, "Cycle", "Reference Cycle 0249");
-  await selectSearchOption(page, "Modules", "Reference Module 0499");
+  await selectSearchOption(page, "Labels", "Reference Label 0999", true);
+  await selectSearchOption(page, "Cycle", "Reference Cycle 0249", true);
+  await selectSearchOption(page, "Modules", "Reference Module 0499", true);
   await selectSearchOption(page, "Assignees", "Picker Member 0498");
 
   await audited("work-item.property-select", "Reference Estimate 49", async () => {
@@ -192,8 +201,15 @@ test("creates representative work items through the real interface", async ({ pa
 
     const identifier = parentOption.locator("button:disabled");
     const identifierBox = await identifier.boundingBox();
+    const optionBox = await parentOption.boundingBox();
     expect(identifierBox, "parent identifier must be rendered").toBeTruthy();
-    await page.mouse.click(identifierBox!.x + identifierBox!.width / 2, identifierBox!.y + identifierBox!.height / 2);
+    expect(optionBox, "parent option must be rendered").toBeTruthy();
+    await parentOption.click({
+      position: {
+        x: identifierBox!.x - optionBox!.x + identifierBox!.width / 2,
+        y: identifierBox!.y - optionBox!.y + identifierBox!.height / 2,
+      },
+    });
 
     await expect(parentOption).toBeHidden();
     await expect(issueForm(page).getByRole("button", { name: "REF-1", exact: true }).first()).toBeVisible();

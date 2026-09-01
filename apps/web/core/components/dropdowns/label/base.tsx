@@ -23,7 +23,7 @@ import { IssueLabelsList } from "@/components/ui/labels-list";
 import { useDropdownKeyDown } from "@/hooks/use-dropdown-key-down";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 
-export type TWorkItemLabelSelectBaseProps = {
+export type TLabelDropdownBaseProps = {
   buttonClassName?: string;
   buttonContainerClassName?: string;
   createLabelEnabled?: boolean;
@@ -39,7 +39,7 @@ export type TWorkItemLabelSelectBaseProps = {
   value: string[];
 };
 
-export const WorkItemLabelSelectBase = observer(function WorkItemLabelSelectBase(props: TWorkItemLabelSelectBaseProps) {
+export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLabelDropdownBaseProps) {
   const {
     buttonClassName,
     buttonContainerClassName,
@@ -71,6 +71,15 @@ export const WorkItemLabelSelectBase = observer(function WorkItemLabelSelectBase
   // popper-js init
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
     placement: placement ?? "bottom-start",
+    strategy: "fixed",
+    modifiers: [
+      {
+        name: "preventOverflow",
+        options: {
+          padding: 12,
+        },
+      },
+    ],
   });
   // derived values
   const labelsList = labelIds.map((labelId) => getLabelById(labelId)).filter((label) => !!label);

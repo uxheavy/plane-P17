@@ -6,17 +6,19 @@
 set -euo pipefail
 
 repo_root=$(git rev-parse --show-toplevel)
-web_url=${PLANE_REFERENCE_WEB_URL:-http://localhost:3001}
+web_url=${PLANE_REFERENCE_WEB_URL:-}
 api_url=${PLANE_REFERENCE_API_URL:-http://localhost:8000}
 api_container=${PLANE_REFERENCE_API_CONTAINER:-}
-fixture="$repo_root/apps/web/tests/reference/provision_create_work_items.py"
+fixture="$repo_root/apps/web/tests/reference/work-item-create-form/fixture.py"
 audit_dir=${PLANE_REFERENCE_AUDIT_DIR:-$repo_root/output/playwright}
-correlation_id="create-work-items-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+correlation_id="work-item-create-form-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 audit_log="$audit_dir/$correlation_id.jsonl"
 reference_run_id=${PLANE_REFERENCE_RUN_ID:-$correlation_id}
 reference_email=${PLANE_REFERENCE_EMAIL:-$reference_run_id@example.test}
 reference_password=${PLANE_REFERENCE_PASSWORD:-PickerReference-2026}
 preview_pid=""
+web_port=""
+port_lock=""
 current_stage="suite.bootstrap"
 stage_open=0
 
@@ -25,7 +27,7 @@ mkdir -p "$audit_dir"
 audit() {
   local action=$1
   local outcome=$2
-  printf '{"timestamp":"%s","correlation_id":"%s","actor":{"type":"system","id":"reference-runner"},"action":"%s","target":{"type":"reference-suite","id":"create-work-items"},"outcome":"%s"}\n' \
+  printf '{"timestamp":"%s","correlation_id":"%s","actor":{"type":"system","id":"reference-runner"},"action":"%s","target":{"type":"reference-suite","id":"work-item-create-form"},"outcome":"%s"}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$correlation_id" "$action" "$outcome" >> "$audit_log"
 }
 
@@ -53,13 +55,38 @@ run_django() {
   fi
 }
 
+claim_web_port() {
+  local candidate=$1
+  local candidate_lock="${TMPDIR:-/tmp}/plane-reference-web-$candidate.lock"
+  mkdir "$candidate_lock" 2>/dev/null || return 1
+  if ! python3 -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1])))' "$candidate" 2>/dev/null; then
+    rmdir "$candidate_lock"
+    return 1
+  fi
+  printf '%s\n' "$$" > "$candidate_lock/owner"
+  web_port=$candidate
+  port_lock=$candidate_lock
+}
+
 cleanup() {
   local exit_code=$?
-  if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} != 1 ]]; then
-    run_django cleanup >/dev/null 2>&1 || true
+  if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} != 1 || $exit_code != 0 ]]; then
+    audit "fixture.cleanup" "started"
+    if run_django cleanup >/dev/null 2>&1; then
+      audit "fixture.cleanup" "success"
+    else
+      audit "fixture.cleanup" "failure"
+      exit_code=1
+    fi
   fi
   if [[ -n "$preview_pid" ]]; then
     kill "$preview_pid" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$port_lock" ]]; then
+    if [[ $(cat "$port_lock/owner" 2>/dev/null) == "$$" ]]; then
+      rm -f "$port_lock/owner"
+      rmdir "$port_lock" >/dev/null 2>&1 || true
+    fi
   fi
   if [[ $exit_code == 0 && $stage_open == 0 ]]; then
     audit "suite.run" "success"
@@ -75,6 +102,22 @@ cleanup() {
   exit "$exit_code"
 }
 trap cleanup EXIT
+
+if [[ -n "$web_url" ]]; then
+  claim_web_port "${web_url##*:}" || {
+    echo "Reference web port is already claimed: ${web_url##*:}" >&2
+    exit 1
+  }
+else
+  for candidate in ${PLANE_REFERENCE_WEB_PORTS:-3000 3001 3002 3100}; do
+    claim_web_port "$candidate" && break
+  done
+  if [[ -z "$web_port" ]]; then
+    echo "No reference web port is available in PLANE_REFERENCE_WEB_PORTS." >&2
+    exit 1
+  fi
+  web_url="http://localhost:$web_port"
+fi
 
 audit "suite.run" "started"
 begin_stage "api.readiness"
@@ -96,7 +139,7 @@ complete_stage
 begin_stage "web.preview"
 (
   cd "$repo_root/apps/web"
-  ./node_modules/.bin/vite preview --host 127.0.0.1 --port "${web_url##*:}"
+  ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
 ) >/tmp/plane-reference-preview.log 2>&1 &
 preview_pid=$!
 for _ in {1..60}; do
@@ -121,7 +164,7 @@ begin_stage "browser.install"
 complete_stage
 
 playwright_args=(
-  test tests/reference/create-work-items.spec.ts
+  test tests/reference/work-item-create-form/work-item-create-form.spec.ts
   --workers=1
   --reporter=line
   --trace=retain-on-failure
@@ -146,3 +189,8 @@ complete_stage
 begin_stage "fixture.assert-persisted"
 run_django assert | tail -1
 complete_stage
+
+if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} == 1 ]]; then
+  printf 'Reference review URL: %s\nReference email: %s\nReference password: %s\nReference run: %s\n' \
+    "$project_url" "$reference_email" "$reference_password" "$reference_run_id"
+fi
