@@ -9,9 +9,11 @@ import type { Request } from "express";
 import type { WebSocket } from "ws";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkMapAuthorization } from "@/services/work-map.service";
+import { workMapAuthorizationSchema } from "@/services/work-map.service";
 import { WorkMapRelay } from "@/services/work-map-relay";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_PROJECT_ID = "55555555-5555-4555-8555-555555555555";
 const WORK_MAP_ID = "22222222-2222-4222-8222-222222222222";
 const OTHER_WORK_MAP_ID = "33333333-3333-4333-8333-333333333333";
 const USER_ID = "44444444-4444-4444-8444-444444444444";
@@ -23,6 +25,7 @@ const authorization = (overrides: Partial<WorkMapAuthorization> = {}): WorkMapAu
   work_map_id: WORK_MAP_ID,
   sender_id: USER_ID,
   generation: 7,
+  collaboration_epoch: 2,
   readable: true,
   editable: true,
   is_locked: false,
@@ -87,9 +90,9 @@ class TestRedisConnection extends EventEmitter {
   async quit() {}
 }
 
-const request = (workMapId = WORK_MAP_ID, generation = 7) =>
+const request = (workMapId = WORK_MAP_ID, generation = 7, projectId = PROJECT_ID) =>
   ({
-    url: `/?workspaceSlug=workspace&projectId=${PROJECT_ID}&workMapId=${workMapId}&generation=${generation}`,
+    url: `/?workspaceSlug=workspace&projectId=${projectId}&workMapId=${workMapId}&generation=${generation}`,
     headers: { cookie: "session=test" },
   }) as Request;
 
@@ -112,6 +115,12 @@ const initializeRelay = async (
 };
 
 describe("WorkMapRelay", () => {
+  it("requires a nonnegative collaboration epoch in authorization", () => {
+    expect(() => workMapAuthorizationSchema.parse({ ...authorization(), collaboration_epoch: -1 })).toThrow();
+    expect(() => workMapAuthorizationSchema.parse({ ...authorization(), collaboration_epoch: undefined })).toThrow();
+    expect(workMapAuthorizationSchema.parse(authorization()).collaboration_epoch).toBe(2);
+  });
+
   it("does not accept frames before authorization and limits read-only viewers to awareness", async () => {
     let resolveAuthorization!: (value: WorkMapAuthorization) => void;
     const pendingAuthorization = new Promise<WorkMapAuthorization>((resolve) => {
@@ -180,10 +189,30 @@ describe("WorkMapRelay", () => {
     vi.useRealTimers();
   });
 
+  it("closes on collaboration epoch changes but not routine generation changes", async () => {
+    vi.useFakeTimers();
+    const bus = new TestRedisBus();
+    const authorize = vi
+      .fn()
+      .mockResolvedValueOnce(authorization())
+      .mockResolvedValueOnce(authorization({ generation: 8 }))
+      .mockResolvedValueOnce(authorization({ generation: 9, collaboration_epoch: 3 }));
+    const relay = await initializeRelay(bus, authorize);
+    const ws = websocket();
+    void relay.handleConnection(ws, request());
+    await vi.runAllTicks();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((ws as unknown as TestWebSocket).closed).toBeNull();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((ws as unknown as TestWebSocket).closed).toEqual({ code: 4409, reason: "Work map authority changed" });
+    await relay.destroy();
+    vi.useRealTimers();
+  });
+
   it("forwards validated frames across instances without self-echo or cross-room leakage", async () => {
     const bus = new TestRedisBus();
-    const authorize = vi.fn(async (_workspace: string, _project: string, workMapId: string) =>
-      authorization({ work_map_id: workMapId })
+    const authorize = vi.fn(async (_workspace: string, projectId: string, workMapId: string) =>
+      authorization({ project_id: projectId, work_map_id: workMapId })
     );
     const firstRelay = await initializeRelay(bus, authorize);
     const secondRelay = await initializeRelay(bus, authorize);
@@ -191,7 +220,7 @@ describe("WorkMapRelay", () => {
     const peer = websocket();
     const otherRoom = websocket();
     void firstRelay.handleConnection(sender, request());
-    void secondRelay.handleConnection(peer, request());
+    void secondRelay.handleConnection(peer, request(WORK_MAP_ID, 7, OTHER_PROJECT_ID));
     void secondRelay.handleConnection(otherRoom, request(OTHER_WORK_MAP_ID));
     await nextTurn();
     const senderSocket = sender as unknown as TestWebSocket;

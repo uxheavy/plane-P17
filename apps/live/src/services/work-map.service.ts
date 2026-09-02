@@ -14,6 +14,7 @@ export const workMapAuthorizationSchema = z.object({
   work_map_id: z.string().uuid(),
   sender_id: z.string().uuid(),
   generation: z.number().int().nonnegative(),
+  collaboration_epoch: z.number().int().nonnegative(),
   readable: z.literal(true),
   editable: z.boolean(),
   is_locked: z.boolean(),

@@ -20,6 +20,7 @@ from plane.app.views import (
     DuplicateAssetEndpoint,
     WorkspaceAssetDownloadEndpoint,
     ProjectAssetDownloadEndpoint,
+    WorkMapSceneAssetEndpoint,
 )
 
 
@@ -46,6 +47,16 @@ urlpatterns = [
         name="file-assets-restore",
     ),
     # V2 Endpoints
+    path(
+        "assets/v2/workspaces/<str:slug>/projects/<uuid:project_id>/work-maps/<uuid:work_map_id>/scene-assets/",
+        WorkMapSceneAssetEndpoint.as_view(),
+        name="work-map-scene-assets",
+    ),
+    path(
+        "assets/v2/workspaces/<str:slug>/projects/<uuid:project_id>/work-maps/<uuid:work_map_id>/scene-assets/<uuid:asset_id>/",
+        WorkMapSceneAssetEndpoint.as_view(),
+        name="work-map-scene-asset",
+    ),
     path(
         "assets/v2/workspaces/<str:slug>/",
         WorkspaceFileAssetEndpoint.as_view(),

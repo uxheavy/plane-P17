@@ -15,7 +15,7 @@ from plane.app.serializers import (
 from plane.db.models import WorkMapBinding
 
 from .base import BaseAPIView
-from .work_map import _visible_work_maps
+from .work_map.base import visible_work_maps
 
 
 def _source_projection(source_kind, source, project):
@@ -62,7 +62,7 @@ def _unavailable(node_key):
 
 
 def _visible_work_map(request, slug, project_id, work_map_id):
-    return _visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
+    return visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
 
 
 def _readable_bindings(*, request, document, node_keys):

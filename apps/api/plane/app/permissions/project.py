@@ -10,6 +10,25 @@ from plane.db.models import ProjectMember, WorkspaceMember
 from plane.db.models.project import ROLE
 
 
+def can_write_projects(*, user, workspace_id, project_ids):
+    project_ids = set(project_ids)
+    memberships = ProjectMember.objects.filter(
+        workspace_id=workspace_id,
+        project_id__in=project_ids,
+        project__archived_at__isnull=True,
+        member=user,
+        is_active=True,
+    )
+    if not WorkspaceMember.objects.filter(
+        workspace_id=workspace_id,
+        member=user,
+        role=ROLE.ADMIN.value,
+        is_active=True,
+    ).exists():
+        memberships = memberships.filter(role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value])
+    return set(memberships.values_list("project_id", flat=True)) == project_ids
+
+
 class ProjectBasePermission(BasePermission):
     def has_permission(self, request, view):
         if request.user.is_anonymous:
