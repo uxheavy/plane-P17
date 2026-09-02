@@ -152,7 +152,7 @@ On realtime loss:
   mutation. Socket reopen alone is insufficient.
 
 Only one unacknowledged full-scene update may enter a `sessionStorage` recovery
-record scoped to user, Work Map, generation, and a content-derived snapshot
+record scoped to user, Work Map, generation, and a request-specific snapshot
 identity. Durable acknowledgement removes the record only when that exact
 snapshot identity is still current. If a newer edit replaced the record while
 an older request was in flight, the acknowledgement advances the newer snapshot
