@@ -44,19 +44,22 @@ Subtype owners remain narrow:
 - Work Map owns exact collaborative scene content and the protected node-binding
   set described by ADR-0003.
 - PageVersion owns Page-specific rich-text snapshot payload.
-- WorkMapVersion owns exact Work Map binary content and a protected binding
+- WorkMapVersion owns exact Work Map scene content and a protected binding
   snapshot. One Document version identifies both parts; they restore atomically.
 
 Plane's existing asset system remains the authority for file bytes and access.
-Work Map collaborative content stores only asset references and Excalidraw file
-metadata, never a second authoritative byte store. Work Map duplication copies
-native assets using the established Page asset-duplication semantics and checks
-access through the new Document/project context.
+`FileAsset.document` is the shared owner link for current Page and Work Map
+assets. Work Map collaborative content stores only opaque `FileAsset` IDs and
+the Excalidraw file metadata needed to render them. It never stores asset bytes,
+`dataURL` values, signed download URLs, or credentials in the scene or relay.
+Materialized browser files are viewer-local and disposable.
 
-A retained Work Map version keeps every Plane asset reference required to render
-that historical scene reachable under the version viewer's document permission.
-Version retention never makes an asset public and never moves file bytes into
-the collaborative binary.
+`DocumentVersionAsset` is the single reachability record between a retained
+Document version and every `FileAsset` required by that version. It does not
+copy bytes. Resolving a historical asset always rechecks the viewer's current
+Document/project permission, so retaining a version neither makes an asset
+public nor creates another access owner. Page version callers migrate to the
+same link without changing Page IDs, routes, payloads, or asset behavior.
 
 This decision does not create a generic content-adapter registry. Shared
 lifecycle is one concrete owner; Page and Work Map content remain a closed
@@ -88,6 +91,19 @@ boundary, recovery is forward repair or database restore, never renewed dual
 ownership. The migration is incomplete until transitional storage and callers
 are removed and invariants prove one owner.
 
+The approved final cutover is destructive only after that caller proof and
+rollback window. It removes shared lifecycle columns from `Page`, retires
+`ProjectPage` as the association owner, and removes shared version identity,
+lifecycle, and asset ownership from `PageVersion`. It also removes legacy
+`FileAsset.page` lifecycle ownership: a temporarily retained Page API pointer
+must use `SET_NULL` and is non-authoritative, never cascading. Retaining its
+cascading delete would leave Page as a second asset-lifecycle owner after the
+cutover. `Page` and `PageVersion` remain as rich-text subtype owners on the same
+preserved IDs; `Document`, Document project associations, Document versions, and
+`DocumentVersionAsset` are their sole shared owners. The contraction is not
+optional compatibility debt and does not create ID translation or a replacement
+Page route.
+
 ### Shared lifecycle semantics
 
 Page behavior is the source of truth:
@@ -117,20 +133,66 @@ the source entity independently authorizes.
 ### Duplication and versions
 
 Duplicating a Work Map is one aggregate operation. It creates a new Document
-and Work Map identity, copies scene content and assets, issues target-map-owned
-opaque binding keys for the same authoritative sources, and applies Page
+and Work Map identity, copies every referenced asset to a target-owned
+`FileAsset` and storage key, rewrites the copied scene to those asset IDs while
+preserving Excalidraw file IDs and structure, issues target-map-owned opaque
+binding keys for the same authoritative sources, and applies Page
 duplication defaults for owner, access, and projects. Source access is evaluated
 again for every viewer of the duplicate. The operation exposes one complete
 duplicate or no duplicate; a partial scene, binding set, or asset copy is never
-visible.
+visible. Failed storage copies are compensated before failure when storage
+permits it. If compensation itself fails, the request still exposes no
+duplicate and retains the `WorkMapDuplicateOperation` receipt and lease state
+needed to retry idempotent cleanup; it never discards the only owner of copied
+objects.
 
 Version restoration follows the Page product experience: the selected version
 becomes current content through the live editor and later history remains
-available. Work Map binary and protected binding snapshot become current in one
-transaction and one new generation. A client can never observe a restored scene
-paired with bindings from another version. Restore failure leaves the prior
-binary, binding set, generation, current asset reachability, and historical
-asset reachability unchanged.
+available. Work Map scene and protected binding snapshot become current in one
+transaction and one new generation. The restored scene reuses the retained
+`DocumentVersionAsset` references rather than copying bytes. A client can never
+observe a restored scene paired with bindings or assets from another version.
+Restore failure leaves the prior scene, binding set, generation, current asset
+reachability, and historical asset reachability unchanged.
+
+### Durable multi-step operations
+
+The database transaction remains the visibility boundary, but uploads, object
+copies, and client-mediated carrier insertion can cross that boundary. V0
+therefore adds four narrow operation owners instead of a generic job or workflow
+registry:
+
+- `WorkMapBindingPlacement` owns one newly created binding until its native
+  carrier is durably inserted or the placement is cancelled;
+- `WorkMapSceneAssetPlacement` owns one newly uploaded Work Map asset until a
+  durable scene generation references it or the placement is cancelled. The
+  same placement owner protects every target-owned asset copied by a cross-map
+  paste after the copy transaction commits and before the pasted scene is
+  durably acknowledged;
+- `WorkMapPasteRebinding` owns the complete source-to-target key replacement for
+  one cross-map paste before any pasted element enters the target scene; and
+- `WorkMapDuplicateOperation` owns one whole-map duplicate, including its target
+  Document, scene, bindings, assets, and version reachability.
+
+Each operation has one accountable owner, an idempotency identity, a renewable
+bounded lease, explicit terminal state, and enough receipts to retry or clean up
+only the resources it created. A claimant may resume an expired lease but may
+not steal an active one. Success becomes visible once; failure and lease-expiry
+cleanup are idempotent. Crash recovery removes orphan binding placements,
+finalized-but-unreferenced Work Map uploads, incomplete paste rebinding, staged
+object copies, and incomplete duplicate aggregates without touching
+pre-existing resources. These records are not a second scene, binding, asset,
+or workflow authority and are retained only for the bounded recovery window
+required to prove cleanup.
+
+A paste operation may become terminal after its source-to-target replacement is
+committed because each copied asset then has its own
+`WorkMapSceneAssetPlacement` receipt. Scene acknowledgement removes those
+placements; lease-expiry cleanup reclaims copied assets that never enter a
+durable scene. Terminal operation and acknowledged placement receipts remain
+queryable only for the configured idempotency/recovery window and are then
+deleted by bounded maintenance. Pending cleanup receipts and asset object names
+are never age-deleted before their owned external cleanup succeeds.
 
 Work Map V0 adds no activity/compliance subsystem. Creator, last editor,
 timestamps, and versions provide document-state attribution. Presence, cursors,

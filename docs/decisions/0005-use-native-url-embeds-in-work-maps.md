@@ -27,6 +27,19 @@ Work Map preserves Excalidraw's native Web Embed tool, click-drag link editor,
 URL parsing, intrinsic sizing, paste/drop, sandbox, and click-to-interact
 behavior. Plane does not implement a parallel URL insertion or gesture path.
 
+The Excalidraw fork adds exactly two generic host controls:
+
+- `shouldLoadEmbeddable(element)` is a pure render-time predicate. `false`
+  preserves the native placeholder and does not mount host-rendered or iframe
+  content; it does not change native interaction activation.
+- `onEmbeddableLoadRequest(element)` is called only from Excalidraw's native
+  click/tap activation gesture for an unloaded Web Embed. The host may then
+  change the state used by `shouldLoadEmbeddable`.
+
+These props contain no Plane permission, document, origin-policy, or persistence
+concept. Excalidraw remains the interaction and rendering owner; Plane supplies
+only its host policy.
+
 Override provider eligibility so every syntactically valid `http` or `https`
 URL may use Excalidraw's native generic iframe fallback. Non-web schemes are
 rejected. Provider transformation remains useful but is not an allowlist.
@@ -45,13 +58,58 @@ being represented as successful content.
 - Changing URL origin resets document enablement to inert. A same-origin path or
   query change does not reset solely because the full URL changed.
 - Excalidraw native duplication copies the node-owned enablement with the node.
+- Any cross-document paste or whole-document duplicate removes
+  `customData.enabledOrigin` before insertion. Same-document duplication may
+  retain it; a new target document always requires its own explicit enablement.
+
+Plane stores document enablement as `customData.enabledOrigin` on the native
+embeddable element. It is enabled only when that exact normalized HTTP(S) origin
+matches the element's current URL origin. The viewer-session key is the tuple of
+Work Map Document ID, native element ID, and normalized origin and exists only
+in the current browser session; it never enters the scene, API, relay, version,
+or persistent browser storage.
+
+Plane's `shouldLoadEmbeddable` returns true for a validated protected Plane
+carrier, because that path renders an authorized Plane projection rather than
+an arbitrary origin. For a native URL embed it returns true only when either
+`enabledOrigin` matches or the current viewer session contains that
+document/element/origin tuple, and only when the origin is outside Plane's
+credential scope. Credential scope includes the configured Plane application
+and API origins and any host equal to or beneath the configured session-cookie
+domain. Native URL embeds in that scope remain inert; a protected Plane carrier
+is the only supported way to render authenticated Plane content. On
+`onEmbeddableLoadRequest`, a currently authorized editor writes the normalized
+origin to `enabledOrigin` through the normal scene mutation and durability path.
+A read-only viewer adds only the viewer-session tuple. If edit authority is lost
+before persistence, document enablement fails closed and the viewer may still
+choose the ephemeral session load. Changing origin makes both old forms
+inapplicable without requiring iframe cooperation. On every cross-origin URL
+edit, Plane removes `enabledOrigin` from the element and clears every
+viewer-session grant for that Document/element before accepting the new URL.
+Returning later to a previously enabled origin therefore requires a new native
+load gesture; stale grants never reactivate.
+
+The protected-carrier exception requires the internal carrier link and opaque
+`nodeKey` already validated by the Work Map scene API. It never authorizes an
+external iframe URL and remains subject to source hydration authorization and
+the uniform unavailable tombstone.
 
 Every arbitrary URL starts as an inert domain-labelled shell. Only a user with
 current Work Map edit permission may persist enablement. The enabled iframe uses
-the existing Excalidraw sandbox and referrer policy; Plane must not add
-permissions or weaken either to make a destination work. Plane never forwards
+the existing Excalidraw sandbox and referrer policy plus a browser-enforced
+credentialless navigation boundary that suppresses credentials across the full
+redirect chain. Plane must not add permissions or weaken either to make a
+destination work. If the current browser cannot provide that redirect-safe
+credential boundary, arbitrary URL content remains inert with an open-link
+fallback; initial-origin validation alone is insufficient. Plane never forwards
 Plane authentication headers, cookies, tokens, or credentials to the embed
 origin and never server-fetches or proxies arbitrary embed URLs.
+
+The selected primitive follows the
+[iframe credentialless specification](https://wicg.github.io/anonymous-iframe/):
+the iframe subtree receives a fresh ephemeral network and storage context rather
+than the user's existing origin credentials. The fallback above remains
+mandatory because this primitive is not a universal browser baseline.
 
 ### Interaction and map state
 
@@ -86,15 +144,25 @@ and a separate decision because it changes document and browser behavior.
   inert-first behavior, explicit interaction, canvas pan/select around and over
   the node, document-wide enablement, temporary viewer load, origin reset, and
   native duplication.
+- Excalidraw package tests must prove the two generic props preserve the native
+  placeholder, request loading only from native click/tap, never mount custom or
+  iframe content while denied, and leave activation behavior native after load.
+- Plane tests must prove exact-origin `enabledOrigin`, Document/element/origin
+  viewer-session scoping, origin-change reset, editor persistence through the
+  scene contract, and absence of viewer-session state from every durable or
+  collaborative payload.
 - Tests must prove editor versus read-only persistence authority and scene
   mutation gating while iframe interaction remains available.
 - URL validation must reject non-web schemes; sandbox attributes must compare to
   the exact native Excalidraw baseline.
+- URL validation must reject Plane credential-scoped origins, including a
+  configured session-cookie parent domain, while leaving unrelated HTTP(S)
+  origins eligible for explicit enablement.
 - A controlled frame-allowed page and controlled CSP/X-Frame-Options-denied page
   must produce distinct honest visible outcomes; a controlled slow destination
   must prove the canvas remains interactive.
 - Browser request inspection must prove no Plane credential reaches the embed
-  origin and no Plane server proxies the request.
+  origin or any redirected destination and no Plane server proxies the request.
 - The ADR-0006 performance envelope must run five embeds before any optimization
   is proposed.
 
