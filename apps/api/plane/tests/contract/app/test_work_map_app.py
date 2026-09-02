@@ -138,9 +138,10 @@ def _source_records(workspace, project, user):
 class TestWorkMapApp:
     def test_relay_force_close_publishes_only_after_commit(self, django_capture_on_commit_callbacks):
         redis_client = Mock()
+        redis_factory = Mock(return_value=redis_client)
         work_map_id = uuid.UUID("22222222-2222-4222-8222-222222222222")
         with (
-            patch("plane.app.work_map_relay.redis_instance", return_value=redis_client),
+            patch("plane.app.work_map_relay.redis_instance", redis_factory),
             django_capture_on_commit_callbacks(execute=True),
         ):
             force_close_work_map_relay_on_commit(
@@ -150,6 +151,7 @@ class TestWorkMapApp:
             )
             redis_client.publish.assert_not_called()
 
+        redis_factory.assert_called_once_with(socket_connect_timeout=1, socket_timeout=1)
         redis_client.publish.assert_called_once_with(
             "work-map:control",
             f'{{"type":"FORCE_CLOSE","workspaceSlug":"workspace","workMapId":"{work_map_id}",'
@@ -170,13 +172,17 @@ class TestWorkMapApp:
         archive_url = f"{work_map_url}archive/"
 
         with patch("plane.app.views.work_map.base.force_close_work_map_relay_on_commit") as force_close:
+            assert (
+                session_client.patch(work_map_url, {"access": Document.PRIVATE_ACCESS}, format="json").status_code
+                == 200
+            )
             assert session_client.post(lock_url).status_code == status.HTTP_204_NO_CONTENT
             assert session_client.delete(lock_url).status_code == status.HTTP_204_NO_CONTENT
             assert session_client.post(archive_url).status_code == status.HTTP_200_OK
             assert session_client.delete(archive_url).status_code == status.HTTP_204_NO_CONTENT
             assert session_client.delete(work_map_url).status_code == status.HTTP_204_NO_CONTENT
 
-        assert force_close.call_count == 5
+        assert force_close.call_count == 6
         for invocation in force_close.call_args_list:
             assert invocation.args == (
                 workspace.slug,

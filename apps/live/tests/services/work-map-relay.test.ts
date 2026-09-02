@@ -142,6 +142,7 @@ describe("WorkMapRelay", () => {
 
     resolveAuthorization(authorization({ editable: false }));
     await nextTurn();
+    await nextTurn();
     ws.emit("message", Buffer.from('{"type":"PRESENCE_UPDATE","payload":{"state":"active"}}'), false);
     ws.emit(
       "message",
@@ -185,6 +186,7 @@ describe("WorkMapRelay", () => {
     const authorize = vi
       .fn()
       .mockResolvedValueOnce(authorization({ editable: false }))
+      .mockResolvedValueOnce(authorization({ editable: false }))
       .mockResolvedValueOnce(authorization({ editable: false, is_locked: true }));
     const relay = await initializeRelay(bus, authorize);
     const ws = websocket();
@@ -192,7 +194,7 @@ describe("WorkMapRelay", () => {
     await vi.runAllTicks();
     await vi.advanceTimersByTimeAsync(15_000);
 
-    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(authorize).toHaveBeenCalledTimes(3);
     expect((ws as unknown as TestWebSocket).closed?.code).toBe(4403);
     await relay.destroy();
     vi.useRealTimers();
@@ -203,6 +205,7 @@ describe("WorkMapRelay", () => {
     const bus = new TestRedisBus();
     const authorize = vi
       .fn()
+      .mockResolvedValueOnce(authorization())
       .mockResolvedValueOnce(authorization())
       .mockResolvedValueOnce(authorization({ generation: 8 }))
       .mockResolvedValueOnce(authorization({ generation: 9, collaboration_epoch: 3 }));
@@ -217,6 +220,25 @@ describe("WorkMapRelay", () => {
     expect(bus.published.some(({ channel }) => channel === "work-map:control")).toBe(false);
     await relay.destroy();
     vi.useRealTimers();
+  });
+
+  it("reauthorizes after joining so an in-flight authority change cannot escape force-close", async () => {
+    const bus = new TestRedisBus();
+    const authorize = vi
+      .fn()
+      .mockResolvedValueOnce(authorization())
+      .mockResolvedValueOnce(authorization({ collaboration_epoch: 3, editable: false }));
+    const relay = await initializeRelay(bus, authorize);
+    const socket = websocket();
+
+    await relay.handleConnection(socket, request());
+
+    expect((socket as unknown as TestWebSocket).closed).toEqual({
+      code: 4409,
+      reason: "Work map changed while connecting",
+    });
+    expect((socket as unknown as TestWebSocket).sent).toHaveLength(0);
+    await relay.destroy();
   });
 
   it("force closes one Work Map across instances without closing another map", async () => {

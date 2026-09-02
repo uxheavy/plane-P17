@@ -177,10 +177,22 @@ class WorkMapViewSet(BaseViewSet):
                 return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
             if "access" in serializer.validated_data and document.owned_by_id != request.user.id:
                 return Response({"error": "Only the owner can change access"}, status=status.HTTP_403_FORBIDDEN)
+            access_changed = (
+                "access" in serializer.validated_data and serializer.validated_data["access"] != document.access
+            )
             for field, value in serializer.validated_data.items():
                 setattr(document, field, value)
             document.updated_by = request.user
             document.save(update_fields=[*serializer.validated_data.keys(), "updated_by", "updated_at"])
+            if access_changed:
+                work_map = WorkMap.objects.select_for_update().get(pk=document.id)
+                work_map.collaboration_epoch += 1
+                work_map.save(update_fields=["collaboration_epoch"])
+                force_close_work_map_relay_on_commit(
+                    slug,
+                    str(work_map.pk),
+                    WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+                )
         return Response(serialize_work_map(document), status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])

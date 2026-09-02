@@ -82,11 +82,11 @@ export type WorkMapRelaySubscriber = {
   unsubscribe(channel: string): Promise<unknown>;
   on(event: "message", listener: (channel: string, message: string) => void): unknown;
   on(event: "close", listener: () => void): unknown;
-  on(event: "error", listener: () => void): unknown;
+  on(event: "error", listener: (error: Error) => void): unknown;
   on(event: "ready", listener: () => void): unknown;
   removeListener(event: "message", listener: (channel: string, message: string) => void): unknown;
   removeListener(event: "close", listener: () => void): unknown;
-  removeListener(event: "error", listener: () => void): unknown;
+  removeListener(event: "error", listener: (error: Error) => void): unknown;
   removeListener(event: "ready", listener: () => void): unknown;
   quit(): Promise<unknown>;
 };
@@ -170,6 +170,27 @@ export class WorkMapRelay {
       const room = workMapRoomName(authorization);
       const connectionId = randomUUID();
       await this.join(room, ws, connectionId);
+      const joinedAuthorization = await this.authorizer(
+        connection.workspaceSlug,
+        connection.projectId,
+        connection.workMapId,
+        cookie
+      );
+      if (
+        joinedAuthorization.workspace_slug !== authorization.workspace_slug ||
+        joinedAuthorization.project_id !== authorization.project_id ||
+        joinedAuthorization.work_map_id !== authorization.work_map_id ||
+        joinedAuthorization.generation !== authorization.generation ||
+        joinedAuthorization.collaboration_epoch !== authorization.collaboration_epoch ||
+        joinedAuthorization.readable !== authorization.readable ||
+        joinedAuthorization.editable !== authorization.editable ||
+        joinedAuthorization.is_locked !== authorization.is_locked ||
+        joinedAuthorization.archived_at !== authorization.archived_at
+      ) {
+        await this.leave(room, ws);
+        ws.close(4409, "Work map changed while connecting");
+        return;
+      }
       ws.send(
         JSON.stringify({ type: "ready", generation: authorization.generation, editable: authorization.editable })
       );
@@ -322,8 +343,8 @@ export class WorkMapRelay {
     for (const socket of sockets) socket.close(1011, "Realtime subscription lost");
   };
 
-  private handleSubscriberError = () => {
-    logger.error("WORK_MAP_RELAY: Redis subscriber error");
+  private handleSubscriberError = (error: Error) => {
+    logger.error("WORK_MAP_RELAY: Redis subscriber error", error);
   };
 
   private handleSubscriberReady = () => {

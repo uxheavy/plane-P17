@@ -1,3 +1,6 @@
+# Copyright (c) 2026-present Ngo Quoc Huy
+# SPDX-License-Identifier: AGPL-3.0-only
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
@@ -36,6 +39,6 @@ def force_close_work_map_relay_on_commit(
     )
 
     def publish() -> None:
-        redis_instance().publish(WORK_MAP_CONTROL_CHANNEL, message)
+        redis_instance(socket_connect_timeout=1, socket_timeout=1).publish(WORK_MAP_CONTROL_CHANNEL, message)
 
     transaction.on_commit(publish, robust=True)
