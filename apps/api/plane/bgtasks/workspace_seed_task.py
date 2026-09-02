@@ -34,7 +34,7 @@ from plane.db.models import (
     IssueSequence,
     IssueActivity,
     Page,
-    ProjectPage,
+    DocumentProject,
     Cycle,
     Module,
     CycleIssue,
@@ -377,10 +377,10 @@ def create_pages(workspace: Workspace, project_map: Dict[int, uuid.UUID], bot_us
 
         logger.info(f"Task: workspace_seed_task -> Page {page_id} created")
         if page_seed.get("project_id") and page_seed.get("type") == "PROJECT":
-            project_page = ProjectPage(
+            project_page = DocumentProject(
                 workspace_id=workspace.id,
                 project_id=project_map[page_seed.get("project_id")],
-                page_id=page.id,
+                document_id=page.id,
                 created_by_id=bot_user.id,
                 updated_by_id=bot_user.id,
             )

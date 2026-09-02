@@ -3,11 +3,9 @@
 # See the LICENSE file for details.
 
 import base64
-import importlib
 import uuid
 
 import pytest
-from django.apps import apps as django_apps
 from django.utils import timezone
 from rest_framework import status
 
@@ -23,7 +21,6 @@ from plane.db.models import (
     Page,
     Project,
     ProjectMember,
-    ProjectPage,
     State,
     WorkMap,
     WorkMapBinding,
@@ -83,7 +80,7 @@ def _source_records(workspace, project, user):
         query={},
     )
     page = Page.objects.create(workspace=workspace, owned_by=user, name="Page")
-    ProjectPage.objects.create(workspace=workspace, project=project, page=page)
+    DocumentProject.objects.create(workspace=workspace, project=project, document=page)
     intake = Intake.objects.create(project=project, workspace=workspace, name="Intake")
     intake_item = IntakeIssue.objects.create(project=project, workspace=workspace, intake=intake, issue=issue)
     return {
@@ -99,28 +96,6 @@ def _source_records(workspace, project, user):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestWorkMapApp:
-    def test_page_backfill_preserves_page_and_project_link_ids(self, workspace, create_user):
-        project, _ = _project(workspace, create_user, "LEG")
-        page = Page.objects.create(workspace=workspace, owned_by=create_user, name="Legacy page")
-        active_link = ProjectPage.objects.create(workspace=workspace, project=project, page=page)
-        deleted_link = ProjectPage.objects.create(
-            workspace=workspace,
-            project=project,
-            page=page,
-            deleted_at=timezone.now(),
-        )
-
-        migration = importlib.import_module("plane.db.migrations.0123_document_work_map")
-        migration.backfill_page_documents(django_apps, None)
-        migration.backfill_page_documents(django_apps, None)
-
-        document = Document.objects.get(pk=page.id)
-        links = DocumentProject._base_manager.filter(document=document).order_by("id")
-        assert document.id == page.id
-        assert set(links.values_list("id", flat=True)) == {active_link.id, deleted_link.id}
-        assert links.get(pk=active_link.id).deleted_at is None
-        assert links.get(pk=deleted_link.id).deleted_at == deleted_link.deleted_at
-
     def test_create_uses_one_document_and_work_map_id(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "MAP")
 

@@ -33,7 +33,7 @@ from plane.db.models import (
     CycleIssue,
     ModuleIssue,
     Page,
-    ProjectPage,
+    DocumentProject,
     PageLabel,
     Intake,
     IntakeIssue,
@@ -226,7 +226,7 @@ def create_pages(workspace, project, user_id, pages_count):
     for _ in range(0, pages_count):
         text = fake.text(max_nb_chars=60000)
         pages.append(
-            Page(
+            Page.objects.create(
                 name=fake.name(),
                 workspace=workspace,
                 owned_by_id=user_id,
@@ -237,11 +237,8 @@ def create_pages(workspace, project, user_id, pages_count):
                 is_locked=False,
             )
         )
-    # Bulk create pages
-    pages = Page.objects.bulk_create(pages, ignore_conflicts=True)
-    # Add Page to project
-    ProjectPage.objects.bulk_create(
-        [ProjectPage(page=page, project=project, workspace=workspace) for page in pages],
+    DocumentProject.objects.bulk_create(
+        [DocumentProject(document_id=page.id, project=project, workspace=workspace) for page in pages],
         batch_size=1000,
     )
 

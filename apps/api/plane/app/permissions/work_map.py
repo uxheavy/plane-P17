@@ -5,7 +5,7 @@
 from django.db.models import Q
 
 from plane.app.permissions import ROLE
-from plane.db.models import Cycle, IntakeIssue, Issue, IssueView, Module, Page, ProjectPage
+from plane.db.models import Cycle, Document, DocumentProject, IntakeIssue, Issue, IssueView, Module, Page
 
 
 def _readable_project_sources(queryset, *, user, workspace_id, feature=None, guest_owner_field=None):
@@ -73,28 +73,33 @@ def readable_work_map_sources(*, user, workspace_id, source_kind, source_ids=Non
         ).select_related("issue", "issue__state")
         name_field = "issue__name"
     elif source_kind == "page":
-        links = ProjectPage.objects.filter(
+        links = DocumentProject.objects.filter(
             workspace_id=workspace_id,
             deleted_at__isnull=True,
-            page__deleted_at__isnull=True,
+            document__kind=Document.Kind.PAGE,
+            document__deleted_at__isnull=True,
             project__archived_at__isnull=True,
             project__page_view=True,
             project__project_projectmember__member=user,
             project__project_projectmember__is_active=True,
-        ).filter(Q(page__owned_by=user) | Q(page__access=Page.PUBLIC_ACCESS))
+        ).filter(Q(document__owned_by=user) | Q(document__access=Page.PUBLIC_ACCESS))
         if source_ids is not None:
-            links = links.filter(page_id__in=source_ids)
+            links = links.filter(document_id__in=source_ids)
         if query:
-            links = links.filter(page__name__icontains=query)
-        links = links.select_related("page", "project").order_by("page__name", "page_id", "project_id").distinct()
+            links = links.filter(document__name__icontains=query)
+        links = (
+            links.select_related("document", "document__page", "project")
+            .order_by("document__name", "document_id", "project_id")
+            .distinct()
+        )
         if limit is not None:
             links = links[:limit]
         seen = set()
         results = []
         for link in links:
-            if link.page_id not in seen:
-                seen.add(link.page_id)
-                results.append((link.page, link.project))
+            if link.document_id not in seen:
+                seen.add(link.document_id)
+                results.append((link.document.page, link.project))
         return results
     else:
         return []
