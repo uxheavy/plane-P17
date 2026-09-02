@@ -5,11 +5,7 @@
 
 import { useMemo } from "react";
 import { useTranslation } from "@plane/i18n";
-import type {
-  EditorShortcut,
-  HostToolbarItem,
-  ToolShortcutOverrides,
-} from "@excalidraw/excalidraw/types";
+import type { EditorShortcut, HostToolbarItem, ToolShortcutOverrides } from "@excalidraw/excalidraw/types";
 import type { TWorkMapSourceKind } from "@plane/types";
 import { Boxes, ListTodo } from "lucide-react";
 
@@ -24,7 +20,7 @@ const SOURCE_KIND_KEYS: Record<TWorkMapSourceKind, string> = {
 
 export const WORK_MAP_TOOL_SHORTCUTS: ToolShortcutOverrides = {
   diamond: [{ key: "3" }],
-  freedraw: ["D", "B", "X", "P"].map((key): EditorShortcut => ({ key })),
+  freedraw: ["D", "B", "X", "P", "7"].map((key): EditorShortcut => ({ key })),
   autoshape: [{ key: "X", shiftKey: true }],
   bucketfill: [],
 };
@@ -33,12 +29,14 @@ type ToolbarProps = {
   editable: boolean;
   sourceKind: TWorkMapSourceKind | null;
   onSelectSourceKind: (sourceKind: TWorkMapSourceKind) => void;
+  onCancelSourceTool: () => void;
 };
 
 export function useWorkMapToolbarItems({
   editable,
   sourceKind,
   onSelectSourceKind,
+  onCancelSourceTool,
 }: ToolbarProps): readonly HostToolbarItem[] {
   const { t } = useTranslation();
 
@@ -52,6 +50,7 @@ export function useWorkMapToolbarItems({
         disabled: !editable,
         checked: sourceKind === "work-item",
         onSelect: () => onSelectSourceKind("work-item"),
+        onCancel: onCancelSourceTool,
       },
       {
         id: "source-menu",
@@ -64,10 +63,12 @@ export function useWorkMapToolbarItems({
           .map((kind) => ({
             id: kind,
             label: t(SOURCE_KIND_KEYS[kind]),
+            checked: sourceKind === kind,
             onSelect: () => onSelectSourceKind(kind),
+            onCancel: onCancelSourceTool,
           })),
       },
     ],
-    [editable, onSelectSourceKind, sourceKind, t],
+    [editable, onCancelSourceTool, onSelectSourceKind, sourceKind, t]
   );
 }

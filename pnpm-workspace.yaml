@@ -5,12 +5,12 @@ packages:
   - "!apps/proxy"
 
 catalog:
-  # UX Heavy Work Map seams, tag target e527b312c89db4ac791ff2716f194eb36ee911f6.
+  # UXHeavy internal editor package, tag target 70c8ef92ecb10101d9a3ec36d72fe7c0b64637be.
   # Release asset SHA-256 values:
-  #   common: 98327105ce05d5ac42341b62e4e09f84b243b050b588636f3fb428382bec200e
-  #   excalidraw: 81907f059fe5a39066b31f3ed9e977067e32b66fc7488c66293e6cff2404eb30
-  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.0-e527b312/uxheavy-excalidraw-common-0.18.0-e527b312.tgz"
-  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.0-e527b312/uxheavy-excalidraw-0.18.0-e527b312.tgz"
+  #   common: 333f149cd05e7e9b781f2246cb6c99a998b60c233b261e88e4240fb8249eda1a
+  #   excalidraw: 25f3e10b0df69881adaddcc0e17851ee872a9fb9a8393c3f6661755ad4449220
+  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-70c8ef92/uxheavy-excalidraw-common-0.18.1-70c8ef92.tgz"
+  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-70c8ef92/uxheavy-excalidraw-0.18.1-70c8ef92.tgz"
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
@@ -278,8 +278,8 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   # GitHub-only release artifacts reviewed above and pinned by exact SHA-256.
-  - "@uxheavy/excalidraw-common@0.18.0-e527b312"
-  - "@uxheavy/excalidraw@0.18.0-e527b312"
+  - "@uxheavy/excalidraw-common@0.18.1-70c8ef92"
+  - "@uxheavy/excalidraw@0.18.1-70c8ef92"
   - "@storybook/addon-docs@10.4.6"
   - "@storybook/builder-vite@10.4.6"
   - "@storybook/csf-plugin@10.4.6"

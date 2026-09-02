@@ -55,6 +55,7 @@ export function WorkMapSourcePicker({
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
   const [results, setResults] = useState<TWorkMapSource[]>([]);
+  const [projects, setProjects] = useState<[string, string][]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
   const { t } = useTranslation();
 
@@ -68,7 +69,16 @@ export function WorkMapSourcePicker({
       service
         .searchSources(workspaceSlug, projectId, workMapId, sourceKind, query.trim(), projectFilter || undefined)
         .then((sources) => {
-          if (!cancelled) setResults(sources);
+          if (!cancelled) {
+            setResults(sources);
+            if (!projectFilter) {
+              setProjects(
+                [...new Map(sources.map((source) => [source.project_id, source.project_name])).entries()].toSorted(
+                  ([, first], [, second]) => first.localeCompare(second)
+                )
+              );
+            }
+          }
           return undefined;
         })
         .catch(() => {
@@ -81,32 +91,23 @@ export function WorkMapSourcePicker({
     };
   }, [workspaceSlug, projectId, workMapId, sourceKind, query, projectFilter]);
 
-  const projects = useMemo(
-    () =>
-      [...new Map(results.map((source) => [source.project_id, source.project_name || source.project_id])).entries()].sort(
-        ([, first], [, second]) => first.localeCompare(second),
-      ),
-    [results],
-  );
-  const groupedResults = useMemo(
-    () =>
-      [...new Map(
-        results.map((source) => [
-          source.project_id,
-          {
-            id: source.project_id,
-            name: source.project_name || source.project_id,
-            sources: results.filter((candidate) => candidate.project_id === source.project_id),
-          },
-        ]),
-      ).values()],
-    [results],
-  );
+  const groupedResults = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string; sources: TWorkMapSource[] }>();
+    for (const source of results) {
+      const group = groups.get(source.project_id) ?? {
+        id: source.project_id,
+        name: source.project_name,
+        sources: [],
+      };
+      group.sources.push(source);
+      groups.set(source.project_id, group);
+    }
+    return [...groups.values()];
+  }, [results]);
 
   return (
     <div
       role="dialog"
-      aria-modal="true"
       aria-label={t("common.add")}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -125,6 +126,7 @@ export function WorkMapSourcePicker({
           onChange={(event) => {
             setSourceKind(event.target.value as TWorkMapSourceKind);
             setProjectFilter("");
+            setProjects([]);
           }}
         >
           {WORK_MAP_SOURCE_KINDS.map((kind) => (
@@ -141,7 +143,7 @@ export function WorkMapSourcePicker({
           id="work-map-source-search"
           data-testid="work-map-source-search"
           className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1.5 text-13"
-          placeholder={t("common.search")}
+          placeholder={t("common.search.label")}
           value={query}
           onChange={(event) => {
             const nextQuery = event.target.value;

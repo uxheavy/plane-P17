@@ -4,6 +4,9 @@
 
 Accepted
 
+The toolbar and shortcut integration portions are amended by ADR-0007. The
+closed live-node, disclosure, carrier, and binding decisions remain in force.
+
 ## Date
 
 2026-09-02

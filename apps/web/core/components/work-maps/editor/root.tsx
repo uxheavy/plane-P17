@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentProps } from "react";
+import type { ComponentProps, CSSProperties } from "react";
 import {
   CaptureUpdateAction,
   Excalidraw,
@@ -26,8 +26,9 @@ import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw
 import type { PointerDownState } from "@excalidraw/excalidraw/types";
 // oxlint-disable-next-line import/no-unassigned-import -- Excalidraw owns its editor styles.
 import "@excalidraw/excalidraw/index.css";
-import type { TWorkMap, TWorkMapSource, TWorkMapSourceKind } from "@plane/types";
+import type { TLanguage } from "@plane/i18n";
 import { useTranslation } from "@plane/i18n";
+import type { TWorkMap, TWorkMapSource, TWorkMapSourceKind } from "@plane/types";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { useWorkMap } from "@/hooks/store/use-work-map";
 import { useUser } from "@/hooks/store/user";
@@ -51,17 +52,34 @@ import { useTheme } from "next-themes";
 
 const service = new WorkMapService();
 
-const EXCALIDRAW_LOCALE_CODES: Record<string, string> = {
+const EXCALIDRAW_LOCALE_CODES: Record<TLanguage, NonNullable<ComponentProps<typeof Excalidraw>["langCode"]>> = {
+  en: "en",
+  fr: "fr-FR",
+  es: "es-ES",
+  ja: "ja-JP",
+  "zh-CN": "zh-CN",
+  "zh-TW": "zh-TW",
+  ru: "ru-RU",
+  it: "it-IT",
+  cs: "cs-CZ",
+  sk: "sk-SK",
+  de: "de-DE",
   ua: "uk-UA",
+  pl: "pl-PL",
+  ko: "ko-KR",
   "pt-BR": "pt-BR",
+  id: "id-ID",
+  ro: "ro-RO",
   "tr-TR": "tr-TR",
   "vi-VN": "vi-VN",
 };
 
-const getExcalidrawLanguageCode = (
-  locale: string,
-): NonNullable<ComponentProps<typeof Excalidraw>["langCode"]> =>
-  (EXCALIDRAW_LOCALE_CODES[locale] ?? locale) as NonNullable<ComponentProps<typeof Excalidraw>["langCode"]>;
+const EXCALIDRAW_THEME_TOKENS = {
+  "--color-primary": "var(--background-color-accent-primary)",
+  "--color-primary-darker": "var(--background-color-accent-primary-hover)",
+  "--color-primary-hover": "var(--background-color-accent-primary-hover)",
+  "--color-primary-darkest": "var(--border-color-accent-strong)",
+} as CSSProperties;
 
 type Props = {
   workspaceSlug: string;
@@ -92,13 +110,14 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [pickerSourceKind, setPickerSourceKind] = useState<TWorkMapSourceKind | null>(null);
   const [pendingSource, setPendingSource] = useState<TWorkMapSource | null>(null);
-  const [placementPointer, setPlacementPointer] = useState<{ x: number; y: number } | null>(null);
+  const [placementPointer, setPlacementPointer] = useState<{ x: number; y: number; zoom: number } | null>(null);
   const [pendingScene, setPendingScene] = useState<{
     elements: readonly OrderedExcalidrawElement[];
     files: BinaryFiles;
   } | null>(null);
   const changeSequenceRef = useRef(0);
   const placingSourceRef = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const context = useMemo(
     () => ({ workspaceSlug, projectId, workMapId: workMap.id }),
     [projectId, workMap.id, workspaceSlug]
@@ -203,25 +222,37 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
 
   const selectSourceKind = useCallback(
     (sourceKind: TWorkMapSourceKind) => {
+      returnFocusRef.current =
+        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+          ? document.activeElement
+          : null;
       api?.setActiveTool({ type: "selection" });
       setPendingSource(null);
       setPickerSourceKind(sourceKind);
     },
     [api]
   );
-  const closeSourcePicker = useCallback(() => setPickerSourceKind(null), []);
+  const returnFocus = useCallback(() => {
+    queueMicrotask(() => returnFocusRef.current?.focus());
+  }, []);
+  const closeSourcePicker = useCallback(() => {
+    setPickerSourceKind(null);
+    returnFocus();
+  }, [returnFocus]);
   const cancelSourceTool = useCallback(() => {
     setPickerSourceKind(null);
     setPendingSource(null);
     setPlacementPointer(null);
     api?.setActiveTool({ type: "selection" });
-  }, [api]);
+    returnFocus();
+  }, [api, returnFocus]);
   const hostToolbarItems = useWorkMapToolbarItems({
     editable,
     sourceKind: pickerSourceKind ?? pendingSource?.source_kind ?? null,
     onSelectSourceKind: selectSourceKind,
+    onCancelSourceTool: cancelSourceTool,
   });
-  const langCode = getExcalidrawLanguageCode(currentLocale);
+  const langCode = EXCALIDRAW_LOCALE_CODES[currentLocale];
 
   const onPaste = useCallback(
     async (data: Parameters<NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>>[0]) => {
@@ -248,16 +279,14 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       onPointerUpdate(payload);
       if (!pendingSource || !api) return;
       const appState = api.getAppState();
-      const viewport = sceneCoordsToViewportCoords(
-        { sceneX: payload.pointer.x, sceneY: payload.pointer.y },
-        appState,
-      );
+      const viewport = sceneCoordsToViewportCoords({ sceneX: payload.pointer.x, sceneY: payload.pointer.y }, appState);
       setPlacementPointer({
         x: viewport.x - appState.offsetLeft,
         y: viewport.y - appState.offsetTop,
+        zoom: appState.zoom.value,
       });
     },
-    [api, onPointerUpdate, pendingSource],
+    [api, onPointerUpdate, pendingSource]
   );
 
   useEffect(() => {
@@ -436,7 +465,6 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       connectionState={connectionState}
       connectionDataState={connectionDataState}
       pickerSourceKind={pickerSourceKind}
-      activeSourceKind={pickerSourceKind ?? pendingSource?.source_kind ?? null}
       recoveryRecord={recoveryRecord}
       recoveryState={recoveryState}
       pendingScene={!!pendingScene}
@@ -446,7 +474,6 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       collaboratorIds={collaboratorIds}
       pointerSenderIds={pointerSenderIds}
       selectionSenderIds={selectionSenderIds}
-      onSelectSourceKind={selectSourceKind}
       onRetryRecovery={() => void retryRecovery(authorizedEditable)}
       onDiscardRecovery={discardRecovery}
       onRetryPending={() => void retryPendingScene()}
@@ -458,7 +485,6 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       onPointerUpdate={handlePointerUpdate}
       placementPointer={placementPointer}
       pendingSourceName={pendingSource?.name ?? null}
-      onCancelSourceTool={cancelSourceTool}
       onPointerDown={onPointerDown}
       onPaste={onPaste}
       renderEmbeddable={renderEmbeddable}
@@ -481,7 +507,6 @@ type EditorSurfaceProps = {
   connectionState: string;
   connectionDataState: string;
   pickerSourceKind: TWorkMapSourceKind | null;
-  activeSourceKind: TWorkMapSourceKind | null;
   recoveryRecord: unknown;
   recoveryState: TRecoveryState | null;
   pendingScene: boolean;
@@ -491,18 +516,16 @@ type EditorSurfaceProps = {
   collaboratorIds: string;
   pointerSenderIds: string;
   selectionSenderIds: string;
-  onSelectSourceKind: (sourceKind: TWorkMapSourceKind) => void;
   onRetryRecovery: () => void;
   onDiscardRecovery: () => void;
   onRetryPending: () => void;
   onDiscardPending: () => void;
   onSelectSource: (source: TWorkMapSource) => void;
   onClosePicker: () => void;
-  onCancelSourceTool: () => void;
   onExcalidrawAPI: (api: ExcalidrawImperativeAPI) => void;
   onChange: NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
   onPointerUpdate: NonNullable<ComponentProps<typeof Excalidraw>["onPointerUpdate"]>;
-  placementPointer: { x: number; y: number } | null;
+  placementPointer: { x: number; y: number; zoom: number } | null;
   pendingSourceName: string | null;
   onPointerDown: NonNullable<ComponentProps<typeof Excalidraw>["onPointerDown"]>;
   onPaste: NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>;
@@ -524,7 +547,6 @@ function WorkMapEditorSurface({
   connectionState,
   connectionDataState,
   pickerSourceKind,
-  activeSourceKind,
   recoveryRecord,
   recoveryState,
   pendingScene,
@@ -534,14 +556,12 @@ function WorkMapEditorSurface({
   collaboratorIds,
   pointerSenderIds,
   selectionSenderIds,
-  onSelectSourceKind,
   onRetryRecovery,
   onDiscardRecovery,
   onRetryPending,
   onDiscardPending,
   onSelectSource,
   onClosePicker,
-  onCancelSourceTool,
   onExcalidrawAPI,
   onChange,
   onPointerUpdate,
@@ -584,8 +604,8 @@ function WorkMapEditorSurface({
           style={{
             left: placementPointer.x,
             top: placementPointer.y,
-            width: 288,
-            height: 132,
+            width: 288 * placementPointer.zoom,
+            height: 132 * placementPointer.zoom,
           }}
         >
           <span className="sr-only">{pendingSourceName}</span>
@@ -606,17 +626,7 @@ function WorkMapEditorSurface({
           onClose={onClosePicker}
         />
       )}
-      <div
-        data-testid="work-map-embed"
-        className="size-full"
-        onKeyDownCapture={(event) => {
-          if (event.key === "Escape" && activeSourceKind) {
-            event.preventDefault();
-            event.stopPropagation();
-            onCancelSourceTool();
-          }
-        }}
-      >
+      <div data-testid="work-map-embed" className="size-full" style={EXCALIDRAW_THEME_TOKENS}>
         <Excalidraw
           onExcalidrawAPI={onExcalidrawAPI}
           initialData={initialScene}
