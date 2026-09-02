@@ -11,11 +11,10 @@
 
 import type { ClipboardData } from "@excalidraw/excalidraw/clipboard";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { createNodeCarrierLink, getNodeKey, isNodeCarrierLink } from "./scene";
+import { getNodeKey } from "./scene";
 
 const isProtectedCarrier = (element: ExcalidrawElement) =>
-  element.type === "embeddable" &&
-  (typeof element.customData?.nodeKey === "string" || (!!element.link && isNodeCarrierLink(element.link)));
+  element.type === "rectangle" && typeof getNodeKey(element) === "string";
 
 const collectNodeKeys = (elements: readonly ExcalidrawElement[]) => {
   const keys: string[] = [];
@@ -59,11 +58,9 @@ export const rebindProtectedPaste = async (
     const nodeKey = getNodeKey(element);
     const reboundNodeKey = nodeKey ? nodeKeyMap[nodeKey] : undefined;
     if (!reboundNodeKey) throw new Error("Work Map paste rebinding was incomplete");
-    const { enabledOrigin: _enabledOrigin, ...customData } = element.customData ?? {};
     return {
       ...element,
-      link: createNodeCarrierLink(reboundNodeKey),
-      customData: { ...customData, nodeKey: reboundNodeKey },
+      customData: { nodeKey: reboundNodeKey },
     };
   });
   return { ...data, elements };

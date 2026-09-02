@@ -12,15 +12,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { TWorkMapFiles } from "@plane/types";
-import {
-  createNodeCarrierLink,
-  decodeScene,
-  encodeScene,
-  getNodeKey,
-  isAllowedEmbedUrl,
-  isGenerationConflict,
-  isNodeCarrierLink,
-} from "./scene";
+import { decodeScene, encodeScene, getNodeKey, isAllowedEmbedUrl, isGenerationConflict } from "./scene";
 
 describe("Work Map scene boundary", () => {
   it("accepts only web embed URLs", () => {
@@ -30,24 +22,19 @@ describe("Work Map scene boundary", () => {
     expect(isAllowedEmbedUrl("not a URL")).toBe(false);
   });
 
-  it("creates and recognizes only closed native carrier links", () => {
-    const nodeKey = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
-    const link = createNodeCarrierLink(nodeKey);
-    expect(link).toBe(`https://work-map.invalid/nodes/${nodeKey}`);
-    expect(isNodeCarrierLink(link)).toBe(true);
-    expect(isNodeCarrierLink("https://work-map.invalid/nodes/not-a-node-key")).toBe(false);
-  });
-
-  it("round-trips native scene bytes with only the opaque node key", () => {
+  it("round-trips native rectangle carriers with only the opaque node key", () => {
     const nodeKey = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
     const element = {
       id: "carrier",
-      type: "embeddable",
+      type: "rectangle",
+      link: "https://work-map.invalid/nodes/legacy",
       customData: { nodeKey, source_id: "must-not-survive", source_kind: "work-item" },
     } as unknown as ExcalidrawElement;
     const encoded = encodeScene({ elements: [element], files: {} });
     const decoded = decodeScene(encoded);
     expect(getNodeKey(decoded.elements[0])).toBe(nodeKey);
+    expect(decoded.elements[0]).toMatchObject({ type: "rectangle", customData: { nodeKey } });
+    expect(decoded.elements[0]).not.toHaveProperty("link");
     expect(atob(encoded)).not.toContain("source_id");
     expect(atob(encoded)).not.toContain("source_kind");
     expect(atob(encoded)).not.toContain("must-not-survive");

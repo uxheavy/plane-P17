@@ -18,7 +18,6 @@ export type TStoredScene = {
 };
 
 const NODE_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const NODE_CARRIER_URL_PREFIX = "https://work-map.invalid/nodes/";
 const ASSET_ID_PATTERN = NODE_KEY_PATTERN;
 const IMAGE_MIME_TYPES = new Set<TWorkMapFile["mimeType"]>([
   "image/svg+xml",
@@ -32,19 +31,21 @@ const IMAGE_MIME_TYPES = new Set<TWorkMapFile["mimeType"]>([
   "image/jfif",
 ]);
 
-export const getNodeKey = (element: Pick<ExcalidrawElement, "type" | "customData">): string | undefined => {
-  const nodeKey = element.type === "embeddable" ? element.customData?.nodeKey : undefined;
+const getCustomDataNodeKey = (element: Pick<ExcalidrawElement, "customData">): string | undefined => {
+  const nodeKey = element.customData?.nodeKey;
   return typeof nodeKey === "string" && NODE_KEY_PATTERN.test(nodeKey) ? nodeKey : undefined;
 };
 
-export const createNodeCarrierLink = (nodeKey: string): string => {
-  if (!NODE_KEY_PATTERN.test(nodeKey)) throw new Error("Invalid Work Map node key");
-  return `${NODE_CARRIER_URL_PREFIX}${nodeKey}`;
+export const getNodeKey = (element: Pick<ExcalidrawElement, "type" | "customData">): string | undefined => {
+  return element.type === "rectangle" ? getCustomDataNodeKey(element) : undefined;
 };
 
-export const isNodeCarrierLink = (link: string): boolean => {
-  if (!link.startsWith(NODE_CARRIER_URL_PREFIX)) return false;
-  return NODE_KEY_PATTERN.test(link.slice(NODE_CARRIER_URL_PREFIX.length));
+const normalizeNodeCarrier = (element: ExcalidrawElement): ExcalidrawElement => {
+  if (element.type !== "rectangle" && element.type !== "embeddable") return element;
+  const nodeKey = getCustomDataNodeKey(element);
+  if (!nodeKey) return element;
+  const { link: _link, ...withoutLink } = element;
+  return { ...withoutLink, type: "rectangle", customData: { nodeKey } } as ExcalidrawElement;
 };
 
 export const isAllowedEmbedUrl = (link: string): boolean => {
@@ -57,10 +58,7 @@ export const isAllowedEmbedUrl = (link: string): boolean => {
 };
 
 export const encodeScene = (scene: TStoredScene): string => {
-  const elements = scene.elements.map((element) => {
-    const nodeKey = getNodeKey(element);
-    return nodeKey ? { ...element, link: createNodeCarrierLink(nodeKey), customData: { nodeKey } } : element;
-  });
+  const elements = scene.elements.map(normalizeNodeCarrier);
   const files = Object.fromEntries(
     Object.entries(scene.files).map(([fileId, file]) => [
       fileId,
@@ -104,7 +102,7 @@ export const decodeScene = (value: string): TStoredScene => {
       return [fileId, { assetId, mimeType: mimeType as TWorkMapFile["mimeType"], created }];
     })
   );
-  return { elements: parsed.elements as ExcalidrawElement[], files };
+  return { elements: (parsed.elements as ExcalidrawElement[]).map(normalizeNodeCarrier), files };
 };
 
 export const isGenerationConflict = (error: unknown): boolean =>

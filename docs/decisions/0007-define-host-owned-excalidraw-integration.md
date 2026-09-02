@@ -10,11 +10,13 @@ Accepted
 
 ## Context
 
-Work Maps need Plane-owned commands in Excalidraw's toolbar and a tldraw-style
-shortcut profile. The first integration rendered a Plane toolbar fragment
+Work Maps need Plane-owned commands in Excalidraw's toolbar, a tldraw-style
+shortcut profile, and viewer-authorized content inside native scene geometry. The first integration rendered a Plane toolbar fragment
 through `renderToolbarUI` and installed a capture-phase `window` key listener.
 That split duplicated toolbar semantics, made focus and text-input behavior
-fragile, and left the displayed key badge unrelated to actual dispatch.
+fragile, and left the displayed key badge unrelated to actual dispatch. It also
+represented Plane nodes as URL embeddables with synthetic links, which invoked
+iframe activation hints and external-link affordances for content that is not a URL.
 
 Excalidraw is the editor and already owns its native toolbar, keyboard event
 guards, menu focus, ARIA metadata, and help dialog. Plane owns source discovery,
@@ -31,7 +33,7 @@ Plane does not vendor Excalidraw source or import its private implementation.
 Release preparation records the fork source commit and package checksums, and
 publishing remains a separate release operation.
 
-The fork exposes two narrow host contracts:
+The fork exposes three narrow host contracts:
 
 - `hostToolbarItems` describes native toolbar buttons and one-level menus using
   a stable ID, translated label, icon, enabled/checked state, shortcuts, and a
@@ -43,15 +45,21 @@ The fork exposes two narrow host contracts:
   applies the same typing, dialog, composition, and modifier guards as native
   shortcuts. The descriptors are instance props only and are never serialized
   into scene data.
+- `renderHostElement` projects host-owned content into the bounds of a visible
+  native, unlinked element. Excalidraw retains geometry, selection, hit testing,
+  transforms, ordering, binding, and history. Linked and iframe-like elements
+  never enter this path, so URL embed activation and external-link semantics
+  remain exclusive to actual URL content. The callback and its rendering are
+  ephemeral and are never serialized into scene data.
 
 For the Work Map instance, Plane supplies:
 
-| Binding | Meaning |
-| --- | --- |
-| `W` | Plane Work Item picker |
-| `D`, `B`, `X`, `P` | Native Free Draw |
-| `3` | Native Diamond |
-| `Shift+X` | Native Autoshape |
+| Binding                                          | Meaning                      |
+| ------------------------------------------------ | ---------------------------- |
+| `W`                                              | Plane Work Item picker       |
+| `D`, `B`, `X`, `P`                               | Native Free Draw             |
+| `3`                                              | Native Diamond               |
+| `Shift+X`                                        | Native Autoshape             |
 | `V`, `H`, `E`, `R`, `O`, `A`, `L`, `F`, `T`, `K` | Existing Excalidraw meanings |
 
 Bucket Fill remains in Excalidraw's More Tools menu. Plane removes its global
@@ -59,7 +67,9 @@ keyboard listener and its overlay toolbar/menu imports. Excalidraw has no
 Plane dependency and exposes no render-only toolbar seam or internal toolbar
 component exports for this integration.
 
-Plane passes its current locale through a small locale-code adapter, passes the
+Plane stores each live node as an ordinary rectangle with only its opaque
+`nodeKey` in `customData`, then returns the viewer-authorized card through
+`renderHostElement`. Plane passes its current locale through a small locale-code adapter, passes the
 resolved light/dark theme, and supplies translated host labels. Shared styling
 is limited to the public toolbar contract and scoped CSS variables; reusable
 Plane and Excalidraw React components remain separately owned.
@@ -88,6 +98,12 @@ lifecycles.
 
 Rejected: shortcuts are viewer/editor policy, not authored drawing content.
 They must change reactively with the host route, locale, and permissions.
+
+### Reuse URL embeddables for Plane nodes
+
+Rejected: a Plane binding is not a URL and must not inherit iframe activation,
+click-to-interact, external-link, or Web Embed behavior. Synthetic links also
+pollute collaborative content with a second navigation representation.
 
 ## Consequences
 

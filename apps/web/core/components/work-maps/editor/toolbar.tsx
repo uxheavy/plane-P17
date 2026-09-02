@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { useTranslation } from "@plane/i18n";
 import type { EditorShortcut, HostToolbarItem, ToolShortcutOverrides } from "@excalidraw/excalidraw/types";
 import type { TWorkMapSourceKind } from "@plane/types";
-import { Boxes, ListTodo } from "lucide-react";
+import { Boxes, Eye, ListTodo } from "lucide-react";
 
 const SOURCE_KIND_KEYS: Record<TWorkMapSourceKind, string> = {
   "work-item": "work_items",
@@ -28,20 +28,35 @@ export const WORK_MAP_TOOL_SHORTCUTS: ToolShortcutOverrides = {
 type ToolbarProps = {
   editable: boolean;
   sourceKind: TWorkMapSourceKind | null;
+  selectedNodeKey: string | null;
   onSelectSourceKind: (sourceKind: TWorkMapSourceKind) => void;
+  onOpenSelectedSource: () => void;
   onCancelSourceTool: () => void;
 };
 
 export function useWorkMapToolbarItems({
   editable,
   sourceKind,
+  selectedNodeKey,
   onSelectSourceKind,
+  onOpenSelectedSource,
   onCancelSourceTool,
 }: ToolbarProps): readonly HostToolbarItem[] {
   const { t } = useTranslation();
 
   return useMemo(
     () => [
+      ...(selectedNodeKey
+        ? [
+            {
+              id: "open-selected-source",
+              label: t("preview"),
+              icon: <Eye />,
+              shortcuts: [{ key: "Enter" }],
+              onSelect: onOpenSelectedSource,
+            },
+          ]
+        : []),
       {
         id: "work-item",
         label: t("work_items"),
@@ -69,6 +84,6 @@ export function useWorkMapToolbarItems({
           })),
       },
     ],
-    [editable, onCancelSourceTool, onSelectSourceKind, sourceKind, t]
+    [editable, onCancelSourceTool, onOpenSelectedSource, onSelectSourceKind, selectedNodeKey, sourceKind, t]
   );
 }

@@ -41,16 +41,11 @@ describe("Work Map embeddable load ownership", () => {
     expect(getViewerEmbeddableKey(embeddable("embed-b", "javascript:alert(1)"))).toBeNull();
   });
 
-  it("never treats a protected Plane carrier as a URL embed", () => {
-    const nodeKey = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
-    const carrier = {
-      ...embeddable("node", `https://work-map.invalid/nodes/${nodeKey}`),
-      customData: { nodeKey },
-    };
-    expect(isDocumentEmbeddableEnabled(carrier)).toBe(false);
-    expect(isEmbeddableLinkAllowed(carrier.link ?? "")).toBe(true);
-    expect(enableDocumentEmbeddable(carrier)).toBe(carrier);
-    expect(getViewerEmbeddableKey(carrier)).toBeNull();
-    expect(shouldLoadEmbeddableContent(carrier, new Set())).toBe(true);
+  it("keeps URL embed lifecycle independent from Plane node carriers", () => {
+    const element = embeddable("embed", "https://example.com/first");
+    expect(isEmbeddableLinkAllowed(element.link ?? "")).toBe(true);
+    expect(enableDocumentEmbeddable(element)).not.toBe(element);
+    expect(getViewerEmbeddableKey(element)).toBe("embed:https://example.com");
+    expect(shouldLoadEmbeddableContent(element, new Set())).toBe(false);
   });
 });

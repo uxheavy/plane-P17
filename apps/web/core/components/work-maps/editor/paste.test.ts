@@ -17,8 +17,7 @@ import { allowPaste, rebindProtectedPaste } from "./paste";
 const carrier = (nodeKey: string) =>
   ({
     id: nodeKey,
-    type: "embeddable",
-    link: `https://work-map.invalid/nodes/${nodeKey}`,
+    type: "rectangle",
     customData: { nodeKey },
   }) as unknown as ExcalidrawElement;
 
@@ -51,6 +50,6 @@ describe("Work Map protected paste", () => {
     }));
     if (!result || result === false || !result.elements) throw new Error("Expected rebound paste data");
     expect(result.elements[0]?.customData).toEqual({ nodeKey: targetKey });
-    expect(result.elements[0]?.link).toBe(`https://work-map.invalid/nodes/${targetKey}`);
+    expect(result.elements[0]).not.toHaveProperty("link");
   });
 });

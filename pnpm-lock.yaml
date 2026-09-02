@@ -31,11 +31,11 @@ catalogs:
       specifier: ^0.104.0
       version: 0.104.0
     '@excalidraw/common':
-      specifier: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-common-0.18.1-66073610.tgz
-      version: 0.18.1-66073610
+      specifier: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz
+      version: 0.18.1-ce4cf488
     '@excalidraw/excalidraw':
-      specifier: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-0.18.1-66073610.tgz
-      version: 0.18.1-66073610
+      specifier: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-0.18.1-ce4cf488.tgz
+      version: 0.18.1-ce4cf488
     '@floating-ui/dom':
       specifier: ^1.7.1
       version: 1.7.4
@@ -1023,10 +1023,10 @@ importers:
         version: 1.3.4
       '@excalidraw/common':
         specifier: 'catalog:'
-        version: '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-common-0.18.1-66073610.tgz'
+        version: '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz'
       '@excalidraw/excalidraw':
         specifier: 'catalog:'
-        version: '@uxheavy/excalidraw@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-0.18.1-66073610.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)'
+        version: '@uxheavy/excalidraw@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-0.18.1-ce4cf488.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)'
       '@fontsource-variable/inter':
         specifier: 'catalog:'
         version: 5.2.8
@@ -6085,13 +6085,13 @@ packages:
   '@upsetjs/venn.js@2.0.0':
     resolution: {integrity: sha512-WbBhLrooyePuQ1VZxrJjtLvTc4NVfpOyKx0sKqioq9bX1C1m7Jgykkn8gLrtwumBioXIqam8DLxp88Adbue6Hw==}
 
-  '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-common-0.18.1-66073610.tgz':
-    resolution: {integrity: sha256-ylADndpBV6+1H0uQ5dSnOZEyXxHAgJtWFgHuJCzg5Lk=, tarball: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-common-0.18.1-66073610.tgz}
-    version: 0.18.1-66073610
+  '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz':
+    resolution: {integrity: sha256-/j/G8CPbDoyfLQQqS2Oq0ZYmuMJaHG8YI2ZSCYwLCF4=, tarball: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz}
+    version: 0.18.1-ce4cf488
 
-  '@uxheavy/excalidraw@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-0.18.1-66073610.tgz':
-    resolution: {integrity: sha256-KTfkS3AAR2kE6jWV7lOwxRy4Oac3pbOtBCreTOBGKvM=, tarball: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-0.18.1-66073610.tgz}
-    version: 0.18.1-66073610
+  '@uxheavy/excalidraw@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-0.18.1-ce4cf488.tgz':
+    resolution: {integrity: sha256-fwKaQPgL6KXtxN+eeHe/22hhbL1u4+JqzdS8SFrJyMY=, tarball: https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-0.18.1-ce4cf488.tgz}
+    version: 0.18.1-ce4cf488
     peerDependencies:
       react: 19.2.8
       react-dom: 19.2.8
@@ -14829,18 +14829,18 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
-  '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-common-0.18.1-66073610.tgz':
+  '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz':
     dependencies:
       tinycolor2: 1.6.0
 
-  '@uxheavy/excalidraw@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-0.18.1-66073610.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@uxheavy/excalidraw@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-0.18.1-ce4cf488.tgz(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@braintree/sanitize-url': 6.0.2
       '@codemirror/commands': 6.11.0
       '@codemirror/language': 6.12.4
       '@codemirror/state': 6.7.2
       '@codemirror/view': 6.43.10
-      '@excalidraw/common': '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-66073610/uxheavy-excalidraw-common-0.18.1-66073610.tgz'
+      '@excalidraw/common': '@uxheavy/excalidraw-common@https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz'
       '@excalidraw/element': 0.18.0-abeeaeb
       '@excalidraw/laser-pointer': 1.3.1
       '@excalidraw/math': 0.18.0-abeeaeb

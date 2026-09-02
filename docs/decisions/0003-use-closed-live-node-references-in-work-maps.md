@@ -49,14 +49,14 @@ dependency. Power K was only an interaction reference.
 
 ### State ownership and disclosure
 
-| State | Owner and visibility |
-| --- | --- |
-| Geometry, selection, order, native bindings, canvas element ID | Excalidraw collaborative scene; visible to map viewers |
-| Opaque globally unique `nodeKey` | Excalidraw carrier custom data; visible but non-authorizing |
-| Source kind, source ID, and binding revision | Plane protected Work Map binding state; never collaborative content |
-| Hydrated title, state, identifiers, actions, canonical project context | Viewer-scoped server response and viewer-scoped cache |
-| Placement ghost and unresolved create/select state | Local ephemeral client state only |
-| Presence, pointer, and selection | Realtime awareness; ephemeral |
+| State                                                                  | Owner and visibility                                                |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Geometry, selection, order, native bindings, canvas element ID         | Excalidraw collaborative scene; visible to map viewers              |
+| Opaque globally unique `nodeKey`                                       | Excalidraw carrier custom data; visible but non-authorizing         |
+| Source kind, source ID, and binding revision                           | Plane protected Work Map binding state; never collaborative content |
+| Hydrated title, state, identifiers, actions, canonical project context | Viewer-scoped server response and viewer-scoped cache               |
+| Placement ghost and unresolved create/select state                     | Local ephemeral client state only                                   |
+| Presence, pointer, and selection                                       | Realtime awareness; ephemeral                                       |
 
 A `nodeKey` locates a protected binding and grants no authority. The server
 resolves it only after current map and source authorization. Missing, deleted,
@@ -74,7 +74,9 @@ Each Plane projection uses one native bindable Excalidraw carrier. That carrier
 is the sole owner of geometry, selection, hit testing, resize, rotation,
 grouping, z-order, duplication, deletion, native arrow binding, and Excalidraw
 history. Plane adds only `nodeKey`, viewer-authorized rendering, placement, and
-the canonical source action.
+the canonical source action. The V0 carrier is an ordinary rectangle with no
+link and no embeddable type. Its only host-owned scene field is `customData.nodeKey`;
+the authorized card is an ephemeral host projection defined by ADR-0007.
 
 Hidden mirror geometry, a second hit-test/transform system, Plane-owned arrows,
 or a separate undo track fail this architecture. A Plane node must provide every
@@ -90,9 +92,10 @@ controllers or full editors in the canvas. CSS container queries reflow or hide
 secondary fields as bounds shrink; V0 adds no separate display-mode state or
 ResizeObserver layout engine.
 
-Primary click/tap selects and drag moves. Double-click, `Enter` on a selected
-node, or a visible Open control invokes the canonical source action. Hover may
-reveal Open on pointer devices; selection must reveal an equivalent on tablet.
+Primary click/tap selects and drag moves. Double-click or `Enter` on a selected
+node invokes the canonical source action. Selection reveals the same action in
+the native toolbar, including on tablet; cards do not carry a permanent Open
+control or external-link badge.
 Work Item and Page use centered modal peek where supported; Cycle and Module use
 their existing peek; Project View and Intake use existing detail/navigation.
 Source editing occurs there under source permissions, not inline in the card.
