@@ -107,6 +107,14 @@ async function selectSearchOption(page: Page, buttonName: string, optionName: st
   });
 }
 
+async function expectAssigneeAbsent(page: Page, name: string) {
+  await issueForm(page).getByRole("button", { name: "Assignees", exact: true }).first().click();
+  const search = page.getByPlaceholder("Search").last();
+  await search.fill(name);
+  await expect(page.locator('[role="option"]').filter({ hasText: name })).toHaveCount(0);
+  await search.press("Escape");
+}
+
 async function selectTodayAsStartDate(page: Page) {
   await audited("work-item.start-date-select", "today", async () => {
     const trigger = issueForm(page).getByRole("button", { name: "Start date", exact: true }).first();
@@ -182,7 +190,9 @@ test("creates representative work items through the real interface", async ({ pa
   await selectSearchOption(page, "Labels", "Reference Label 0999", true);
   await selectSearchOption(page, "Cycle", "Reference Cycle 0249", true);
   await selectSearchOption(page, "Modules", "Reference Module 0499", true);
-  await selectSearchOption(page, "Assignees", "Picker Member 0498");
+  await expectAssigneeAbsent(page, "Reference Agent Disabled");
+  await expectAssigneeAbsent(page, "Reference Workspace Seed");
+  await selectSearchOption(page, "Assignees", "Reference Agent A");
 
   await audited("work-item.property-select", "Reference Estimate 49", async () => {
     await issueForm(page).getByRole("button", { name: "Estimate", exact: true }).first().click();

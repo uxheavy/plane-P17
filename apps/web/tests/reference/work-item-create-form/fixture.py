@@ -7,9 +7,12 @@ import json
 import os
 
 from django.contrib.auth.hashers import make_password
-from django.db import transaction
+from django.db import connection, transaction
+from django.utils import timezone
 
+from plane.api.services import WorkspaceAgentMemberships
 from plane.db.models import (
+    BotTypeEnum,
     Cycle,
     Estimate,
     EstimatePoint,
@@ -22,6 +25,7 @@ from plane.db.models import (
     State,
     User,
     Workspace,
+    WorkspaceAgentMembership,
     WorkspaceMember,
 )
 from plane.license.models import Instance, InstanceConfiguration
@@ -34,6 +38,7 @@ SLUG = f"picker-reference-{RUN_KEY}"
 EMAIL = os.environ["PLANE_REFERENCE_EMAIL"]
 PASSWORD = os.environ["PLANE_REFERENCE_PASSWORD"]
 MEMBER_PREFIX = f"picker-reference-member-{RUN_KEY}-"
+SEED_EMAIL = f"picker-reference-seed-{RUN_KEY}@agents.invalid"
 LOCK_KEY = "reference_work_item_create_form_lock"
 COUNTS = {
     "members": 500,
@@ -62,21 +67,49 @@ def cleanup():
         if instance is None or str(instance.id) != owner["instance_id"]:
             raise RuntimeError("Reference fixture instance changed during the run")
 
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+        workspace = Workspace.objects.filter(slug=SLUG).first()
+        agent_user_ids = (
+            list(
+                WorkspaceAgentMembership.objects.filter(workspace=workspace).values_list(
+                    "user_id", flat=True
+                )
+            )
+            if workspace
+            else []
+        )
         Workspace.objects.filter(slug=SLUG).delete(soft=False)
+        User.objects.filter(id__in=agent_user_ids).delete()
         User.objects.filter(email=EMAIL).delete()
         User.objects.filter(email__startswith=MEMBER_PREFIX).delete()
-        instance.is_setup_done = owner["instance_setup_was_done"]
-        instance.save(update_fields=["is_setup_done", "updated_at"])
-        invalidate_cache_directly(path="/api/instances/", user=False)
+        User.objects.filter(email=SEED_EMAIL).delete()
         claim.delete(soft=False)
+        if owner["instance_created"]:
+            instance.delete(soft=False)
+        else:
+            instance.is_setup_done = owner["instance_setup_was_done"]
+            instance.save(update_fields=["is_setup_done", "updated_at"])
+        invalidate_cache_directly(path="/api/instances/", user=False)
         return True
 
 
 def setup():
     with transaction.atomic():
         instance = Instance.objects.select_for_update().first()
+        instance_created = instance is None
         if instance is None:
-            raise RuntimeError("Plane instance is not registered")
+            instance = Instance.objects.create(
+                instance_name="Plane Reference",
+                instance_id=f"picker-reference-{RUN_KEY}",
+                current_version="reference",
+                domain="http://reference.invalid",
+                last_checked_at=timezone.now(),
+                is_setup_done=False,
+                is_test=True,
+                is_telemetry_enabled=False,
+                is_support_required=False,
+            )
         claim = (
             InstanceConfiguration.all_objects.select_for_update()
             .filter(key=LOCK_KEY)
@@ -113,6 +146,7 @@ def setup():
                 {
                     "run_key": RUN_KEY,
                     "instance_id": str(instance.id),
+                    "instance_created": instance_created,
                     "instance_setup_was_done": instance_setup_was_done,
                 }
             ),
@@ -161,6 +195,41 @@ def setup():
         )
         ProjectMember.objects.create(
             project=project, workspace=workspace, member=owner, role=20
+        )
+        for agent_key, display_name, state in (
+            ("agent-a", "Reference Agent A", "active"),
+            ("agent-b", "Reference Agent B", "active"),
+            ("agent-disabled", "Reference Agent Disabled", "disabled"),
+        ):
+            WorkspaceAgentMemberships.apply(
+                workspace_id=workspace.id,
+                agent_key=f"{RUN_KEY}-{agent_key}",
+                desired={
+                    "display_name": display_name,
+                    "state": state,
+                    "project_ids": [str(project.id)],
+                    "credential_action": "ensure",
+                },
+                idempotency_key=f"{RUN_KEY}-create-{agent_key}",
+                actor=owner,
+            )
+        seed = User.objects.create(
+            email=SEED_EMAIL,
+            username=SEED_EMAIL,
+            display_name="Reference Workspace Seed",
+            is_bot=True,
+            bot_type=BotTypeEnum.WORKSPACE_SEED,
+            is_active=True,
+        )
+        WorkspaceMember.objects.create(
+            workspace=workspace, member=seed, role=15, is_active=True
+        )
+        ProjectMember.objects.create(
+            project=project,
+            workspace=workspace,
+            member=seed,
+            role=15,
+            is_active=True,
         )
 
         users = [
@@ -302,7 +371,7 @@ def assert_created_work_items():
     assert rich.estimate_point.value == "49"
     assert list(rich.labels.values_list("name", flat=True)) == ["Reference Label 0999"]
     assert list(rich.assignees.values_list("display_name", flat=True)) == [
-        "Picker Member 0498"
+        "Reference Agent A"
     ]
     assert list(rich.issue_module.values_list("module__name", flat=True)) == [
         "Reference Module 0499"
@@ -318,7 +387,7 @@ def assert_created_work_items():
             "state": rich.state.name,
             "estimate": rich.estimate_point.value,
             "label": "Reference Label 0999",
-            "assignee": "Picker Member 0498",
+            "assignee": "Reference Agent A",
             "module": "Reference Module 0499",
             "cycle": "Reference Cycle 0249",
         },
