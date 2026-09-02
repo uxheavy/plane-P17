@@ -64,19 +64,27 @@ being represented as successful content.
 
 Plane stores document enablement as `customData.enabledOrigin` on the native
 embeddable element. It is enabled only when that exact normalized HTTP(S) origin
-matches the element's current URL origin. The viewer-session key is the pair of
-native element ID and normalized origin and exists only in the current browser
-session; it never enters the scene, API, relay, version, or persistent browser
-storage.
+matches the element's current URL origin. The viewer-session key is the tuple of
+Work Map Document ID, native element ID, and normalized origin and exists only
+in the current browser session; it never enters the scene, API, relay, version,
+or persistent browser storage.
 
-Plane's `shouldLoadEmbeddable` returns true when either `enabledOrigin` matches
-or the current viewer session contains that element/origin pair. On
+Plane's `shouldLoadEmbeddable` returns true for a validated protected Plane
+carrier, because that path renders an authorized Plane projection rather than
+an arbitrary origin. For a native URL embed it returns true only when either
+`enabledOrigin` matches or the current viewer session contains that
+document/element/origin tuple. On
 `onEmbeddableLoadRequest`, a currently authorized editor writes the normalized
 origin to `enabledOrigin` through the normal scene mutation and durability path.
-A read-only viewer adds only the viewer-session pair. If edit authority is lost
+A read-only viewer adds only the viewer-session tuple. If edit authority is lost
 before persistence, document enablement fails closed and the viewer may still
 choose the ephemeral session load. Changing origin makes both old forms
 inapplicable without requiring iframe cooperation.
+
+The protected-carrier exception requires the internal carrier link and opaque
+`nodeKey` already validated by the Work Map scene API. It never authorizes an
+external iframe URL and remains subject to source hydration authorization and
+the uniform unavailable tombstone.
 
 Every arbitrary URL starts as an inert domain-labelled shell. Only a user with
 current Work Map edit permission may persist enablement. The enabled iframe uses
@@ -121,7 +129,7 @@ and a separate decision because it changes document and browser behavior.
 - Excalidraw package tests must prove the two generic props preserve the native
   placeholder, request loading only from native click/tap, never mount custom or
   iframe content while denied, and leave activation behavior native after load.
-- Plane tests must prove exact-origin `enabledOrigin`, element/origin
+- Plane tests must prove exact-origin `enabledOrigin`, Document/element/origin
   viewer-session scoping, origin-change reset, editor persistence through the
   scene contract, and absence of viewer-session state from every durable or
   collaborative payload.

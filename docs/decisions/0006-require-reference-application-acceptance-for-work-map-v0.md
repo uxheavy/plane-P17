@@ -114,8 +114,9 @@ including the legacy `FileAsset.page` cascade before destructive contraction.
 With users holding different map/source/project permissions, inspect API, DOM,
 clipboard, raw collaborative scene, and socket payloads. Prove source metadata
 is absent when unauthorized, tombstones are non-disclosing, every attachment
-reauthorizes, read-only cannot mutate, and permission/generation changes close
-stale writers.
+reauthorizes, read-only cannot mutate, and permission changes or
+`collaboration_epoch` resets close stale writers. Ordinary generation changes
+must not close an otherwise authorized collaboration session.
 
 While a connected focused map remains open, revoke one source permission. Prove
 the affected cached card becomes the uniform tombstone, protected metadata
@@ -143,7 +144,9 @@ without treating ordinary conflicts as infrastructure failure. Replace a
 recovery record with a newer edit while an older PATCH is in flight and prove the
 older acknowledgement cannot clear the newer snapshot. Prove the API
 compare-and-swap, not relay receipt, is the durability acknowledgement and
-survives API, Live, Redis, and browser restart. Prove atomic version restore with
+survives API, Live, Redis, and browser restart. Prove a scene above 4 MiB is
+rejected by the durable API and the largest accepted scene remains below the
+5 MiB relay-frame limit after framing. Prove atomic version restore with
 matching protected bindings and retained asset reachability. Prove normal CAS
 changes generation without changing `collaboration_epoch`; restore and lifecycle
 resets advance the epoch, publish immediate force-close, and periodic
@@ -168,7 +171,10 @@ target-owned `FileAsset` ID and storage key with byte-identical content, while
 the copied scene preserves Excalidraw file IDs and structure and bindings use
 fresh target-owned keys. Inject a storage-copy failure and prove no target
 Document, Work Map, scene, binding, version-asset link, or asset row becomes
-visible and any staged object is removed.
+visible. When compensating object deletion succeeds, prove every staged object
+is removed. When it fails, prove the operation receipt remains recoverable and
+a later idempotent cleanup removes the staged object without exposing the
+duplicate.
 
 Interrupt native image insertion after upload finalization but before the scene
 save. Prove the expired `WorkMapSceneAssetPlacement` removes only that
@@ -244,7 +250,7 @@ cannot replace its outside-in result.
 | Document-owned asset lifecycle | Editor, authorized viewer, and denied viewer | Native insertion persists a Document-owned asset; reload and restart materialize it only for authorized viewers; versions retain reachability; duplicate creates a byte-identical target-owned copy; injected copy failure leaves no partial aggregate | bytes or signed URLs in scene/relay, unauthorized materialization, missing history, shared duplicate asset ownership, or orphan storage/database state | `FileAsset.document`, `DocumentVersionAsset`, object bytes, stored scene, and aggregate readback | confidentiality or durable data loss |
 | Cross-map mixed paste | Target editor with allowed and denied source cases | Allowed paste preserves key-sharing topology, assets, and structure before one native insertion; denial, asset failure, placement failure, or cross-workspace input leaves scene, bindings, and assets unchanged | partial selection, old key, orphan binding, asset drift, broken structure, or leaked source | binding transaction, Plane asset owner, and final collaborative scene | authorization and data loss |
 | Version restore and duplicate | Document owner | Scene, binding snapshot, generation, and asset references change atomically; duplicate is complete and independently authorized | mixed version state, missing historical asset, stale overwrite, or visible partial duplicate | Work Map aggregate and Plane asset owner | unrecoverable inconsistency |
-| URL embed trust on desktop and tablet | Editor and read-only viewer | Controlled allowed, denied, and slow origins prove inert-first loading, shared document enablement, viewer-local load, origin reset, native pan/interaction, sandbox, and credential isolation | iframe steals gestures, viewer mutates document, sandbox weakens, credential leak, or canvas stall | collaborative node state, browser policy, and controlled local origins | third-party trust and gesture failure |
+| URL embed trust on desktop and tablet | Editor and read-only viewer | Controlled allowed, denied, and slow origins prove inert-first loading, shared document enablement, Document-scoped viewer-local load, origin reset, native pan/interaction, sandbox, and credential isolation; validated Plane carriers still render through their authorized host path | iframe steals gestures, a session grant crosses Documents, Plane carriers remain inert, viewer mutates document, sandbox weakens, credential leak, or canvas stall | collaborative node state, browser policy, and controlled local origins | third-party trust and gesture failure |
 | Discovery and project lifecycle | Owner and members with different project access | Lists, search, favorite, and recent open through an accessible active project; Page-like lock/archive and final-link deletion behavior hold | unscoped access, ghost route, or Work Map-only lifecycle semantics | shared Document associations and current Page behavior | secondary access drift |
 | Supported load envelope | Ten authenticated editors | A 1,000-element scene with 100 live nodes and five embeds remains interactive while hydration is independent and clients converge | hydration or embeds block drawing, crash clients, or prevent convergence | measured browser interaction and persisted final state | unusable supported scale |
 

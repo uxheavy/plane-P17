@@ -140,8 +140,11 @@ binding keys for the same authoritative sources, and applies Page
 duplication defaults for owner, access, and projects. Source access is evaluated
 again for every viewer of the duplicate. The operation exposes one complete
 duplicate or no duplicate; a partial scene, binding set, or asset copy is never
-visible. Failed storage copies are compensated before the database transaction
-returns failure.
+visible. Failed storage copies are compensated before failure when storage
+permits it. If compensation itself fails, the request still exposes no
+duplicate and retains the `WorkMapDuplicateOperation` receipt and lease state
+needed to retry idempotent cleanup; it never discards the only owner of copied
+objects.
 
 Version restoration follows the Page product experience: the selected version
 becomes current content through the live editor and later history remains
