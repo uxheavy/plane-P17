@@ -175,6 +175,11 @@ from .page.base import (
 )
 from .page.version import PageVersionEndpoint
 from .work_map import WorkMapBindingEndpoint, WorkMapRealtimeEndpoint, WorkMapSceneEndpoint, WorkMapViewSet
+from .work_map_source import (
+    WorkMapBindingHydrationEndpoint,
+    WorkMapBindingOpenEndpoint,
+    WorkMapSourceDiscoveryEndpoint,
+)
 
 from .search.base import GlobalSearchEndpoint, SearchEndpoint
 from .search.issue import IssueSearchEndpoint
