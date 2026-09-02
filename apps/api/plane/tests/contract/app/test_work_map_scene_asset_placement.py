@@ -80,6 +80,37 @@ class TestWorkMapSceneAssetPlacement:
         assert asset.page_id is None
 
     @patch("plane.app.views.asset.work_map.S3Storage.generate_presigned_post")
+    def test_unconfirmed_upload_is_leased_and_reclaimed(
+        self,
+        generate_presigned_post,
+        session_client,
+        workspace,
+        create_user,
+    ):
+        generate_presigned_post.return_value = {"url": "https://upload.invalid", "fields": {}}
+        project = _project(workspace, create_user)
+        work_map_data = session_client.post(_work_map_url(workspace, project), {"name": "Map"}, format="json").json()
+        created = session_client.post(
+            _scene_asset_url(workspace, project, work_map_data["id"]),
+            {"name": "unconfirmed.png", "mime_type": "image/png", "size": 4},
+            format="json",
+        )
+        assert created.status_code == status.HTTP_201_CREATED
+        asset_id = created.json()["asset"]["asset_id"]
+        asset = FileAsset.objects.get(pk=asset_id)
+        placement = WorkMapSceneAssetPlacement.objects.get(asset=asset)
+        WorkMapSceneAssetPlacement.objects.filter(pk=placement.pk).update(
+            created_at=timezone.now() - timedelta(minutes=16)
+        )
+
+        with patch("plane.bgtasks.work_map_asset_task.S3Storage.delete_files", return_value=True) as delete_files:
+            cleanup_stale_scene_asset_placements()
+
+        delete_files.assert_called_once_with([asset.asset.name])
+        assert not FileAsset.all_objects.filter(pk=asset_id).exists()
+        assert not WorkMapSceneAssetPlacement.all_objects.filter(pk=placement.pk).exists()
+
+    @patch("plane.app.views.asset.work_map.S3Storage.generate_presigned_post")
     @patch("plane.app.views.asset.work_map.S3Storage.get_object_metadata")
     def test_expired_unreferenced_finalized_upload_is_reclaimed(
         self,

@@ -17,7 +17,7 @@ from rest_framework import status
 from botocore.exceptions import EndpointConnectionError
 
 from plane.app.permissions import ROLE
-from plane.app.serializers.asset import WORK_MAP_SCENE_ASSET_MIME_TYPES
+from plane.app.serializers.asset import FileAssetSerializer, WORK_MAP_SCENE_ASSET_MIME_TYPES
 from plane.app.serializers.work_map import MAX_WORK_MAP_SCENE_BYTES, WorkMapSceneSerializer
 from plane.app.views.work_map.duplicate import mark_failed_after_cleanup as mark_duplicate_failed
 from plane.app.views.work_map.duplicate import renew_copy_lease as renew_duplicate_lease
@@ -322,6 +322,13 @@ class TestWorkMapApp:
     def test_page_asset_backfill_uses_the_shared_document_owner(self, workspace, create_user):
         project, _ = _project(workspace, create_user, "LEG")
         page = Page.objects.create(workspace=workspace, owned_by=create_user, name="Legacy page")
+        legacy_payload = FileAssetSerializer().validate(
+            {
+                "entity_type": FileAsset.EntityTypeContext.PAGE_DESCRIPTION,
+                "page": page,
+            }
+        )
+        assert legacy_payload["document"] == page
         DocumentProject.objects.create(workspace=workspace, project=project, document=page)
         page_asset = FileAsset(
             workspace=workspace,
@@ -995,6 +1002,30 @@ class TestWorkMapApp:
         assert not WorkMapBinding.objects.filter(node_key=abandoned["node_key"]).exists()
         assert WorkMapBinding.all_objects.filter(node_key=abandoned["node_key"], deleted_at__isnull=False).exists()
         recursive_delete.assert_not_called()
+
+        work_map.scene_binary = b'{"elements":[],"files":{}}'
+        work_map.save(update_fields=["scene_binary"])
+        replacement = session_client.post(
+            bindings_url,
+            {
+                "generation": 0,
+                "placement_id": uuid.uuid4(),
+                "source_kind": "work-item",
+                "source_id": kept_issue.id,
+            },
+            format="json",
+        )
+        assert replacement.status_code == status.HTTP_201_CREATED
+        replacement_placement = WorkMapBindingPlacement.objects.get(
+            binding__node_key=kept["node_key"],
+            acknowledged_at__isnull=True,
+        )
+        WorkMapBindingPlacement.objects.filter(id=replacement_placement.id).update(
+            created_at=timezone.now() - timedelta(minutes=16)
+        )
+        with patch("plane.db.mixins.soft_delete_related_objects.delay"):
+            expire_stale_work_map_binding_placements()
+        assert not WorkMapBinding.objects.filter(node_key=kept["node_key"]).exists()
 
         WorkMapBindingPlacement.objects.filter(id=kept_placement.id).update(
             acknowledged_at=timezone.now() - timedelta(days=settings.HARD_DELETE_AFTER_DAYS + 1)

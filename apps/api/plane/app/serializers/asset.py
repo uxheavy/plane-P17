@@ -27,6 +27,11 @@ WORK_MAP_SCENE_ASSET_MIME_TYPES = (
 
 
 class FileAssetSerializer(BaseSerializer):
+    def validate(self, attrs):
+        if attrs.get("entity_type") == FileAsset.EntityTypeContext.PAGE_DESCRIPTION and attrs.get("page") is not None:
+            attrs["document"] = attrs["page"]
+        return attrs
+
     class Meta:
         model = FileAsset
         fields = "__all__"

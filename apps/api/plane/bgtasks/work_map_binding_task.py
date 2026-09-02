@@ -61,7 +61,10 @@ def expire_stale_work_map_binding_placements():
                 placement.save(update_fields=["acknowledged_at", "updated_at"])
                 continue
             WorkMapBindingPlacement.objects.filter(id=placement.id).delete()
-            if not WorkMapBindingPlacement.objects.filter(binding=binding).exists():
+            if not WorkMapBindingPlacement.objects.filter(
+                binding=binding,
+                acknowledged_at__isnull=True,
+            ).exists():
                 WorkMapBinding.objects.filter(id=binding.id).delete()
 
     WorkMapBindingPlacement.objects.filter(

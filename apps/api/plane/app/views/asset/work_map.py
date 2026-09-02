@@ -75,6 +75,11 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
                 created_by=request.user,
                 entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
             )
+            WorkMapSceneAssetPlacement.objects.create(
+                work_map=work_map,
+                asset=asset,
+                created_by=request.user,
+            )
         upload_data = S3Storage(request=request).generate_presigned_post(
             object_name=object_name,
             file_type=data["mime_type"],
@@ -256,6 +261,8 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
             )
             return Response({"error": "Asset deletion is unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
