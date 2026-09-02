@@ -115,11 +115,14 @@ rather than assuming no invalidation was missed.
 
 ### Persistence and failure semantics
 
-The durable scene API accepts at most 3 MiB of serialized scene bytes. Its
-base64 JSON request remains below Plane's 5 MiB request-body cap, and the Live
-relay accepts frames up to 5 MiB. That fixed headroom covers both encodings and
-prevents an API-valid scene from becoming impossible to persist, broadcast, or
-repair solely because transport framing adds bytes.
+The durable scene API accepts at most 3 MiB of serialized scene bytes. Clients
+transmit those bytes as canonical base64 in both the API request and the
+`SCENE_UPDATE.payload`. Base64 expands 3 MiB to exactly 4 MiB, its alphabet
+needs no JSON string escaping, and the fixed frame fields add only bounded
+metadata. The resulting JSON therefore remains below Plane's 5 MiB request-body
+cap and Live's 5 MiB raw-frame cap. This fixed headroom prevents an API-valid
+scene from becoming impossible to persist, broadcast, or repair solely because
+transport encoding adds bytes.
 
 Every transmitted update is a full serialized Work Map scene. Relay,
 persistence, periodic repair, and recovery serialization all source elements
