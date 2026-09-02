@@ -1,4 +1,4 @@
-# ADR-0004: Use Plane Live for Work Map realtime persistence
+# ADR-0004: Use Plane Live as the Work Map transport relay
 
 ## Status
 
@@ -25,16 +25,25 @@ evidence-gated choice inside that boundary.
 
 ## Decision
 
-`apps/live` is the sole Work Map realtime shell in V0. It uses a closed
-`project_page | work_map` dispatch with separate content implementations.
+`apps/live` is the sole Work Map realtime shell in V0. The bounded host gate
+rejected Yjs scene projection, so Work Map uses the approved Plane-secured
+transport-only native-style relay. The closed document identity remains
+`project_page | work_map`, but the existing Page collaboration path is not
+changed.
 
 - Page retains its existing locator, rich-text conversion, title sync, editor,
   and supported APIs.
-- Work Map uses exact Work Map Yjs binary. It never runs Page serializers,
-  HTML/JSON conversion, title observers, XML-fragment assumptions, or IndexedDB
-  offline persistence.
-- Hocuspocus owns authenticated transport and in-memory Yjs documents; Redis
-  owns cross-instance updates, awareness, and force-close coordination.
+- Work Map frames use the validated `SCENE_UPDATE`, `POINTER_UPDATE`, and
+  `PRESENCE_UPDATE` native-style shapes. They never enter a Hocuspocus document,
+  Yjs content, Page serializer, HTML/JSON conversion, title observer,
+  XML-fragment assumption, or IndexedDB offline persistence.
+- `SCENE_UPDATE.payload` is the serialized Excalidraw scene-update string. It is
+  opaque to Plane Live: the relay validates only the outer native-style frame
+  and byte limit, and it neither parses elements nor invents a server-side scene
+  model. Protected bindings remain outside that payload.
+- Plane Live owns authenticated WebSocket transport and Redis owns
+  cross-instance fan-out. The server adds Plane sender and connection identity,
+  never echoes to the originating connection, and never logs scene payloads.
 - Plane Document/WorkMap storage owns durable identity, exact binary, versions,
   protected bindings, assets, and current generation.
 - Excalidraw Store/History owns user-facing undo. Remote application uses the
@@ -46,28 +55,37 @@ This is a closed dispatch, not a generic document-adapter registry.
 
 Every WebSocket attachment independently validates the closed document type,
 workspace, active project association, document ID, user, and Work Map
-generation. It must call the current Plane permission owner even if the Yjs
-document is already loaded on that server.
+generation. It must call the current Plane permission owner even if the relay
+room is already active on that server.
 
 Unreadable documents are denied before content is sent. Readable but noneditable
-documents attach read-only. Lock, archive, lost map permission, project-link
-loss, or generation change force-close affected Work Map rooms across instances
-and require fresh authorization on reconnect. Query-parameter casts and room
-knowledge are never authority.
+documents may send and receive only ephemeral pointer and presence frames;
+`SCENE_UPDATE` is rejected. Lock, archive, lost map permission, project-link
+loss, or version restoration force-close affected Work Map rooms across
+instances and require fresh authorization on reconnect. Query-parameter casts
+and room knowledge are never authority.
 
-Existing Page realtime locators remain unchanged. Work Map rooms include enough
-typed identity and generation to prevent a stale generation from joining or
-writing the current document.
+Existing Page realtime locators remain unchanged. Work Map room identity is
+derived server-side from the authorized workspace, project, and Work Map. The
+client-supplied generation is checked for attach freshness but does not partition
+the room: a successful save advances generation without splitting attached
+collaborators. Plane Live periodically reauthorizes active connections and
+force-closes them when readability, editability, lock, archive, or association
+changes. A normal scene save advances generation and therefore does not by
+itself force-close an attached room; version restoration uses the explicit
+cross-instance force-close seam before clients resynchronize.
 
 Awareness is ephemeral and contains only Plane user identity, pointer,
 selection, and idle state. It is neither persisted history nor map content.
 
 ### Persistence and failure semantics
 
-Persist the exact Work Map Yjs binary produced by the selected encoding. Do not
-regenerate durable state from a scene-JSON mirror. File bytes remain in the
-permission-checked Plane asset owner; protected source bindings remain outside
-collaborative binary.
+Persist the exact Work Map scene binary through the generation-CAS scene API.
+The relay does not persist, acknowledge, reconstruct, or merge scenes. A
+byte-identical retry of the immediately preceding stale generation is
+idempotently acknowledged; every other stale write is rejected without changing
+bytes or generation. File bytes remain in the permission-checked Plane asset
+owner; protected source bindings remain outside collaborative binary.
 
 An edit is acknowledged to its originating client only after it enters the
 Plane-owned durability boundary used for restart recovery. Socket receipt,
@@ -149,14 +167,32 @@ single selected fallback. It must derive room identity and access from Plane and
 leave durable state, versions, assets, and bindings in Plane. Do not build both,
 use stock `excalidraw-room`, Firebase, or public room secrets.
 
+#### Gate result
+
+The gate completed on 2026-09-02 against
+`@excalidraw/excalidraw@0.18.0`, `@hocuspocus/provider@2.2.3`,
+`@hocuspocus/server@2.2.3`, and `yjs@13.6.27`. Two real browser clients used a
+`Y.Map("elements")` projection, stock `restoreElements` and
+`reconcileElements`, and `updateScene(captureUpdate=NEVER)`. Independent moves
+converged and the persisted 988-byte Yjs state survived restart byte-identically
+with SHA-256
+`75d1a7a0c43b1d26502b30810a9925614b322fdd5808660c14acd35ea8f719e0`.
+
+The decisive undo requirement failed: after A moved one native rectangle and B
+moved another, A's native Undo reverted both A's local move and B's remote move
+on both clients. Therefore the Yjs scene projection is rejected and the
+transport-only relay is selected. The durable gate receipt is owned by the
+Work Map acceptance suite rather than copied into production code.
+
 ## Verification obligations
 
 - Multi-user and multi-instance tests must prove authorization on new
   attachments to already-loaded rooms, read-only enforcement, force-close, and
   no content before authorization.
-- Raw binary/socket inspection must prove absence of protected source metadata.
-- Exact binary must survive persistence and restart without rich-text
-  conversion.
+- Raw scene/API/socket inspection must prove absence of protected source
+  metadata and scene payloads from logs.
+- Exact scene binary must survive persistence and restart without Yjs or
+  rich-text conversion.
 - Disconnect, persistence failure, journal retry, acknowledgement cleanup,
   explicit discard, expiry cleanup, permission revocation, generation mismatch,
   and version restoration must prove no silent edit, replay, loss, or stale
@@ -190,10 +226,10 @@ current authorization and version generations.
 
 ## Consequences
 
-- Existing Plane Live authentication must be hardened into document
-  authorization before Work Map ships.
-- Work Map gains separate binary/content behavior without a second realtime
-  service by default.
+- Existing Plane Live authentication is hardened into per-attachment document
+  authorization plus bounded periodic reauthorization.
+- Work Map gains cross-instance transport without a second persistence owner or
+  a second standalone realtime service.
 - Editing availability depends on Plane Live and authoritative resync.
 - Encoding uncertainty is paid once in a bounded gate rather than embedded as
   rescue complexity in production.

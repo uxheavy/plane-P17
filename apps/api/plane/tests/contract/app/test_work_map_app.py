@@ -27,6 +27,7 @@ from plane.db.models import (
     State,
     WorkMap,
     WorkMapBinding,
+    WorkspaceMember,
 )
 
 
@@ -115,11 +116,53 @@ class TestWorkMapApp:
             format="json",
         )
         current = session_client.get(scene_url)
+        retry = session_client.patch(
+            scene_url,
+            {"generation": 0, "scene_binary": base64.b64encode(scene).decode("ascii")},
+            format="json",
+        )
 
         assert updated.status_code == status.HTTP_200_OK
         assert updated.json()["generation"] == 1
         assert stale.status_code == status.HTTP_409_CONFLICT
+        assert retry.status_code == status.HTTP_200_OK
+        assert retry.json() == {"generation": 1}
         assert current.json() == {"generation": 1, "scene_binary": base64.b64encode(scene).decode("ascii")}
+
+    def test_realtime_authorization_is_project_scoped_and_read_only_for_guests(
+        self, session_client, workspace, create_user
+    ):
+        project, membership = _project(workspace, create_user, "LIV")
+        other_project, _ = _project(workspace, create_user, "ALT")
+        work_map = _create_work_map(session_client, workspace, project)
+        realtime_url = _work_maps_url(workspace, project, work_map["id"], "realtime/")
+
+        authorized = session_client.get(realtime_url)
+        assert authorized.status_code == status.HTTP_200_OK
+        assert authorized.json() == {
+            "document_type": "work_map",
+            "workspace_slug": workspace.slug,
+            "project_id": str(project.id),
+            "work_map_id": work_map["id"],
+            "sender_id": str(create_user.id),
+            "generation": 0,
+            "readable": True,
+            "editable": True,
+            "is_locked": False,
+            "archived_at": None,
+        }
+
+        membership.role = 5
+        membership.save(update_fields=["role"])
+        assert session_client.get(realtime_url).json()["editable"] is True
+        workspace_membership = WorkspaceMember.objects.get(workspace=workspace, member=create_user)
+        workspace_membership.role = 5
+        workspace_membership.save(update_fields=["role"])
+        assert session_client.get(realtime_url).json()["editable"] is False
+        assert (
+            session_client.get(_work_maps_url(workspace, other_project, work_map["id"], "realtime/")).status_code
+            == status.HTTP_404_NOT_FOUND
+        )
 
     def test_wrong_project_and_inactive_member_cannot_read_or_write_scene(self, session_client, workspace, create_user):
         project, membership = _project(workspace, create_user, "OWN")

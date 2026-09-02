@@ -23,12 +23,14 @@ import { env } from "@/env";
 import { HocusPocusServerManager } from "@/hocuspocus";
 // redis
 import { redisManager } from "@/redis";
+import { WorkMapRelay } from "@/services/work-map-relay";
 
 export class Server {
   private app: Express;
   private router: Router;
   private hocuspocusServer: Hocuspocus | undefined;
   private httpServer: HttpServer | undefined;
+  private readonly workMapRelay = new WorkMapRelay();
 
   constructor() {
     this.app = express();
@@ -43,6 +45,13 @@ export class Server {
     try {
       await redisManager.initialize();
       logger.info("SERVER: Redis setup completed");
+      const redisClient = redisManager.getClient();
+      if (!redisClient) throw new Error("Redis is required for Work Map realtime");
+      const workMapPublisher = redisClient.duplicate();
+      const workMapSubscriber = redisClient.duplicate();
+      await Promise.all([workMapPublisher.ping(), workMapSubscriber.ping()]);
+      await this.workMapRelay.initialize(workMapPublisher, workMapSubscriber);
+      logger.info("SERVER: Work Map relay setup completed");
       const manager = HocusPocusServerManager.getInstance();
       this.hocuspocusServer = await manager.initialize();
       logger.info("SERVER: HocusPocus setup completed");
@@ -89,7 +98,9 @@ export class Server {
   }
 
   private setupRoutes(hocuspocusServer: Hocuspocus) {
-    CONTROLLERS.forEach((controller) => registerController(this.router, controller, [hocuspocusServer]));
+    CONTROLLERS.forEach((controller) =>
+      registerController(this.router, controller, [hocuspocusServer, this.workMapRelay])
+    );
   }
 
   public listen() {
@@ -109,6 +120,7 @@ export class Server {
       logger.info("SERVER: HocusPocus connections closed gracefully.");
     }
 
+    await this.workMapRelay.destroy();
     await redisManager.disconnect();
     logger.info("SERVER: Redis connection closed gracefully.");
 
