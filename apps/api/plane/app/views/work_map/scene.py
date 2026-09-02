@@ -16,11 +16,29 @@ from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.work_map import can_read_work_map_source
 from plane.app.serializers import WorkMapSceneSerializer
 from plane.app.serializers.asset import WORK_MAP_SCENE_ASSET_MIME_TYPES
-from plane.db.models import Document, FileAsset, WorkMap, WorkMapBinding, WorkMapBindingPlacement
+from plane.db.models import (
+    Document,
+    FileAsset,
+    WorkMap,
+    WorkMapBinding,
+    WorkMapBindingPlacement,
+    WorkMapSceneAssetPlacement,
+)
 
 from ..base import BaseAPIView
 from .base import visible_work_maps
 from .binding import protected_binding_keys, validate_protected_binding_carriers
+
+
+LEGACY_SCENE_UPGRADE_ERROR = "Work map scene requires upgrade"
+
+
+class WorkMapSceneUpgradeRequired(Exception):
+    pass
+
+
+class WorkMapSceneOpaque(ValueError):
+    """The bytes do not use the lifecycle scene representation."""
 
 
 def decode_work_map_scene(scene_binary):
@@ -30,14 +48,36 @@ def decode_work_map_scene(scene_binary):
     try:
         scene = json.loads(bytes(scene_binary).decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
-        raise ValueError("Scene is not valid Work Map JSON")
+        raise WorkMapSceneOpaque("Scene is not valid Work Map JSON")
     if (
         not isinstance(scene, dict)
         or not isinstance(scene.get("elements"), list)
         or not isinstance(scene.get("files"), dict)
     ):
-        raise ValueError("Scene is not a Work Map document")
+        raise WorkMapSceneOpaque("Scene is not a Work Map document")
     return scene
+
+
+def try_decode_work_map_scene(scene_binary, *, decoder=None):
+    """Decode structured scene data without changing the opaque scene contract."""
+    decoder = decode_work_map_scene if decoder is None else decoder
+    try:
+        return decoder(scene_binary)
+    except WorkMapSceneOpaque:
+        return None
+
+
+def work_map_has_semantic_state(work_map, document_id):
+    return (
+        work_map.bindings.filter(deleted_at__isnull=True).exists()
+        or FileAsset.objects.filter(
+            document_id=document_id,
+            entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+            is_uploaded=True,
+            is_deleted=False,
+            deleted_at__isnull=True,
+        ).exists()
+    )
 
 
 def work_map_scene_assets(scene):
@@ -129,9 +169,23 @@ class WorkMapSceneEndpoint(BaseAPIView):
                     {"error": "Work map generation is stale", "generation": work_map.generation},
                     status=status.HTTP_409_CONFLICT,
                 )
+            scene_asset_ids = set()
             try:
-                scene = decode_work_map_scene(candidate_scene_binary)
-                validate_work_map_scene_assets(scene, document.id, lock=True)
+                current_scene = try_decode_work_map_scene(work_map.scene_binary)
+                scene = try_decode_work_map_scene(candidate_scene_binary)
+                if scene is None:
+                    if current_scene is not None:
+                        return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
+                    work_map.scene_binary = candidate_scene_binary
+                    work_map.generation += 1
+                    work_map.save(update_fields=["scene_binary", "generation"])
+                    document.updated_by = request.user
+                    document.save(update_fields=["updated_by", "updated_at"])
+                    return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
+                if current_scene is None and work_map_has_semantic_state(work_map, document.id):
+                    return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
+                assets = validate_work_map_scene_assets(scene, document.id, lock=True)
+                scene_asset_ids = set(assets)
                 carrier_keys = protected_binding_keys(scene)
                 referenced_bindings = {
                     binding.node_key: binding
@@ -194,6 +248,10 @@ class WorkMapSceneEndpoint(BaseAPIView):
                 binding__node_key__in=carrier_keys,
                 acknowledged_at__isnull=True,
             ).update(acknowledged_at=changed_at, updated_by=request.user, updated_at=changed_at)
+            WorkMapSceneAssetPlacement.all_objects.filter(
+                work_map=work_map,
+                asset_id__in=scene_asset_ids,
+            ).delete()
             work_map.scene_binary = candidate_scene_binary
             work_map.generation += 1
             work_map.save(update_fields=["scene_binary", "generation"])

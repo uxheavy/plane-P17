@@ -126,12 +126,4 @@ export type TSelectionPageProps<T = any> = {
   onClose: () => void;
 };
 
-export type TPowerKSearchResultsKeys =
-  | "workspace"
-  | "project"
-  | "issue"
-  | "cycle"
-  | "module"
-  | "issue_view"
-  | "page"
-  | "work_map";
+export type TPowerKSearchResultsKeys = "workspace" | "project" | "issue" | "cycle" | "module" | "issue_view" | "page";

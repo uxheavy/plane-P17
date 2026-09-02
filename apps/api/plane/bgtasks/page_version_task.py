@@ -29,15 +29,11 @@ def page_version_assets(page):
             asset_ids.add(uuid.UUID(str(source)))
         except (TypeError, ValueError):
             continue
-    assets = {
-        asset.id: asset
-        for asset in FileAsset.objects.filter(
-            id__in=asset_ids,
-            document_id=page.id,
-            entity_type=FileAsset.EntityTypeContext.PAGE_DESCRIPTION,
-        )
-    }
-    if set(assets) != asset_ids:
+    assets = {asset.id: asset for asset in FileAsset._base_manager.filter(id__in=asset_ids)}
+    if any(
+        asset.document_id != page.id or asset.entity_type != FileAsset.EntityTypeContext.PAGE_DESCRIPTION
+        for asset in assets.values()
+    ):
         raise ValueError("Page version asset is not owned by its Document")
     return assets.values()
 

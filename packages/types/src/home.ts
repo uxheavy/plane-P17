@@ -7,7 +7,7 @@
 import type { TLogoProps } from "./common";
 import type { TIssuePriorities } from "./issues";
 
-export type TRecentActivityFilterKeys = "all item" | "issue" | "page" | "project" | "workspace_page" | "work_map";
+export type TRecentActivityFilterKeys = "all item" | "issue" | "page" | "project" | "workspace_page";
 export type THomeWidgetKeys = "quick_links" | "recents" | "my_stickies" | "quick_tutorial" | "new_at_plane";
 
 export type THomeWidgetProps = {
@@ -21,14 +21,6 @@ export type TPageEntityData = {
   project_id?: string;
   owned_by: string;
   project_identifier?: string;
-};
-
-export type TWorkMapEntityData = {
-  id: string;
-  name: string;
-  project_id: string;
-  owned_by: string;
-  project_identifier: string;
 };
 
 export type TProjectEntityData = {
@@ -54,10 +46,10 @@ export type TIssueEntityData = {
 
 export type TActivityEntityData = {
   id: string;
-  entity_name: "page" | "project" | "issue" | "workspace_page" | "work_map";
+  entity_name: "page" | "project" | "issue" | "workspace_page";
   entity_identifier: string;
   visited_at: string;
-  entity_data: TPageEntityData | TProjectEntityData | TIssueEntityData | TWorkMapEntityData;
+  entity_data: TPageEntityData | TProjectEntityData | TIssueEntityData;
 };
 
 export type TLinkEditableFields = {

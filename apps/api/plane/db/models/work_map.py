@@ -66,6 +66,20 @@ class WorkMapBindingPlacement(BaseModel):
         ]
 
 
+class WorkMapSceneAssetPlacement(BaseModel):
+    """Own a finalized scene asset until a durable scene or cleanup does."""
+
+    work_map = models.ForeignKey("db.WorkMap", on_delete=models.CASCADE, related_name="scene_asset_placements")
+    asset = models.OneToOneField(
+        "db.FileAsset",
+        on_delete=models.CASCADE,
+        related_name="work_map_scene_placement",
+    )
+
+    class Meta:
+        db_table = "work_map_scene_asset_placements"
+
+
 class WorkMapPasteRebinding(BaseModel):
     class Status(models.TextChoices):
         COPYING = "copying", "Copying"

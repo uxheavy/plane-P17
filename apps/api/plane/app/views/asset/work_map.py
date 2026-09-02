@@ -14,11 +14,15 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.document import visible_documents
 from plane.app.serializers import WorkMapSceneAssetCreateSerializer, WorkMapSceneAssetSerializer
-from plane.db.models import Document, FileAsset
+from plane.db.models import Document, FileAsset, WorkMap, WorkMapSceneAssetPlacement
 from plane.settings.storage import S3Storage
 
 from ..base import BaseAPIView
-from ..work_map.scene import decode_work_map_scene, work_map_scene_assets
+from ..work_map.scene import (
+    LEGACY_SCENE_UPGRADE_ERROR,
+    try_decode_work_map_scene,
+    work_map_scene_assets,
+)
 
 
 def visible_work_map(request, slug, project_id, work_map_id):
@@ -51,6 +55,9 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
                 return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
             if document.is_locked or document.archived_at is not None:
                 return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
+            work_map = WorkMap.objects.select_for_update().get(pk=document.id)
+            if try_decode_work_map_scene(work_map.scene_binary) is None:
+                return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
             object_name = f"{document.workspace_id}/{uuid.uuid4().hex}-{data['name']}"
             asset = FileAsset.objects.create(
                 attributes={
@@ -112,6 +119,9 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
                 return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
             if document.is_locked or document.archived_at is not None:
                 return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
+            work_map = WorkMap.objects.select_for_update().get(pk=document.id)
+            if try_decode_work_map_scene(work_map.scene_binary) is None:
+                return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
             asset = (
                 FileAsset.objects.select_for_update()
                 .filter(
@@ -153,6 +163,11 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
                     "updated_by",
                     "updated_at",
                 ]
+            )
+            WorkMapSceneAssetPlacement.objects.get_or_create(
+                work_map_id=document.id,
+                asset=asset,
+                defaults={"created_by": request.user},
             )
         return Response(
             WorkMapSceneAssetSerializer(asset, context={"project_id": project_id}).data,
@@ -215,10 +230,11 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
             if asset is None:
                 return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
             if asset.deleted_at is None:
+                scene = try_decode_work_map_scene(document.work_map.scene_binary)
+                if scene is None:
+                    return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
                 try:
-                    current_asset_ids = set(
-                        work_map_scene_assets(decode_work_map_scene(document.work_map.scene_binary)).values()
-                    )
+                    current_asset_ids = set(work_map_scene_assets(scene).values())
                 except ValueError:
                     return Response({"error": "Work map scene is invalid"}, status=status.HTTP_409_CONFLICT)
                 if asset.id in current_asset_ids or asset.document_version_links.exists():
@@ -227,6 +243,7 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
                 asset.is_deleted = True
                 asset.updated_by = request.user
                 asset.save(update_fields=["deleted_at", "is_deleted", "updated_by", "updated_at"])
+                WorkMapSceneAssetPlacement.objects.filter(asset=asset).delete(soft=False)
             object_name = asset.asset.name
 
         if object_name and not storage.delete_files([object_name]):

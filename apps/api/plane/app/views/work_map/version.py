@@ -24,7 +24,13 @@ from plane.db.models import (
 from ..base import BaseAPIView
 from .base import visible_work_maps
 from .binding import validate_protected_binding_carriers
-from .scene import decode_work_map_scene, validate_work_map_scene_assets
+from .scene import (
+    LEGACY_SCENE_UPGRADE_ERROR,
+    decode_work_map_scene,
+    try_decode_work_map_scene,
+    validate_work_map_scene_assets,
+    work_map_has_semantic_state,
+)
 
 MAX_WORK_MAP_VERSIONS = 20
 
@@ -64,10 +70,18 @@ class WorkMapVersionEndpoint(BaseAPIView):
                 return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
             work_map = WorkMap.objects.select_for_update().get(document=document)
             try:
-                scene = decode_work_map_scene(work_map.scene_binary)
-                assets = validate_work_map_scene_assets(scene, document.id, lock=True)
+                scene = try_decode_work_map_scene(work_map.scene_binary, decoder=decode_work_map_scene)
             except ValueError:
                 return Response({"error": "Work map version cannot be created"}, status=status.HTTP_409_CONFLICT)
+            if scene is None:
+                if work_map_has_semantic_state(work_map, document.id):
+                    return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
+                assets = {}
+            else:
+                try:
+                    assets = validate_work_map_scene_assets(scene, document.id, lock=True)
+                except ValueError:
+                    return Response({"error": "Work map version cannot be created"}, status=status.HTTP_409_CONFLICT)
             binding_snapshot = [
                 {
                     "node_key": str(binding.node_key),
@@ -77,13 +91,14 @@ class WorkMapVersionEndpoint(BaseAPIView):
                 }
                 for binding in work_map.bindings.filter(deleted_at__isnull=True).order_by("created_at")
             ]
-            try:
-                validate_protected_binding_carriers(
-                    scene,
-                    {uuid.UUID(binding["node_key"]): binding for binding in binding_snapshot},
-                )
-            except ValueError:
-                return Response({"error": "Work map version cannot be created"}, status=status.HTTP_409_CONFLICT)
+            if scene is not None:
+                try:
+                    validate_protected_binding_carriers(
+                        scene,
+                        {uuid.UUID(binding["node_key"]): binding for binding in binding_snapshot},
+                    )
+                except ValueError:
+                    return Response({"error": "Work map version cannot be created"}, status=status.HTTP_409_CONFLICT)
             document_version = DocumentVersion.objects.create(
                 document=document,
                 workspace=document.workspace,
@@ -136,14 +151,27 @@ class WorkMapVersionRestoreEndpoint(BaseAPIView):
                 return Response({"error": "Work map version not found"}, status=status.HTTP_404_NOT_FOUND)
 
             try:
-                version_scene = decode_work_map_scene(version.scene_binary)
-                version_assets = validate_work_map_scene_assets(version_scene, document.id, lock=True)
-                validate_protected_binding_carriers(
-                    version_scene,
-                    {uuid.UUID(binding["node_key"]): binding for binding in version.binding_snapshot},
-                )
+                version_scene = try_decode_work_map_scene(version.scene_binary, decoder=decode_work_map_scene)
+                current_scene = try_decode_work_map_scene(work_map.scene_binary, decoder=decode_work_map_scene)
             except ValueError:
                 return Response({"error": "Work map version cannot be restored"}, status=status.HTTP_409_CONFLICT)
+            if version_scene is None:
+                if (
+                    version.binding_snapshot
+                    or current_scene is not None
+                    or work_map_has_semantic_state(work_map, document.id)
+                ):
+                    return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
+                version_assets = {}
+            else:
+                try:
+                    version_assets = validate_work_map_scene_assets(version_scene, document.id, lock=True)
+                    validate_protected_binding_carriers(
+                        version_scene,
+                        {uuid.UUID(binding["node_key"]): binding for binding in version.binding_snapshot},
+                    )
+                except ValueError:
+                    return Response({"error": "Work map version cannot be restored"}, status=status.HTTP_409_CONFLICT)
             retained_asset_ids = set(version.document_version.asset_links.values_list("asset_id", flat=True))
             if retained_asset_ids != set(version_assets):
                 return Response(

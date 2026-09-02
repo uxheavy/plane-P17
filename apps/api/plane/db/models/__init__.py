@@ -95,6 +95,7 @@ from .work_map import (
     WorkMapBindingPlacement,
     WorkMapDuplicateOperation,
     WorkMapPasteRebinding,
+    WorkMapSceneAssetPlacement,
     WorkMapVersion,
 )
 

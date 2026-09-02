@@ -4,10 +4,12 @@
 
 import base64
 import binascii
-from django.conf import settings
 from rest_framework import serializers
 
 from plane.db.models import WorkMapBinding, WorkMapVersion
+
+
+MAX_WORK_MAP_SCENE_BYTES = 3 * 1024 * 1024
 
 
 class WorkMapCreateSerializer(serializers.Serializer):
@@ -29,8 +31,8 @@ class WorkMapSceneSerializer(serializers.Serializer):
             scene_binary = base64.b64decode(value, validate=True)
         except (binascii.Error, ValueError):
             raise serializers.ValidationError("Scene binary must be valid base64.")
-        if len(scene_binary) > settings.DATA_UPLOAD_MAX_MEMORY_SIZE:
-            raise serializers.ValidationError("Scene binary exceeds the configured upload limit.")
+        if len(scene_binary) > MAX_WORK_MAP_SCENE_BYTES:
+            raise serializers.ValidationError("Scene binary exceeds the Work Map limit.")
         return scene_binary
 
 
@@ -67,7 +69,7 @@ class WorkMapPasteRebindingSerializer(serializers.Serializer):
     generation = serializers.IntegerField(min_value=0)
     idempotency_key = serializers.UUIDField()
     node_keys = serializers.ListField(child=serializers.UUIDField(), allow_empty=True, max_length=100)
-    files = WorkMapPasteFileSerializer(many=True, required=False, default=list)
+    files = WorkMapPasteFileSerializer(many=True, required=False, default=list, max_length=100)
 
     def validate(self, attrs):
         node_keys = attrs["node_keys"]

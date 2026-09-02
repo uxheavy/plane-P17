@@ -18,6 +18,7 @@ from botocore.exceptions import EndpointConnectionError
 
 from plane.app.permissions import ROLE
 from plane.app.serializers.asset import WORK_MAP_SCENE_ASSET_MIME_TYPES
+from plane.app.serializers.work_map import MAX_WORK_MAP_SCENE_BYTES, WorkMapSceneSerializer
 from plane.app.views.work_map.duplicate import mark_failed_after_cleanup as mark_duplicate_failed
 from plane.app.views.work_map.duplicate import renew_copy_lease as renew_duplicate_lease
 from plane.app.views.work_map.duplicate import WorkMapSourceChanged
@@ -278,6 +279,14 @@ class TestWorkMapApp:
             with pytest.raises(error):
                 renew(operation.id, stale_lease)
 
+        for operation, cleanup in ((duplicate, mark_duplicate_failed), (paste, mark_paste_failed)):
+            storage = Mock()
+            storage.delete_files.return_value = True
+            cleanup(operation, current_lease, storage)
+            operation.refresh_from_db()
+            assert operation.status == operation.Status.FAILED
+            assert operation.deleted_at is not None
+
     def test_work_map_scene_asset_types_match_native_excalidraw(self):
         assert set(WORK_MAP_SCENE_ASSET_MIME_TYPES) == {
             "image/avif",
@@ -290,6 +299,24 @@ class TestWorkMapApp:
             "image/webp",
             "image/x-icon",
         }
+
+    def test_work_map_scene_reserves_transport_headroom(self):
+        accepted = WorkMapSceneSerializer(
+            data={
+                "generation": 0,
+                "scene_binary": base64.b64encode(b"x" * MAX_WORK_MAP_SCENE_BYTES).decode("ascii"),
+            }
+        )
+        rejected = WorkMapSceneSerializer(
+            data={
+                "generation": 0,
+                "scene_binary": base64.b64encode(b"x" * (MAX_WORK_MAP_SCENE_BYTES + 1)).decode("ascii"),
+            }
+        )
+
+        assert accepted.is_valid(), accepted.errors
+        assert not rejected.is_valid()
+        assert rejected.errors == {"scene_binary": ["Scene binary exceeds the Work Map limit."]}
 
     def test_page_asset_backfill_uses_the_shared_document_owner(self, workspace, create_user):
         project, _ = _project(workspace, create_user, "LEG")
@@ -347,6 +374,20 @@ class TestWorkMapApp:
         )
         with pytest.raises(RuntimeError, match="not owned by its Document"):
             asset_migration.backfill_page_version_assets(django_apps, None)
+
+    def test_page_version_keeps_history_when_a_referenced_asset_is_missing(self, workspace, create_user):
+        page = Page.objects.create(
+            workspace=workspace,
+            owned_by=create_user,
+            name="Page with missing asset",
+            description_html=f'<image-component src="{uuid.uuid4()}"></image-component>',
+        )
+
+        track_page_version(page.id, json.dumps({"description_html": ""}), create_user.id)
+
+        version = PageVersion.objects.get(document_id=page.id)
+        assert version.description_html == page.description_html
+        assert not version.asset_links.exists()
 
     def test_create_uses_one_document_and_work_map_id(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "MAP")
@@ -913,11 +954,12 @@ class TestWorkMapApp:
         replayed = session_client.post(paste_url, payload, format="json")
         assert replayed.status_code == status.HTTP_200_OK
         assert replayed.json() == pasted.json()
-        receipt = WorkMapPasteRebinding.objects.get(
+        receipt = WorkMapPasteRebinding.all_objects.get(
             work_map_id=target["id"],
             idempotency_key=idempotency_key,
         )
         assert receipt.status == WorkMapPasteRebinding.Status.COMMITTED
+        assert receipt.deleted_at is not None
 
         denied_target = _create_work_map(session_client, workspace, project)
         denied_payload = {**payload, "idempotency_key": uuid.uuid4()}
@@ -942,6 +984,25 @@ class TestWorkMapApp:
             )
         assert denied.status_code == status.HTTP_409_CONFLICT
         assert not WorkMapBinding.objects.filter(work_map_id=denied_target["id"]).exists()
+
+    def test_cross_map_paste_bounds_file_copies(self, session_client, workspace, create_user):
+        project, _ = _project(workspace, create_user, "PFL")
+        target = _create_work_map(session_client, workspace, project)
+        idempotency_key = uuid.uuid4()
+
+        response = session_client.post(
+            _work_maps_url(workspace, project, target["id"], "paste-rebindings/"),
+            {
+                "generation": 0,
+                "idempotency_key": idempotency_key,
+                "node_keys": [],
+                "files": [{"file_id": f"file-{index}", "asset_id": uuid.uuid4()} for index in range(101)],
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not WorkMapPasteRebinding.all_objects.filter(idempotency_key=idempotency_key).exists()
 
     def test_duplicate_replaces_every_binding_key_atomically(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "DUP")
@@ -992,7 +1053,13 @@ class TestWorkMapApp:
                         "type": "embeddable",
                         "link": f"https://work-map.invalid/nodes/{source_key}",
                         "customData": {"nodeKey": source_key},
-                    }
+                    },
+                    {
+                        "id": "native-embed",
+                        "type": "embeddable",
+                        "link": "https://example.invalid",
+                        "customData": {"enabledOrigin": "https://example.invalid"},
+                    },
                 ],
                 "files": {},
             }
@@ -1034,6 +1101,7 @@ class TestWorkMapApp:
         assert duplicate_binding.node_key == uuid.UUID(target_key)
         assert target_key != source_key
         assert duplicate_scene["elements"][0]["link"] == f"https://work-map.invalid/nodes/{target_key}"
+        assert "enabledOrigin" not in duplicate_scene["elements"][1]["customData"]
         assert duplicate_binding.source_kind == "work-item"
         assert duplicate_binding.source_id == issue.id
         assert duplicate.document.owned_by == create_user
@@ -1478,11 +1546,12 @@ class TestWorkMapApp:
                 format="json",
             )
         assert failed_paste.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-        paste_receipt = WorkMapPasteRebinding.objects.get(
+        paste_receipt = WorkMapPasteRebinding.all_objects.get(
             work_map_id=paste_target["id"],
             idempotency_key=paste_idempotency_key,
         )
         assert paste_receipt.status == WorkMapPasteRebinding.Status.FAILED
+        assert paste_receipt.deleted_at is not None
         assert paste_receipt.lease_id is None
         assert paste_receipt.lease_expires_at is None
         assert not FileAsset.objects.filter(document_id=paste_target["id"]).exists()
@@ -1490,6 +1559,7 @@ class TestWorkMapApp:
         assert len(paste_cleanup.call_args.args[0]) == 2
 
         duplicate_url = _work_maps_url(workspace, project, work_map["id"], "duplicate/")
+        duplicate_idempotency_key = uuid.uuid4()
         with (
             patch("plane.app.views.work_map.duplicate.S3Storage.copy_object", return_value={"ok": True}),
             patch(
@@ -1501,9 +1571,12 @@ class TestWorkMapApp:
                 duplicate_url,
                 {},
                 format="json",
-                HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+                HTTP_IDEMPOTENCY_KEY=str(duplicate_idempotency_key),
             )
         assert duplicated.status_code == status.HTTP_201_CREATED
+        duplicate_receipt = WorkMapDuplicateOperation.all_objects.get(idempotency_key=duplicate_idempotency_key)
+        assert duplicate_receipt.status == WorkMapDuplicateOperation.Status.COMMITTED
+        assert duplicate_receipt.deleted_at is not None
         assert renew_lease.call_count == 4
         duplicate_scene = json.loads(bytes(WorkMap.objects.get(pk=duplicated.json()["id"]).scene_binary))
         duplicate_asset_ids = {metadata["assetId"] for metadata in duplicate_scene["files"].values()}
@@ -1519,6 +1592,7 @@ class TestWorkMapApp:
 
         document_count = Document.objects.filter(kind=Document.Kind.WORK_MAP).count()
         asset_count = FileAsset.objects.filter(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).count()
+        failed_duplicate_idempotency_key = uuid.uuid4()
         with (
             patch(
                 "plane.app.views.work_map.duplicate.S3Storage.copy_object",
@@ -1530,9 +1604,14 @@ class TestWorkMapApp:
                 duplicate_url,
                 {},
                 format="json",
-                HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+                HTTP_IDEMPOTENCY_KEY=str(failed_duplicate_idempotency_key),
             )
         assert failed_duplicate.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        failed_duplicate_receipt = WorkMapDuplicateOperation.all_objects.get(
+            idempotency_key=failed_duplicate_idempotency_key
+        )
+        assert failed_duplicate_receipt.status == WorkMapDuplicateOperation.Status.FAILED
+        assert failed_duplicate_receipt.deleted_at is not None
         assert Document.objects.filter(kind=Document.Kind.WORK_MAP).count() == document_count
         assert FileAsset.objects.filter(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).count() == asset_count
         delete_files.assert_called_once()

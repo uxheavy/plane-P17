@@ -31,7 +31,7 @@ from plane.utils.path_validator import sanitize_filename
 
 from ..base import BaseAPIView
 from .base import visible_work_maps
-from .scene import decode_work_map_scene
+from .scene import LEGACY_SCENE_UPGRADE_ERROR, WorkMapSceneUpgradeRequired, try_decode_work_map_scene
 
 
 PASTE_LEASE_DURATION = timedelta(minutes=15)
@@ -88,6 +88,7 @@ def mark_failed_after_cleanup(operation, lease_id, storage):
             status=WorkMapPasteRebinding.Status.FAILED,
             lease_id=None,
             lease_expires_at=None,
+            deleted_at=timezone.now(),
         )
 
 
@@ -160,13 +161,9 @@ def authorized_paste_sources(*, user, workspace_id, node_keys, files, lock):
             )
         ):
             raise WorkMapPasteSourceUnavailable
-        try:
-            scene = scenes.setdefault(
-                source_document.id,
-                decode_work_map_scene(source_document.work_map.scene_binary),
-            )
-        except ValueError as error:
-            raise WorkMapPasteSourceUnavailable from error
+        scene = scenes.setdefault(source_document.id, try_decode_work_map_scene(source_document.work_map.scene_binary))
+        if scene is None:
+            raise WorkMapSceneUpgradeRequired
         metadata = scene["files"].get(item["file_id"])
         if not isinstance(metadata, dict) or metadata.get("assetId") != str(asset.id):
             raise WorkMapPasteSourceUnavailable
@@ -230,6 +227,8 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
                         {"error": "Work map generation is stale", "generation": work_map.generation},
                         status=status.HTTP_409_CONFLICT,
                     )
+                if operation is None and try_decode_work_map_scene(work_map.scene_binary) is None:
+                    raise WorkMapSceneUpgradeRequired
                 if operation is not None:
                     operation.lease_id = lease_id
                     operation.lease_expires_at = timezone.now() + PASTE_LEASE_DURATION
@@ -328,6 +327,8 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
                 work_map = WorkMap.objects.select_for_update().get(pk=document.id)
                 if work_map.generation != operation.generation:
                     raise WorkMapPasteSourceUnavailable
+                if try_decode_work_map_scene(work_map.scene_binary) is None:
+                    raise WorkMapSceneUpgradeRequired
                 bindings, source_assets = authorized_paste_sources(
                     user=request.user,
                     workspace_id=document.workspace_id,
@@ -384,17 +385,23 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
 
                 operation.status = WorkMapPasteRebinding.Status.COMMITTED
                 operation.committed_at = timezone.now()
+                operation.deleted_at = timezone.now()
                 operation.lease_id = None
                 operation.lease_expires_at = None
                 operation.save(
                     update_fields=[
                         "status",
                         "committed_at",
+                        "deleted_at",
                         "lease_id",
                         "lease_expires_at",
                         "updated_at",
                     ]
                 )
+        except WorkMapSceneUpgradeRequired:
+            if operation is not None:
+                mark_failed_after_cleanup(operation, lease_id, storage)
+            return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
         except (IntegrityError, WorkMapPasteSourceUnavailable):
             if operation is not None:
                 mark_failed_after_cleanup(operation, lease_id, storage)

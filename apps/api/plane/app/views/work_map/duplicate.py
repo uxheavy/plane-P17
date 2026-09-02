@@ -30,7 +30,14 @@ from plane.utils.path_validator import sanitize_filename
 from ..base import BaseAPIView
 from .base import serialize_work_map, visible_work_maps
 from .binding import WORK_MAP_NODE_LINK_PREFIX, validate_protected_binding_carriers
-from .scene import decode_work_map_scene, validate_work_map_scene_assets
+from .scene import (
+    LEGACY_SCENE_UPGRADE_ERROR,
+    WorkMapSceneUpgradeRequired,
+    decode_work_map_scene,
+    try_decode_work_map_scene,
+    validate_work_map_scene_assets,
+    work_map_has_semantic_state,
+)
 
 
 class WorkMapAssetCopyError(Exception):
@@ -106,12 +113,18 @@ def duplicate_scene(scene_binary, bindings, key_map=None):
             raise ValueError("Scene has protected bindings but no content")
         return None, {}
 
-    scene = decode_work_map_scene(scene_binary)
+    scene = try_decode_work_map_scene(scene_binary, decoder=decode_work_map_scene)
+    if scene is None:
+        if bindings:
+            raise WorkMapSceneUpgradeRequired
+        return None, {}
     validate_protected_binding_carriers(scene, bindings)
 
     key_map = {} if key_map is None else key_map
     for element in scene["elements"]:
         custom_data = element.get("customData")
+        if isinstance(custom_data, dict):
+            custom_data.pop("enabledOrigin", None)
         node_key_value = custom_data.get("nodeKey") if isinstance(custom_data, dict) else None
         if node_key_value is None:
             continue
@@ -206,6 +219,7 @@ def mark_failed_after_cleanup(operation, lease_id, storage):
             status=WorkMapDuplicateOperation.Status.FAILED,
             lease_id=None,
             lease_expires_at=None,
+            deleted_at=timezone.now(),
         )
 
 
@@ -283,15 +297,20 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                         status=status.HTTP_409_CONFLICT,
                     )
                 bindings = binding_snapshot(source_work_map, lock=True)
+                source_scene_binary = bytes(source_work_map.scene_binary)
+                source_scene = try_decode_work_map_scene(source_scene_binary, decoder=decode_work_map_scene)
+                if source_scene is None:
+                    if work_map_has_semantic_state(source_work_map, source.id):
+                        raise WorkMapSceneUpgradeRequired
+                    source_assets = {}
+                else:
+                    validate_protected_binding_carriers(source_scene, bindings)
+                    source_assets = validate_work_map_scene_assets(source_scene, source.id, lock=True)
                 validate_duplicate_sources(
                     user=request.user,
                     workspace_id=source.workspace_id,
                     bindings=bindings,
                 )
-                source_scene_binary = bytes(source_work_map.scene_binary)
-                source_scene = decode_work_map_scene(source_scene_binary)
-                validate_protected_binding_carriers(source_scene, bindings)
-                source_assets = validate_work_map_scene_assets(source_scene, source.id, lock=True)
                 source_snapshot = duplicate_snapshot(source, bindings, source_assets)
                 linked_project_ids = [project_id for project_id, _workspace_id in project_snapshot(source)]
                 if not can_write_projects(
@@ -349,7 +368,9 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                 lease_id=lease_id,
             )
             target_scene_binary = (
-                b"" if scene is None else json.dumps(scene, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                source_scene_binary
+                if scene is None
+                else json.dumps(scene, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             )
 
             with transaction.atomic():
@@ -363,8 +384,16 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                 if current is None:
                     raise WorkMapSourceChanged
                 current_work_map = WorkMap.objects.select_for_update().get(document=current)
-                current_scene = decode_work_map_scene(current_work_map.scene_binary)
-                current_assets = validate_work_map_scene_assets(current_scene, current.id, lock=True)
+                current_scene = try_decode_work_map_scene(
+                    current_work_map.scene_binary,
+                    decoder=decode_work_map_scene,
+                )
+                if current_scene is None:
+                    if work_map_has_semantic_state(current_work_map, current.id):
+                        raise WorkMapSceneUpgradeRequired
+                    current_assets = {}
+                else:
+                    current_assets = validate_work_map_scene_assets(current_scene, current.id, lock=True)
                 current_bindings = binding_snapshot(current_work_map, lock=True)
                 current_project_ids = [project_id for project_id, _workspace_id in project_snapshot(current)]
                 if not can_write_projects(
@@ -432,17 +461,23 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                 )
                 operation.status = WorkMapDuplicateOperation.Status.COMMITTED
                 operation.committed_at = timezone.now()
+                operation.deleted_at = timezone.now()
                 operation.lease_id = None
                 operation.lease_expires_at = None
                 operation.save(
                     update_fields=[
                         "status",
                         "committed_at",
+                        "deleted_at",
                         "lease_id",
                         "lease_expires_at",
                         "updated_at",
                     ]
                 )
+        except WorkMapSceneUpgradeRequired:
+            if operation is not None:
+                mark_failed_after_cleanup(operation, lease_id, storage)
+            return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
         except ValueError:
             if operation is not None:
                 mark_failed_after_cleanup(operation, lease_id, storage)

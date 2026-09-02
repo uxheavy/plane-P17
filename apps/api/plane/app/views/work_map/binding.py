@@ -200,9 +200,12 @@ class WorkMapBindingEndpoint(BaseAPIView):
             if placement is None or placement.deleted_at is not None:
                 return Response(status=status.HTTP_204_NO_CONTENT)
             binding = WorkMapBinding.all_objects.select_for_update().get(id=placement.binding_id)
-            from .scene import decode_work_map_scene
+            from .scene import LEGACY_SCENE_UPGRADE_ERROR, try_decode_work_map_scene
 
-            carrier_keys = protected_binding_keys(decode_work_map_scene(work_map.scene_binary))
+            scene = try_decode_work_map_scene(work_map.scene_binary)
+            if scene is None:
+                return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
+            carrier_keys = protected_binding_keys(scene)
             if binding.node_key in carrier_keys:
                 if placement.acknowledged_at is None:
                     placement.acknowledged_at = timezone.now()
