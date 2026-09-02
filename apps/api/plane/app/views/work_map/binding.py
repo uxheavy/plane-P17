@@ -88,6 +88,10 @@ class WorkMapBindingEndpoint(BaseAPIView):
                         {"error": "Work map generation is stale", "generation": work_map.generation},
                         status=status.HTTP_409_CONFLICT,
                     )
+                from .scene import LEGACY_SCENE_UPGRADE_ERROR, try_decode_work_map_scene
+
+                if try_decode_work_map_scene(work_map.scene_binary) is None:
+                    return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
                 if not can_read_work_map_source(
                     user=request.user,
                     workspace_id=document.workspace_id,

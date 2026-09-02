@@ -71,6 +71,8 @@ class WorkMapVersionEndpoint(BaseAPIView):
             document = Document.objects.select_for_update().filter(id=visible_id).first()
             if document is None:
                 return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
+            if document.is_locked or document.archived_at is not None:
+                return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
             work_map = WorkMap.objects.select_for_update().get(document=document)
             try:
                 scene = try_decode_work_map_scene(work_map.scene_binary, decoder=decode_work_map_scene)
@@ -244,6 +246,8 @@ class WorkMapVersionRestoreEndpoint(BaseAPIView):
             document.save(update_fields=["updated_by", "updated_at"])
 
         return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

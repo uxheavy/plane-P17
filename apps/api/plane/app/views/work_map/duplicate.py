@@ -52,6 +52,7 @@ class WorkMapSourceChanged(Exception):
 
 
 DUPLICATE_LEASE_DURATION = timedelta(minutes=15)
+MAX_WORK_MAP_DUPLICATE_ASSETS = 100
 
 
 def binding_snapshot(work_map, *, lock=False):
@@ -309,6 +310,8 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                 else:
                     validate_protected_binding_carriers(source_scene, bindings)
                     source_assets = validate_work_map_scene_assets(source_scene, source.id, lock=True)
+                if len(source_assets) > MAX_WORK_MAP_DUPLICATE_ASSETS:
+                    raise ValueError("Work map has too many assets to duplicate")
                 validate_duplicate_sources(
                     user=request.user,
                     workspace_id=source.workspace_id,
@@ -504,6 +507,8 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
 
         duplicate.is_favorite = False
         return Response(serialize_work_map(duplicate), status=status.HTTP_201_CREATED)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

@@ -14,8 +14,10 @@ from rest_framework import status
 from plane.db.models import (
     Document,
     FileAsset,
+    Issue,
     Project,
     ProjectMember,
+    State,
     WorkMap,
     WorkMapBinding,
     WorkMapBindingPlacement,
@@ -194,6 +196,29 @@ class TestWorkMapLegacySceneApp:
         work_map_data = _create_work_map(session_client, workspace, project)
         work_map = WorkMap.objects.get(pk=work_map_data["id"])
         legacy_scene = _set_legacy_scene(work_map)
+        state = State.objects.create(
+            project=project,
+            workspace=workspace,
+            name="Backlog",
+            color="#000000",
+            group="backlog",
+            default=True,
+        )
+        issue = Issue.objects.create(project=project, workspace=workspace, state=state, name="Work item")
+        binding_url = _work_map_url(workspace, project, work_map.pk, "bindings/")
+        new_binding = session_client.post(
+            binding_url,
+            {
+                "generation": 0,
+                "placement_id": uuid.uuid4(),
+                "source_kind": "work-item",
+                "source_id": issue.id,
+            },
+            format="json",
+        )
+        assert new_binding.status_code == status.HTTP_409_CONFLICT
+        assert new_binding.json() == {"error": "Work map scene requires upgrade"}
+        assert not WorkMapBinding.objects.filter(work_map=work_map).exists()
         binding = WorkMapBinding.objects.create(
             work_map=work_map,
             node_key=uuid.uuid4(),
@@ -285,6 +310,8 @@ class TestWorkMapLegacySceneApp:
         assert response.status_code == status.HTTP_409_CONFLICT
         assert response.json() == {"error": "Work map scene requires upgrade"}
         assert not FileAsset.objects.filter(document=work_map.document).exists()
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

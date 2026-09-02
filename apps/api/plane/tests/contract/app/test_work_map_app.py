@@ -1141,7 +1141,7 @@ class TestWorkMapApp:
         assert denied.status_code == status.HTTP_409_CONFLICT
         assert not WorkMapBinding.objects.filter(work_map_id=denied_target["id"]).exists()
 
-    def test_cross_map_paste_bounds_file_copies(self, session_client, workspace, create_user):
+    def test_work_map_copy_operations_bound_file_copies(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "PFL")
         target = _create_work_map(session_client, workspace, project)
         idempotency_key = uuid.uuid4()
@@ -1159,6 +1159,48 @@ class TestWorkMapApp:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert not WorkMapPasteRebinding.all_objects.filter(idempotency_key=idempotency_key).exists()
+
+        source = WorkMap.objects.get(pk=_create_work_map(session_client, workspace, project)["id"])
+        assets = [
+            FileAsset(
+                workspace=workspace,
+                document=source.document,
+                asset=f"duplicate-source-{index}",
+                attributes={"name": f"source-{index}.png", "type": "image/png"},
+                entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+                is_uploaded=True,
+            )
+            for index in range(101)
+        ]
+        FileAsset.objects.bulk_create(assets)
+        source.scene_binary = json.dumps(
+            {
+                "elements": [
+                    {"id": f"image-{index}", "type": "image", "fileId": f"file-{index}"} for index in range(101)
+                ],
+                "files": {
+                    f"file-{index}": {
+                        "assetId": str(asset.id),
+                        "mimeType": "image/png",
+                        "created": index,
+                    }
+                    for index, asset in enumerate(assets)
+                },
+            }
+        ).encode()
+        source.save(update_fields=["scene_binary"])
+        with patch("plane.app.views.work_map.duplicate.S3Storage.copy_object") as copy_object:
+            duplicate = session_client.post(
+                _work_maps_url(workspace, project, source.pk, "duplicate/"),
+                {},
+                format="json",
+                HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+            )
+
+        assert duplicate.status_code == status.HTTP_409_CONFLICT
+        assert duplicate.json() == {"error": "Work map cannot be duplicated"}
+        copy_object.assert_not_called()
+        assert not WorkMapDuplicateOperation.all_objects.filter(source_work_map=source).exists()
 
     def test_duplicate_replaces_every_binding_key_atomically(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "DUP")
@@ -1472,6 +1514,15 @@ class TestWorkMapApp:
             is_uploaded=True,
         )
         DocumentVersionAsset.objects.create(document_version_id=first.json()["id"], asset=retained_asset)
+
+        work_map_url = _work_maps_url(workspace, project, work_map["id"])
+        assert session_client.post(f"{work_map_url}lock/").status_code == status.HTTP_204_NO_CONTENT
+        assert session_client.post(versions_url, {}, format="json").status_code == status.HTTP_409_CONFLICT
+        assert session_client.delete(f"{work_map_url}lock/").status_code == status.HTTP_204_NO_CONTENT
+        assert session_client.post(f"{work_map_url}archive/").status_code == status.HTTP_200_OK
+        assert session_client.post(versions_url, {}, format="json").status_code == status.HTTP_409_CONFLICT
+        assert session_client.delete(f"{work_map_url}archive/").status_code == status.HTTP_204_NO_CONTENT
+        assert WorkMapVersion.objects.filter(document_version__document=document).count() == 1
 
         for _ in range(20):
             assert session_client.post(versions_url, {}, format="json").status_code == status.HTTP_201_CREATED
