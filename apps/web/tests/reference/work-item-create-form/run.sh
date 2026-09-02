@@ -8,6 +8,7 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd -P)
 web_url=${PLANE_REFERENCE_WEB_URL:-}
 web_port_override=${PLANE_REFERENCE_WEB_PORT:-}
+reservation_fd=${PLANE_REFERENCE_WEB_PORT_FD:-}
 api_url=${PLANE_REFERENCE_API_URL:-http://localhost:8000}
 api_container=${PLANE_REFERENCE_API_CONTAINER:-}
 fixture="$repo_root/apps/web/tests/reference/work-item-create-form/fixture.py"
@@ -64,7 +65,12 @@ claim_web_port() {
   local candidate=$1
   local candidate_lock="${TMPDIR:-/tmp}/plane-reference-web-$candidate.lock"
   mkdir "$candidate_lock" 2>/dev/null || return 1
-  if ! python3 -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1])))' "$candidate" 2>/dev/null; then
+  if [[ -n "$reservation_fd" ]]; then
+    if ! python3 -c 'import os,socket,sys; s=socket.socket(fileno=os.dup(int(sys.argv[1]))); assert s.getsockname() == ("127.0.0.1", int(sys.argv[2]))' "$reservation_fd" "$candidate" 2>/dev/null; then
+      rmdir "$candidate_lock"
+      return 1
+    fi
+  elif ! python3 -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1])))' "$candidate" 2>/dev/null; then
     rmdir "$candidate_lock"
     return 1
   fi
@@ -111,6 +117,10 @@ trap cleanup EXIT
 if [[ -n "$web_url" ]]; then
   external_web=1
 else
+  if [[ -n "$reservation_fd" && ( -z "$web_port_override" || ! "$reservation_fd" =~ ^[0-9]+$ ) ]]; then
+    echo "PLANE_REFERENCE_WEB_PORT_FD requires a numeric descriptor and PLANE_REFERENCE_WEB_PORT." >&2
+    exit 1
+  fi
   if [[ -n "$web_port_override" ]]; then
     claim_web_port "$web_port_override" || {
       echo "Reference web port is already claimed: $web_port_override" >&2
@@ -145,6 +155,10 @@ if [[ $external_web == 0 ]]; then
     pnpm --dir "$repo_root" build --filter=web... --env-mode=loose
   complete_stage
   begin_stage "web.preview"
+  if [[ -n "$reservation_fd" ]]; then
+    eval "exec ${reservation_fd}>&-"
+    reservation_fd=""
+  fi
   (
     cd "$repo_root/apps/web"
     exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
