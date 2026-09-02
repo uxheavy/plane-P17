@@ -7,6 +7,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd -P)
 web_url=${PLANE_REFERENCE_WEB_URL:-}
+web_port_override=${PLANE_REFERENCE_WEB_PORT:-}
 api_url=${PLANE_REFERENCE_API_URL:-http://localhost:8000}
 api_container=${PLANE_REFERENCE_API_CONTAINER:-}
 fixture="$repo_root/apps/web/tests/reference/work-item-create-form/fixture.py"
@@ -22,6 +23,7 @@ port_lock=""
 current_stage="suite.bootstrap"
 stage_open=0
 review_stop=0
+external_web=0
 
 mkdir -p "$audit_dir"
 
@@ -107,19 +109,23 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ -n "$web_url" ]]; then
-  claim_web_port "${web_url##*:}" || {
-    echo "Reference web port is already claimed: ${web_url##*:}" >&2
-    exit 1
-  }
+  external_web=1
 else
-  for candidate in ${PLANE_REFERENCE_WEB_PORTS:-3000 3001 3002 3100}; do
-    claim_web_port "$candidate" && break
-  done
+  if [[ -n "$web_port_override" ]]; then
+    claim_web_port "$web_port_override" || {
+      echo "Reference web port is already claimed: $web_port_override" >&2
+      exit 1
+    }
+  else
+    for candidate in ${PLANE_REFERENCE_WEB_PORTS:-3000 3001 3002 3100}; do
+      claim_web_port "$candidate" && break
+    done
+  fi
   if [[ -z "$web_port" ]]; then
     echo "No reference web port is available in PLANE_REFERENCE_WEB_PORTS." >&2
     exit 1
   fi
-  web_url="http://localhost:$web_port"
+  web_url="http://127.0.0.1:$web_port"
 fi
 
 audit "suite.run" "started"
@@ -133,22 +139,24 @@ if [[ ! -d "$repo_root/node_modules" ]]; then
   complete_stage
 fi
 
-begin_stage "web.build"
-VITE_API_BASE_URL="$api_url" VITE_WEB_BASE_URL="$web_url" \
-  pnpm --dir "$repo_root" build --filter=web... --env-mode=loose
-complete_stage
-begin_stage "web.preview"
-(
-  cd "$repo_root/apps/web"
-  exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
-) >/tmp/plane-reference-preview.log 2>&1 &
-preview_pid=$!
-for _ in {1..60}; do
-  curl -fsS "$web_url" >/dev/null 2>&1 && break
-  sleep 1
-done
-curl -fsS "$web_url" >/dev/null
-complete_stage
+if [[ $external_web == 0 ]]; then
+  begin_stage "web.build"
+  VITE_API_BASE_URL="$api_url" VITE_WEB_BASE_URL="$web_url" \
+    pnpm --dir "$repo_root" build --filter=web... --env-mode=loose
+  complete_stage
+  begin_stage "web.preview"
+  (
+    cd "$repo_root/apps/web"
+    exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
+  ) >/tmp/plane-reference-preview.log 2>&1 &
+  preview_pid=$!
+  for _ in {1..60}; do
+    curl -fsS "$web_url" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  curl -fsS "$web_url" >/dev/null
+  complete_stage
+fi
 
 begin_stage "fixture.provision"
 fixture_json=$(run_django setup | tail -1)
@@ -197,7 +205,7 @@ if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} == 1 ]]; then
   trap 'review_stop=1' INT TERM
   printf 'Reference review URL: %s\nReference email: %s\nReference password: %s\nReference run: %s\nReference cleanup: kill -TERM %s\n' \
     "$project_url" "$reference_email" "$reference_password" "$reference_run_id" "$$"
-  while [[ $review_stop == 0 ]]; do
+  while [[ $review_stop == 0 && -n "$preview_pid" ]]; do
     if ! kill -0 "$preview_pid" 2>/dev/null; then
       echo "Reference preview exited before review cleanup." >&2
       exit 1

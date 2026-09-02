@@ -19,6 +19,7 @@ import { getFileURL } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
+import { isNativeAgent } from "@/store/member/utils";
 export interface RowData extends Pick<TProjectMembership, "original_role"> {
   member: IUserLite;
 }
@@ -42,7 +43,7 @@ export function NameColumn(props: NameProps) {
   const { rowData, workspaceSlug, isAdmin, currentUser, setRemoveMemberModal } = props;
   // derived values
   const { avatar_url, display_name, email, first_name, id, last_name } = rowData.member;
-  const isAgent = rowData.member.bot_type === "AGENT";
+  const isAgent = isNativeAgent(rowData.member);
 
   return (
     <Disclosure>
@@ -67,7 +68,7 @@ export function NameColumn(props: NameProps) {
                   </span>
                 </Link>
               )}
-              {first_name} {last_name}
+              {isAgent ? display_name : `${first_name} ${last_name}`}
             </div>
             {!isAgent && (isAdmin || id === currentUser?.id) && (
               <CustomMenu
@@ -111,7 +112,7 @@ const AccountTypeColumnView = observer(function AccountTypeColumnView(props: Acc
   } = useForm();
   // derived values
   const roleLabel = ROLE[rowData.original_role ?? EUserPermissions.GUEST];
-  const isAgent = rowData.member.bot_type === "AGENT";
+  const isAgent = isNativeAgent(rowData.member);
   const isCurrentUser = currentUser?.id === rowData.member.id;
   const isRowDataWorkspaceAdmin = [EUserPermissions.ADMIN].includes(
     Number(getWorkspaceMemberDetails(rowData.member.id)?.role ?? EUserPermissions.GUEST)

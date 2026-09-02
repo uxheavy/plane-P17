@@ -44,6 +44,176 @@ export type TLabelDropdownBaseProps = {
   value: string[];
 };
 
+type LabelDropdownTriggerProps = {
+  buttonClassName?: string;
+  buttonContainerClassName?: string;
+  customLabel?: React.ReactNode;
+  isOpen: boolean;
+  labelsById: Map<string, IIssueLabel>;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  referenceElement: (element: HTMLButtonElement | null) => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+  value: string[];
+};
+
+function LabelDropdownTrigger(props: LabelDropdownTriggerProps) {
+  const {
+    buttonClassName,
+    buttonContainerClassName,
+    customLabel,
+    isOpen,
+    labelsById,
+    onClick,
+    referenceElement,
+    t,
+    value,
+  } = props;
+
+  return (
+    <button
+      type="button"
+      ref={referenceElement}
+      className={cn("flex h-full cursor-pointer items-center gap-2 text-11", buttonContainerClassName)}
+      onClick={onClick}
+      aria-expanded={isOpen}
+    >
+      {customLabel ? (
+        customLabel
+      ) : value.length > 0 ? (
+        <span className={cn("flex h-full items-center justify-center gap-2 text-11", buttonClassName)}>
+          <IssueLabelsList labels={value.map((v) => labelsById.get(v)) ?? []} length={3} showLength />
+        </span>
+      ) : (
+        <div
+          className={cn(
+            "flex h-full items-center justify-center gap-1 rounded-sm border-[0.5px] border-strong px-2 py-1 text-11 hover:bg-layer-1",
+            buttonClassName
+          )}
+        >
+          <LabelPropertyIcon className="h-3 w-3 flex-shrink-0" />
+          <span>{t("labels")}</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+type LabelDropdownOptionsProps = {
+  attributes: Record<string, string> | undefined;
+  createLabelEnabled: boolean;
+  handleAddLabel: (labelName: string) => Promise<void>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  labelsById: Map<string, IIssueLabel>;
+  noMatchingResults: string;
+  popperElementRef: (element: HTMLDivElement | null) => void;
+  query: string;
+  searchInputKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => Promise<void>;
+  setQuery: (query: string) => void;
+  style: React.CSSProperties;
+  submitting: boolean;
+  t: (key: string, params?: Record<string, unknown>) => string;
+  virtualOptions: string[];
+};
+
+function LabelDropdownOptions(props: LabelDropdownOptionsProps) {
+  const {
+    attributes,
+    createLabelEnabled,
+    handleAddLabel,
+    inputRef,
+    labelsById,
+    noMatchingResults,
+    popperElementRef,
+    query,
+    searchInputKeyDown,
+    setQuery,
+    style,
+    submitting,
+    t,
+    virtualOptions,
+  } = props;
+
+  return (
+    <div
+      className="fixed z-10 my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none"
+      ref={popperElementRef}
+      style={style}
+      {...(attributes ?? {})}
+    >
+      <div className="flex items-center gap-1.5 rounded-sm border border-subtle bg-surface-2 px-2">
+        <SearchIcon className="h-3.5 w-3.5 text-placeholder" strokeWidth={1.5} />
+        <Combobox.Input
+          as="input"
+          ref={inputRef}
+          className="w-full bg-transparent py-1 text-11 text-secondary placeholder:text-placeholder focus:outline-none"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("search")}
+          displayValue={(assigned: any) => assigned?.name}
+          onKeyDown={searchInputKeyDown}
+        />
+      </div>
+      {virtualOptions.length > 0 ? (
+        <Combobox.Options as="ul" className="mt-2 h-48 space-y-1 overflow-y-scroll" modal={false} static>
+          {({ option }: { option: string }) => {
+            const label = labelsById.get(option)!;
+            const parentLabel = label.parent ? labelsById.get(label.parent) : undefined;
+            return (
+              <Combobox.Option
+                as="li"
+                key={label.id}
+                className={({ active }) =>
+                  `${active ? "bg-layer-1" : ""} group flex w-full cursor-pointer items-center gap-2 truncate rounded-sm px-1 py-1.5 text-secondary select-none`
+                }
+                value={label.id}
+              >
+                {({ selected }) => (
+                  <div className="flex w-full justify-between gap-2 rounded-sm">
+                    <div className="flex items-center justify-start gap-2 truncate">
+                      <span
+                        className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                        style={{ backgroundColor: label.color }}
+                      />
+                      {parentLabel && <Component className="h-3 w-3 flex-shrink-0" />}
+                      <span className="truncate">
+                        {parentLabel && <span className="text-tertiary">{parentLabel.name} / </span>}
+                        {label.name}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center justify-center rounded-sm p-1">
+                      <CheckIcon className={`h-3 w-3 ${selected ? "opacity-100" : "opacity-0"}`} />
+                    </div>
+                  </div>
+                )}
+              </Combobox.Option>
+            );
+          }}
+        </Combobox.Options>
+      ) : submitting ? (
+        <Loader className="mt-2 h-3.5 w-3.5 animate-spin" />
+      ) : createLabelEnabled ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (query.length) void handleAddLabel(query);
+          }}
+          disabled={!query.length}
+          className={`mt-2 text-left text-secondary ${query.length ? "cursor-pointer" : "cursor-default"}`}
+        >
+          {query.length ? (
+            <>
+              + Add <span className="text-primary">&quot;{query}&quot;</span> to labels
+            </>
+          ) : (
+            t("label.create.type")
+          )}
+        </button>
+      ) : (
+        <p className="mt-2 px-1.5 py-1 text-placeholder italic">{noMatchingResults}</p>
+      )}
+    </div>
+  );
+}
+
 export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLabelDropdownBaseProps) {
   const {
     buttonClassName,
@@ -198,112 +368,34 @@ export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLab
       onKeyDown={handleKeyDown}
       virtual={{ options: virtualOptions }}
     >
-      <button
-        type="button"
-        ref={setReferenceElement}
-        className={cn("flex h-full cursor-pointer items-center gap-2 text-11", buttonContainerClassName)}
+      <LabelDropdownTrigger
+        buttonClassName={buttonClassName}
+        buttonContainerClassName={buttonContainerClassName}
+        customLabel={customLabel}
+        isOpen={isDropdownOpen}
+        labelsById={labelsById}
         onClick={handleOnClick}
-      >
-        {customLabel ? (
-          customLabel
-        ) : value && value.length > 0 ? (
-          <span className={cn("flex h-full items-center justify-center gap-2 text-11", buttonClassName)}>
-            <IssueLabelsList labels={value.map((v) => labelsById.get(v)) ?? []} length={3} showLength />
-          </span>
-        ) : (
-          <div
-            className={cn(
-              "flex h-full items-center justify-center gap-1 rounded-sm border-[0.5px] border-strong px-2 py-1 text-11 hover:bg-layer-1",
-              buttonClassName
-            )}
-          >
-            <LabelPropertyIcon className="h-3 w-3 flex-shrink-0" />
-            <span>{t("labels")}</span>
-          </div>
-        )}
-      </button>
+        referenceElement={setReferenceElement}
+        t={t}
+        value={value}
+      />
       {isDropdownOpen && (
-        <div
-          className="fixed z-10 my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none"
-          ref={setPopperElement}
+        <LabelDropdownOptions
+          attributes={attributes.popper}
+          createLabelEnabled={createLabelEnabled}
+          handleAddLabel={handleAddLabel}
+          inputRef={inputRef}
+          labelsById={labelsById}
+          noMatchingResults={t("no_matching_results")}
+          popperElementRef={setPopperElement}
+          query={query}
+          searchInputKeyDown={searchInputKeyDown}
+          setQuery={setQuery}
           style={styles.popper}
-          {...attributes.popper}
-        >
-          <div className="flex items-center gap-1.5 rounded-sm border border-subtle bg-surface-2 px-2">
-            <SearchIcon className="h-3.5 w-3.5 text-placeholder" strokeWidth={1.5} />
-            <Combobox.Input
-              as="input"
-              ref={inputRef}
-              className="w-full bg-transparent py-1 text-11 text-secondary placeholder:text-placeholder focus:outline-none"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("search")}
-              displayValue={(assigned: any) => assigned?.name}
-              onKeyDown={searchInputKeyDown}
-            />
-          </div>
-          {virtualOptions.length > 0 ? (
-            <Combobox.Options as="ul" className="mt-2 h-48 space-y-1 overflow-y-scroll" modal={false} static>
-              {({ option }: { option: string }) => {
-                const label = labelsById.get(option)!;
-                const parentLabel = label.parent ? labelsById.get(label.parent) : undefined;
-                return (
-                  <Combobox.Option
-                    as="li"
-                    key={label.id}
-                    className={({ active }) =>
-                      `${
-                        active ? "bg-layer-1" : ""
-                      } group flex w-full cursor-pointer items-center gap-2 truncate rounded-sm px-1 py-1.5 text-secondary select-none`
-                    }
-                    value={label.id}
-                  >
-                    {({ selected }) => (
-                      <div className="flex w-full justify-between gap-2 rounded-sm">
-                        <div className="flex items-center justify-start gap-2 truncate">
-                          <span
-                            className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                            style={{ backgroundColor: label.color }}
-                          />
-                          {parentLabel && <Component className="h-3 w-3 flex-shrink-0" />}
-                          <span className="truncate">
-                            {parentLabel && <span className="text-tertiary">{parentLabel.name} / </span>}
-                            {label.name}
-                          </span>
-                        </div>
-                        <div className="flex shrink-0 items-center justify-center rounded-sm p-1">
-                          <CheckIcon className={`h-3 w-3 ${selected ? "opacity-100" : "opacity-0"}`} />
-                        </div>
-                      </div>
-                    )}
-                  </Combobox.Option>
-                );
-              }}
-            </Combobox.Options>
-          ) : submitting ? (
-            <Loader className="mt-2 h-3.5 w-3.5 animate-spin" />
-          ) : createLabelEnabled ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (!query.length) return;
-                handleAddLabel(query);
-              }}
-              disabled={!query.length}
-              className={`mt-2 text-left text-secondary ${query.length ? "cursor-pointer" : "cursor-default"}`}
-            >
-              {/* TODO: translate here */}
-              {query.length ? (
-                <>
-                  + Add <span className="text-primary">&quot;{query}&quot;</span> to labels
-                </>
-              ) : (
-                t("label.create.type")
-              )}
-            </button>
-          ) : (
-            <p className="mt-2 px-1.5 py-1 text-placeholder italic">{t("no_matching_results")}</p>
-          )}
-        </div>
+          submitting={submitting}
+          t={t}
+          virtualOptions={virtualOptions}
+        />
       )}
     </Combobox>
   );

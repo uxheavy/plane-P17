@@ -15,13 +15,15 @@ from unittest.mock import Mock, patch
 
 import pytest
 from django.conf import settings
-from django.db import DatabaseError, close_old_connections, connection, transaction
+from django.db import DatabaseError, IntegrityError, close_old_connections, connection, transaction
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from plane.api.middleware.api_authentication import APIKeyAuthentication
+from plane.api.views.issue import IssueDetailAPIEndpoint
 from plane.api.services import AgentMembershipConflict, AgentMembershipError, WorkspaceAgentMemberships
+from plane.api.services.agent_membership import MAX_AGENT_KEY_LENGTH
 from plane.api.serializers import IssueCommentSerializer
 from plane.bgtasks.webhook_task import get_model_data, webhook_send_task
 from plane.bgtasks.deletion_task import hard_delete, soft_delete_related_objects
@@ -48,9 +50,7 @@ from plane.tests.factories import (
 
 
 def install_agent_membership_guards():
-    operation = import_module(
-        "plane.db.migrations.0123_workspace_agent_membership"
-    ).Migration.operations[-1]
+    operation = import_module("plane.db.migrations.0125_workspace_agent_membership").Migration.operations[-1]
     with connection.cursor() as cursor:
         cursor.execute(operation.reverse_sql)
         cursor.execute(operation.sql)
@@ -238,7 +238,7 @@ class TestWorkspaceAgentMemberships:
             "rotate-historian",
         )
         assert rotation_replay.data["replayed"] is True
-        assert rotation_replay.data["credential"] is None
+        assert rotation_replay.data["credential"] == new_token
         assert APIToken.objects.filter(user_id=user_id).count() == token_count
 
         disabled = self.put_agent(
@@ -371,6 +371,11 @@ class TestWorkspaceAgentMemberships:
         assert not User.objects.filter(is_bot=True, bot_type="AGENT").exists()
         assert not WorkspaceAgentMembership.objects.exists()
 
+    def test_agent_bot_type_requires_bot_identity(self):
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                UserFactory(is_bot=False, bot_type=BotTypeEnum.AGENT)
+
     def test_rotate_then_disable_revokes_credentials_and_preserves_user(self):
         created = self.apply()
         rotated = self.apply({**self.desired, "credential_action": "rotate"}, key="operation-2")
@@ -453,7 +458,20 @@ class TestWorkspaceAgentMemberships:
         token = APIToken.objects.get(token=created["credential"])
         client = APIClient()
         client.credentials(HTTP_X_API_KEY=token.token)
-        issue_id = uuid.uuid4()
+        issue = Issue.objects.create(
+            name="Authored issue",
+            workspace=self.workspace,
+            project=self.project,
+            state=State.objects.create(
+                name="Todo",
+                workspace=self.workspace,
+                project=self.project,
+                group="backlog",
+                default=True,
+            ),
+            created_by=self.admin,
+        )
+        issue_id = issue.id
         unsupported_paths = (
             f"/api/v1/workspaces/{self.workspace.slug}/projects/{self.project.id}/work-items/",
             f"/api/v1/workspaces/{self.workspace.slug}/projects/{self.project.id}/work-items/{issue_id}/links/",
@@ -470,6 +488,78 @@ class TestWorkspaceAgentMemberships:
         )
         assert response.status_code == 400
         assert response.data["error"] == "Agent authorship is derived from the authenticated user"
+
+        request = APIRequestFactory().put(
+            f"/api/v1/workspaces/{self.workspace.slug}/projects/{self.project.id}/work-items/",
+            {
+                "external_id": "agent-upsert",
+                "external_source": "agent-test",
+                "name": "Agent upsert",
+                "created_by": str(self.admin.id),
+            },
+            format="json",
+        )
+        force_authenticate(request, user=User.objects.get(id=created["user_id"]))
+        response = IssueDetailAPIEndpoint.as_view(http_method_names=["put"])(
+            request,
+            slug=self.workspace.slug,
+            project_id=self.project.id,
+        )
+        assert response.status_code == 400
+        assert response.data["error"] == "Agent authorship is derived from the authenticated user"
+
+    def test_runtime_token_rejects_comments_for_an_issue_in_another_project(self):
+        other_project = ProjectFactory(
+            workspace=self.workspace,
+            name="Other project",
+            identifier="OTHER",
+        )
+        other_issue = Issue.objects.create(
+            name="Other project issue",
+            workspace=self.workspace,
+            project=other_project,
+            state=State.objects.create(
+                name="Other Todo",
+                workspace=self.workspace,
+                project=other_project,
+                group="backlog",
+                default=True,
+            ),
+            created_by=self.admin,
+        )
+        created = self.apply()
+        client = self.token_client(created["credential"])
+        url = "/api/v1/workspaces/{}/projects/{}/work-items/{}/comments/".format(
+            self.workspace.slug,
+            self.project.id,
+            other_issue.id,
+        )
+
+        response = client.post(url, {"comment_html": "<p>Cross-project</p>"}, format="json")
+
+        assert response.status_code == 403
+        assert not IssueComment.objects.filter(issue=other_issue).exists()
+
+    def test_agent_key_fits_activity_log_path_limit(self):
+        maximum_key = "a" * MAX_AGENT_KEY_LENGTH
+        result = WorkspaceAgentMemberships.apply(
+            workspace_id=self.workspace.id,
+            agent_key=maximum_key,
+            desired=self.desired,
+            idempotency_key="maximum-agent-key",
+            actor=self.admin,
+        )
+
+        assert len(f"/api/v1/workspaces/{'w' * 48}/agent-memberships/{maximum_key}/") == 255
+        assert result["credential"].startswith("plane_api_")
+        with pytest.raises(AgentMembershipError, match="Agent key is invalid"):
+            WorkspaceAgentMemberships.apply(
+                workspace_id=self.workspace.id,
+                agent_key="a" * (MAX_AGENT_KEY_LENGTH + 1),
+                desired=self.desired,
+                idempotency_key="too-long-agent-key",
+                actor=self.admin,
+            )
 
     def test_lifecycle_token_is_scoped_to_its_workspace_but_users_me_remains_available(self):
         created = self.apply()
@@ -569,6 +659,17 @@ class TestWorkspaceAgentMemberships:
         hard_delete()
         assert not WorkspaceMember.objects.filter(member_id=workspace_agent["user_id"]).exists()
         assert not ProjectMember.objects.filter(member_id=workspace_agent["user_id"]).exists()
+
+    def test_direct_membership_deletion_remains_guarded(self):
+        install_agent_membership_guards()
+        created = self.apply(key="recursive-lifecycle")
+        project_member = ProjectMember.objects.get(project=self.project, member_id=created["user_id"])
+
+        with pytest.raises(DatabaseError, match="lifecycle-managed"):
+            with transaction.atomic():
+                soft_delete_related_objects("db", "projectmember", project_member.id)
+
+        assert ProjectMember.all_objects.get(id=project_member.id).deleted_at is None
 
     def test_token_creation_failure_rolls_back_partial_lifecycle_state(self):
         before = {

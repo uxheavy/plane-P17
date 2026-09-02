@@ -23,6 +23,7 @@ from plane.app.serializers import (
 from plane.app.views.base import BaseAPIView
 from plane.db.models import Project, ProjectMember, WorkspaceMember, DraftIssue
 from plane.utils.cache import invalidate_cache
+from plane.utils.agent import agent_user_q, is_agent_user
 
 from .. import BaseViewSet
 
@@ -39,7 +40,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
-            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT", is_active=True, member__is_active=True))
+            .filter(Q(member__is_bot=False) | (agent_user_q("member__") & Q(is_active=True, member__is_active=True)))
             .select_related("member", "member__avatar_asset")
         )
 
@@ -77,7 +78,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
         workspace_member = WorkspaceMember.objects.get(pk=pk, workspace__slug=slug, is_active=True)
-        if workspace_member.member.is_bot and workspace_member.member.bot_type == "AGENT":
+        if is_agent_user(workspace_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
                 status=status.HTTP_409_CONFLICT,
@@ -103,7 +104,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     def destroy(self, request, slug, pk):
         # Check the user role who is deleting the user
         workspace_member = WorkspaceMember.objects.get(workspace__slug=slug, pk=pk, is_active=True)
-        if workspace_member.member.is_bot and workspace_member.member.bot_type == "AGENT":
+        if is_agent_user(workspace_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
                 status=status.HTTP_409_CONFLICT,

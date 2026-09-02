@@ -136,6 +136,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "Users"
         db_table = "users"
         ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(bot_type__isnull=True)
+                | ~models.Q(bot_type=BotTypeEnum.AGENT)
+                | models.Q(is_bot=True),
+                name="agent_bot_type_requires_is_bot",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.username} <{self.email}>"

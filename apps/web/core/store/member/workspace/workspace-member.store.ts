@@ -20,6 +20,7 @@ import type { IMemberRootStore } from "../index.ts";
 import type { IWorkspaceMemberFiltersStore } from "./workspace-member-filters.store";
 import { WorkspaceMemberFiltersStore } from "./workspace-member-filters.store";
 import type { RootStore } from "@/store/root.store";
+import { isNativeAgent } from "../utils";
 
 export interface IWorkspaceMembership {
   id: string;
@@ -79,7 +80,11 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
 
   private isVisibleMember = (membership: IWorkspaceMembership) => {
     const user = this.memberRoot?.memberMap?.[membership.member];
-    return membership.is_active && (!user?.is_bot || user.bot_type === "AGENT");
+    return !user?.is_bot || isNativeAgent(user);
+  };
+
+  private isActiveMember = (membership: IWorkspaceMembership) => {
+    return membership.is_active && this.isVisibleMember(membership);
   };
 
   constructor(_memberRoot: IMemberRootStore, _rootStore: RootStore) {
@@ -138,7 +143,7 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
       (m) => this.memberRoot?.memberMap?.[m.member]?.display_name?.toLowerCase(),
     ]);
     const memberIds = members.reduce<string[]>((ids, member) => {
-      if (this.isVisibleMember(member)) ids.push(member.member);
+      if (this.isActiveMember(member)) ids.push(member.member);
       return ids;
     }, []);
     return memberIds;

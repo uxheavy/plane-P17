@@ -22,6 +22,7 @@ from plane.api.serializers import (
 )
 from plane.db.models import User, Workspace, WorkspaceMember, Project, ProjectMember
 from plane.utils.permissions import ProjectMemberPermission, WorkSpaceAdminPermission, ProjectAdminPermission
+from plane.utils.agent import agent_user_q, human_or_agent_user_q, is_agent_user
 from plane.utils.openapi import (
     WORKSPACE_SLUG_PARAMETER,
     PROJECT_ID_PARAMETER,
@@ -90,7 +91,7 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
 
         workspace_members = (
             WorkspaceMember.objects.filter(workspace__slug=slug)
-            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT", is_active=True, member__is_active=True))
+            .filter(Q(member__is_bot=False) | (agent_user_q("member__") & Q(is_active=True, member__is_active=True)))
             .select_related("member")
         )
 
@@ -154,7 +155,7 @@ class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
 
         # Get all the users that are present inside the workspace
         users = UserLiteSerializer(
-            User.objects.filter(Q(is_bot=False) | Q(bot_type="AGENT"), id__in=project_members, is_active=True),
+            User.objects.filter(human_or_agent_user_q(), id__in=project_members, is_active=True),
             many=True,
         ).data
         return Response(users, status=status.HTTP_200_OK)
@@ -221,7 +222,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
     )
     def patch(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
-        if project_member.member.is_bot and project_member.member.bot_type == "AGENT":
+        if is_agent_user(project_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
                 status=status.HTTP_409_CONFLICT,
@@ -241,7 +242,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
     )
     def delete(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
-        if project_member.member.is_bot and project_member.member.bot_type == "AGENT":
+        if is_agent_user(project_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
                 status=status.HTTP_409_CONFLICT,
@@ -290,7 +291,7 @@ class WorkspaceMemberLiteAPIEndpoint(BaseAPIView):
 
         workspace_members = (
             WorkspaceMember.objects.filter(
-                Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                human_or_agent_user_q("member__"),
                 workspace__slug=slug,
                 is_active=True,
                 member__is_active=True,
@@ -350,7 +351,7 @@ class ProjectMemberLiteAPIEndpoint(BaseAPIView):
 
         project_members = (
             ProjectMember.objects.filter(
-                Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                human_or_agent_user_q("member__"),
                 project_id=project_id,
                 workspace__slug=slug,
                 is_active=True,

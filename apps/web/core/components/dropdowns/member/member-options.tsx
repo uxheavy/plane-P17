@@ -52,6 +52,7 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
   const { workspaceSlug } = useParams();
   // refs
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const wasOpenRef = useRef(false);
   // states
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
   // plane hooks
@@ -76,12 +77,19 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    if (!wasOpenRef.current) {
       onDropdownOpen?.();
       if (!isMobile) {
         inputRef.current?.focus();
       }
     }
+
+    wasOpenRef.current = true;
   }, [isOpen, isMobile, onDropdownOpen]);
 
   const searchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -90,6 +98,8 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
       setQuery("");
     }
   };
+
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <div

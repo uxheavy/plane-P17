@@ -5,7 +5,7 @@
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Min, Q
+from django.db.models import Min
 
 # Module imports
 from .base import BaseViewSet, BaseAPIView
@@ -22,6 +22,7 @@ from plane.db.models import Project, ProjectMember, ProjectUserProperty, User, W
 from plane.bgtasks.project_add_user_email_task import project_add_user_email
 from plane.utils.host import base_host
 from plane.app.permissions.base import allow_permission, ROLE
+from plane.utils.agent import agent_user_q, human_or_agent_user_q, is_agent_user
 
 
 class ProjectMemberViewSet(BaseViewSet):
@@ -36,7 +37,7 @@ class ProjectMemberViewSet(BaseViewSet):
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
-            .filter(Q(member__is_bot=False) | Q(member__bot_type="AGENT"))
+            .filter(human_or_agent_user_q("member__"))
             .filter()
             .select_related("project")
             .select_related("member")
@@ -48,7 +49,7 @@ class ProjectMemberViewSet(BaseViewSet):
         # Get the list of members to be added to the project and their roles i.e. the user_id and the role
         members = request.data.get("members", [])
         member_ids = [member.get("member_id") for member in members]
-        if User.objects.filter(id__in=member_ids, is_bot=True, bot_type="AGENT").exists():
+        if User.objects.filter(agent_user_q(), id__in=member_ids).exists():
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
                 status=status.HTTP_409_CONFLICT,
@@ -163,7 +164,7 @@ class ProjectMemberViewSet(BaseViewSet):
     def list(self, request, slug, project_id):
         # Get the list of project members for the project
         project_members = ProjectMember.objects.filter(
-            Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+            human_or_agent_user_q("member__"),
             project_id=project_id,
             workspace__slug=slug,
             is_active=True,
@@ -185,7 +186,7 @@ class ProjectMemberViewSet(BaseViewSet):
 
         project_member = (
             ProjectMember.objects.filter(
-                Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                human_or_agent_user_q("member__"),
                 pk=pk,
                 project_id=project_id,
                 workspace__slug=slug,
@@ -211,7 +212,7 @@ class ProjectMemberViewSet(BaseViewSet):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def partial_update(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(pk=pk, workspace__slug=slug, project_id=project_id, is_active=True)
-        if project_member.member.is_bot and project_member.member.bot_type == "AGENT":
+        if is_agent_user(project_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
                 status=status.HTTP_409_CONFLICT,
@@ -300,12 +301,15 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN])
     def destroy(self, request, slug, project_id, pk):
-        project_member = ProjectMember.objects.get(
-            workspace__slug=slug,
-            project_id=project_id,
-            pk=pk,
-            member__is_bot=False,
-            is_active=True,
+        project_member = (
+            ProjectMember.objects.filter(
+                workspace__slug=slug,
+                project_id=project_id,
+                pk=pk,
+                is_active=True,
+            )
+            .filter(human_or_agent_user_q("member__"))
+            .get()
         )
         # check requesting user role
         requesting_project_member = ProjectMember.objects.get(

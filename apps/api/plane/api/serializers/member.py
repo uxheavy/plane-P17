@@ -10,6 +10,7 @@ from plane.db.models import ProjectMember, WorkspaceMember
 from .base import BaseSerializer
 from plane.db.models import User
 from plane.utils.permissions import ROLE
+from plane.utils.agent import is_agent_user
 
 
 class ProjectMemberSerializer(BaseSerializer):
@@ -28,10 +29,8 @@ class ProjectMemberSerializer(BaseSerializer):
             raise serializers.ValidationError("Slug is required", code="INVALID_SLUG")
         if not value:
             raise serializers.ValidationError("Member is required", code="INVALID_MEMBER")
-        if value.is_bot and value.bot_type == "AGENT":
-            raise serializers.ValidationError(
-                "Agent membership is lifecycle-managed", code="AGENT_LIFECYCLE_MANAGED"
-            )
+        if is_agent_user(value):
+            raise serializers.ValidationError("Agent membership is lifecycle-managed", code="AGENT_LIFECYCLE_MANAGED")
         if not WorkspaceMember.objects.filter(workspace__slug=slug, member=value).exists():
             raise serializers.ValidationError("Member not found in workspace", code="INVALID_MEMBER")
         return value

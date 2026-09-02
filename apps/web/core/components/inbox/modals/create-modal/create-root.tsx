@@ -1,5 +1,3 @@
-// oxlint-disable jsx_a11y/prefer-tag-over-role
-// oxlint-disable jsx_a11y/click-events-have-key-events
 /**
  * Copyright (c) 2023-present Plane Software, Inc. and contributors
  * SPDX-License-Identifier: AGPL-3.0-only
@@ -7,7 +5,7 @@
  */
 
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { ETabIndices } from "@plane/constants";
@@ -72,6 +70,7 @@ export const InboxIssueCreateRoot = observer(function InboxIssueCreateRoot(props
   const { t } = useTranslation();
   // states
   const [createMore, setCreateMore] = useState<boolean>(false);
+  const createMoreId = useId();
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<TIssue>>(defaultIssueData);
   const handleFormData = useCallback(
@@ -206,15 +205,16 @@ export const InboxIssueCreateRoot = observer(function InboxIssueCreateRoot(props
             </div>
           </div>
           <div className="flex items-center justify-between gap-2 rounded-b-lg border-t-[0.5px] border-subtle bg-surface-1 px-5 py-4">
-            <div
-              className="inline-flex cursor-pointer items-center gap-1.5"
-              onClick={() => setCreateMore((prevData) => !prevData)}
-              role="button"
-              tabIndex={getIndex("create_more")}
-            >
-              <Switch size="sm" checked={createMore} onCheckedChange={() => {}} aria-label={t("create_more")} />
+            <label htmlFor={createMoreId} className="inline-flex cursor-pointer items-center gap-1.5">
+              <Switch
+                id={createMoreId}
+                size="sm"
+                checked={createMore}
+                onCheckedChange={setCreateMore}
+                aria-label={t("create_more")}
+              />
               <span className="text-11">{t("create_more")}</span>
-            </div>
+            </label>
             <div className="flex items-center gap-3">
               <Button
                 variant="secondary"

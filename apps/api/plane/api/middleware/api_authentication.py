@@ -13,7 +13,7 @@ from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
 
 # Module imports
-from plane.db.models import APIToken
+from plane.db.models import APIToken, Issue
 
 
 class APIKeyAuthentication(authentication.BaseAuthentication):
@@ -39,11 +39,20 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
                 return True
             if method == "GET" and re.fullmatch(r"/api/v1/workspaces/[^/]+/projects/[^/]+/members/?", path):
                 return True
-            return method in {"GET", "POST"} and bool(
-                re.fullmatch(
-                    r"/api/v1/workspaces/[^/]+/projects/[^/]+/work-items/[^/]+/comments/?",
-                    path,
-                )
+            match = re.fullmatch(
+                r"/api/v1/workspaces/(?P<workspace_slug>[^/]+)/projects/(?P<project_id>[^/]+)/"
+                r"work-items/(?P<issue_id>[^/]+)/comments/?",
+                path,
+            )
+            return (
+                method in {"GET", "POST"}
+                and bool(match)
+                and Issue.objects.filter(
+                    id=match.group("issue_id"),
+                    project_id=match.group("project_id"),
+                    project__workspace_id=api_token.workspace_id,
+                    project__workspace__slug=match.group("workspace_slug"),
+                ).exists()
             )
         return False
 

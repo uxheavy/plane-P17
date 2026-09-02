@@ -23,6 +23,12 @@ from plane.db.models import (
     WorkspaceAgentMembershipReceipt,
     WorkspaceMember,
 )
+from plane.utils.agent import agent_lifecycle
+
+
+# The lifecycle URL is persisted in APIActivityLog.path (255 chars). Workspace
+# slugs are capped at 48 chars, leaving 168 chars for the agent key.
+MAX_AGENT_KEY_LENGTH = 168
 
 
 class AgentMembershipError(ValueError):
@@ -37,22 +43,14 @@ class WorkspaceAgentMemberships:
     @staticmethod
     @transaction.atomic
     def apply(*, workspace_id, agent_key, desired, idempotency_key, actor):
-        from django.db import connection
-
-        try:
-            with transaction.atomic():
-                with connection.cursor() as cursor:
-                    cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
-                return WorkspaceAgentMemberships._apply(
-                    workspace_id=workspace_id,
-                    agent_key=agent_key,
-                    desired=desired,
-                    idempotency_key=idempotency_key,
-                    actor=actor,
-                )
-        finally:
-            with connection.cursor() as cursor:
-                cursor.execute("SET LOCAL plane.agent_lifecycle = 'off'")
+        with agent_lifecycle():
+            return WorkspaceAgentMemberships._apply(
+                workspace_id=workspace_id,
+                agent_key=agent_key,
+                desired=desired,
+                idempotency_key=idempotency_key,
+                actor=actor,
+            )
 
     @staticmethod
     def _apply(*, workspace_id, agent_key, desired, idempotency_key, actor):
@@ -63,7 +61,7 @@ class WorkspaceAgentMemberships:
         if not isinstance(desired, dict):
             raise AgentMembershipError("Desired state must be an object")
         safe_key = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
-        if not isinstance(agent_key, str) or len(agent_key) > 255 or not safe_key.fullmatch(agent_key):
+        if not isinstance(agent_key, str) or len(agent_key) > MAX_AGENT_KEY_LENGTH or not safe_key.fullmatch(agent_key):
             raise AgentMembershipError("Agent key is invalid")
         if (
             not isinstance(idempotency_key, str)
@@ -162,7 +160,8 @@ class WorkspaceAgentMemberships:
         if state == "disabled":
             active_tokens.update(is_active=False)
         elif replayed:
-            credential = None
+            token = active_tokens.first()
+            credential = token.token if action == "rotate" and token else None
         elif action == "rotate":
             active_tokens.update(is_active=False)
             token = APIToken.objects.create(

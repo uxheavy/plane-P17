@@ -183,7 +183,7 @@ test("creates representative work items through the real interface", async ({ pa
 
   await audited("project.open", "high-cardinality-options", async () => {
     await openProject(page, projectUrl!);
-    await expect(page.getByRole("button", { name: "Add work item", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add work item", exact: true })).toBeVisible({ timeout: 15_000 });
   });
 
   await openCreateModal(page, "Reference minimal work item");

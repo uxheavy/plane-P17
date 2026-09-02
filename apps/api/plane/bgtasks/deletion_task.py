@@ -6,21 +6,22 @@
 from django.utils import timezone
 from django.apps import apps
 from django.conf import settings
-from django.db import connection, models, transaction
+from django.db import models
 from django.db.models.fields.related import OneToOneRel
 
 
 # Third party imports
 from celery import shared_task
 
+# Module imports
+from plane.utils.agent import agent_lifecycle
+
 
 @shared_task
 def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
     model_class = apps.get_model(app_label, model_name)
     if model_class._meta.label_lower in {"db.workspace", "db.project"}:
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+        with agent_lifecycle():
             return _soft_delete_related_objects(app_label, model_name, instance_pk, using)
     return _soft_delete_related_objects(app_label, model_name, instance_pk, using)
 
@@ -145,15 +146,11 @@ def hard_delete():
 
     days = settings.HARD_DELETE_AFTER_DAYS
     # check delete workspace
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+    with agent_lifecycle():
         _ = Workspace.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
 
     # check delete project
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("SET LOCAL plane.agent_lifecycle = 'on'")
+    with agent_lifecycle():
         _ = Project.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
 
     # check delete cycle

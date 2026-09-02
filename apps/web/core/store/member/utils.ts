@@ -8,6 +8,12 @@
 import type { EUserPermissions, TMemberOrderByOptions } from "@plane/constants";
 import type { IUserLite, TProjectMembership } from "@plane/types";
 
+type NativeAgentMember = {
+  bot_type?: string | null;
+};
+
+export const isNativeAgent = (member?: NativeAgentMember | null): boolean => member?.bot_type === "AGENT";
+
 export interface IMemberFilters {
   order_by?: TMemberOrderByOptions;
   roles?: string[];
@@ -109,6 +115,7 @@ export const sortMembers = <T>(
 
   const { field, direction } = parseOrderKey(orderBy);
 
+  // oxlint-disable-next-line unicorn/no-array-sort -- Plane targets ES2022; the copy keeps this immutable.
   return [...members].sort((a, b) => {
     const aKey = getMemberKey(a);
     const bKey = getMemberKey(b);

@@ -41,6 +41,141 @@ export type TCommentCardDisplayProps = {
   renderQuickActions?: () => ReactNode;
 };
 
+type CommentHeaderProps = Pick<
+  TCommentCardDisplayProps,
+  "comment" | "disabled" | "showAccessSpecifier" | "renderQuickActions"
+> & {
+  avatarUrl?: string;
+  displayName?: string;
+  handleEmojiSelect: (emoji: string) => void;
+  isPickerOpen: boolean;
+  setIsPickerOpen: (isOpen: boolean) => void;
+};
+
+function CommentHeader(props: CommentHeaderProps) {
+  const {
+    avatarUrl,
+    comment,
+    disabled,
+    displayName,
+    handleEmojiSelect,
+    isPickerOpen,
+    renderQuickActions,
+    setIsPickerOpen,
+    showAccessSpecifier,
+  } = props;
+
+  return (
+    <>
+      {showAccessSpecifier && (
+        <div className="absolute top-2.5 right-2.5 z-[1] text-tertiary">
+          {comment.access === EIssueCommentAccessSpecifier.INTERNAL ? (
+            <LockIcon className="size-3" />
+          ) : (
+            <GlobeIcon className="size-3" />
+          )}
+        </div>
+      )}
+      <div className="relative mb-3 flex w-full items-center gap-2">
+        <Avatar size="sm" name={displayName ?? ""} src={getFileURL(avatarUrl ?? "")} className="shrink-0" />
+        <div className="flex flex-1 flex-wrap items-center gap-1">
+          <div className="text-caption-sm-medium">{displayName}</div>
+          <div className="text-caption-sm-regular text-tertiary">
+            commented{" "}
+            <Tooltip
+              label={`${renderFormattedDate(comment.created_at)} at ${renderFormattedTime(comment.created_at)}`}
+              side="bottom"
+              layout="single"
+              delay={200}
+            >
+              <span className="text-tertiary">
+                {calculateTimeAgo(comment.created_at)}
+                {comment.edited_at && " (edited)"}
+              </span>
+            </Tooltip>
+          </div>
+        </div>
+        {!disabled && (
+          <div className="flex shrink-0 items-center gap-1">
+            <EmojiReactionPicker
+              isOpen={isPickerOpen}
+              handleToggle={setIsPickerOpen}
+              onChange={handleEmojiSelect}
+              disabled={disabled}
+              label={<EmojiReactionButton onAddReaction={() => setIsPickerOpen(true)} />}
+              placement="bottom-start"
+            />
+            {renderQuickActions ? renderQuickActions() : null}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+type CommentBodyProps = Pick<
+  TCommentCardDisplayProps,
+  "activityOperations" | "comment" | "disabled" | "projectId" | "readOnlyEditorRef" | "workspaceId" | "workspaceSlug"
+> & {
+  highlightClassName: string;
+  isEditing: boolean;
+  renderFooter?: (ReactionsComponent: ReactNode | null) => ReactNode;
+  setIsEditing?: (isEditing: boolean) => void;
+  shouldRenderReactions: boolean;
+};
+
+function CommentBody(props: CommentBodyProps) {
+  const {
+    activityOperations,
+    comment,
+    disabled,
+    highlightClassName,
+    isEditing,
+    projectId,
+    readOnlyEditorRef,
+    renderFooter,
+    setIsEditing,
+    shouldRenderReactions,
+    workspaceId,
+    workspaceSlug,
+  } = props;
+
+  if (isEditing && setIsEditing) {
+    return (
+      <CommentCardEditForm
+        activityOperations={activityOperations}
+        comment={comment}
+        isEditing={isEditing}
+        readOnlyEditorRef={readOnlyEditorRef.current}
+        setIsEditing={setIsEditing}
+        projectId={projectId}
+        workspaceId={workspaceId}
+        workspaceSlug={workspaceSlug}
+      />
+    );
+  }
+
+  const reactions = <CommentReactions comment={comment} disabled={disabled} activityOperations={activityOperations} />;
+
+  return (
+    <>
+      <LiteTextEditor
+        editable={false}
+        ref={readOnlyEditorRef}
+        id={comment.id}
+        initialValue={comment.comment_html ?? ""}
+        workspaceId={workspaceId}
+        workspaceSlug={workspaceSlug}
+        containerClassName={cn("!py-1 transition-[border-color] duration-500", highlightClassName)}
+        projectId={projectId?.toString()}
+        displayConfig={{ fontSize: "small-font" }}
+        parentClassName="border-none"
+      />
+      {shouldRenderReactions && (renderFooter ? renderFooter(reactions) : reactions)}
+    </>
+  );
+}
+
 export const CommentCardDisplay = observer(function CommentCardDisplay(props: TCommentCardDisplayProps) {
   const {
     activityOperations,
@@ -111,85 +246,31 @@ export const CommentCardDisplay = observer(function CommentCardDisplay(props: TC
 
   return (
     <div id={commentBlockId} className="relative flex flex-col gap-2">
-      {showAccessSpecifier && (
-        <div className="absolute top-2.5 right-2.5 z-[1] text-tertiary">
-          {comment.access === EIssueCommentAccessSpecifier.INTERNAL ? (
-            <LockIcon className="size-3" />
-          ) : (
-            <GlobeIcon className="size-3" />
-          )}
-        </div>
-      )}
-      <div className="relative mb-3 flex w-full items-center gap-2">
-        <Avatar size="sm" name={displayName} src={getFileURL(avatarUrl)} className="shrink-0" />
-        <div className="flex flex-1 flex-wrap items-center gap-1">
-          <div className="text-caption-sm-medium">{displayName}</div>
-          <div className="text-caption-sm-regular text-tertiary">
-            commented{" "}
-            <Tooltip
-              label={`${renderFormattedDate(comment.created_at)} at ${renderFormattedTime(comment.created_at)}`}
-              side="bottom"
-              layout="single"
-              delay={200}
-            >
-              <span className="text-tertiary">
-                {calculateTimeAgo(comment.created_at)}
-                {comment.edited_at && " (edited)"}
-              </span>
-            </Tooltip>
-          </div>
-        </div>
-        {!disabled && (
-          <div className="flex shrink-0 items-center gap-1">
-            <EmojiReactionPicker
-              isOpen={isPickerOpen}
-              handleToggle={setIsPickerOpen}
-              onChange={handleEmojiSelect}
-              disabled={disabled}
-              label={<EmojiReactionButton onAddReaction={() => setIsPickerOpen(true)} />}
-              placement="bottom-start"
-            />
-            {renderQuickActions ? renderQuickActions() : null}
-          </div>
-        )}
-      </div>
-      {isEditing && setIsEditing ? (
-        <CommentCardEditForm
-          activityOperations={activityOperations}
-          comment={comment}
-          isEditing={isEditing}
-          readOnlyEditorRef={readOnlyEditorRef.current}
-          setIsEditing={setIsEditing}
-          projectId={projectId}
-          workspaceId={workspaceId}
-          workspaceSlug={workspaceSlug}
-        />
-      ) : (
-        <>
-          <LiteTextEditor
-            editable={false}
-            ref={readOnlyEditorRef}
-            id={comment.id}
-            initialValue={comment.comment_html ?? ""}
-            workspaceId={workspaceId}
-            workspaceSlug={workspaceSlug}
-            containerClassName={cn("!py-1 transition-[border-color] duration-500", highlightClassName)}
-            projectId={projectId?.toString()}
-            displayConfig={{
-              fontSize: "small-font",
-            }}
-            parentClassName="border-none"
-          />
-          {shouldRenderReactions &&
-            (renderFooter ? (
-              renderFooter(
-                <CommentReactions comment={comment} disabled={disabled} activityOperations={activityOperations} />
-              )
-            ) : (
-              <CommentReactions comment={comment} disabled={disabled} activityOperations={activityOperations} />
-            ))}
-        </>
-      )}
+      <CommentHeader
+        avatarUrl={avatarUrl}
+        comment={comment}
+        disabled={disabled}
+        displayName={displayName}
+        handleEmojiSelect={handleEmojiSelect}
+        isPickerOpen={isPickerOpen}
+        renderQuickActions={renderQuickActions}
+        setIsPickerOpen={setIsPickerOpen}
+        showAccessSpecifier={showAccessSpecifier}
+      />
+      <CommentBody
+        activityOperations={activityOperations}
+        comment={comment}
+        disabled={disabled}
+        highlightClassName={highlightClassName}
+        isEditing={isEditing}
+        projectId={projectId}
+        readOnlyEditorRef={readOnlyEditorRef}
+        renderFooter={renderFooter}
+        setIsEditing={setIsEditing}
+        shouldRenderReactions={!!shouldRenderReactions}
+        workspaceId={workspaceId}
+        workspaceSlug={workspaceSlug}
+      />
     </div>
   );
 });

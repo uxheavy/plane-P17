@@ -159,10 +159,11 @@ from plane.utils.openapi import (
     WORKSPACE_NOT_FOUND_RESPONSE,
 )
 from plane.bgtasks.work_item_link_task import crawl_work_item_link_title
+from plane.utils.agent import is_agent_user
 
 
 def agent_author_override_error(request, *fields):
-    if request.user.is_bot and request.user.bot_type == "AGENT" and any(field in request.data for field in fields):
+    if is_agent_user(request.user) and any(field in request.data for field in fields):
         return Response(
             {"error": "Agent authorship is derived from the authenticated user"},
             status=status.HTTP_400_BAD_REQUEST,
@@ -630,6 +631,9 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         Update an existing work item identified by external ID and source, or create a new one if it doesn't exist.
         Requires external_id and external_source parameters for identification.
         """
+        if error := agent_author_override_error(request, "created_by", "actor"):
+            return error
+
         # Get the entities required for putting the issue, external_id and
         # external_source are must to identify the issue here
         project = Project.objects.get(pk=project_id)

@@ -6,9 +6,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    dependencies = [("db", "0122_alter_draftissue_assignees_alter_issue_assignees_and_more")]
+    dependencies = [("db", "0124_page_document_cutover")]
 
     operations = [
+        migrations.AddConstraint(
+            model_name="user",
+            constraint=models.CheckConstraint(
+                condition=models.Q(bot_type__isnull=True)
+                | ~models.Q(bot_type="AGENT")
+                | models.Q(is_bot=True),
+                name="agent_bot_type_requires_is_bot",
+            ),
+        ),
         migrations.AddField(
             model_name="apitoken",
             name="purpose",
@@ -148,6 +157,7 @@ class Migration(migrations.Migration):
             sql="""
             CREATE OR REPLACE FUNCTION enforce_agent_membership_lifecycle() RETURNS trigger AS $$
             DECLARE
+                agent_is_bot boolean;
                 agent_kind text;
                 owner_workspace uuid;
                 membership_row record;
@@ -155,8 +165,9 @@ class Migration(migrations.Migration):
             BEGIN
                 membership_row := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
                 lifecycle_on := current_setting('plane.agent_lifecycle', true) = 'on';
-                SELECT bot_type INTO agent_kind FROM users WHERE id = membership_row.member_id;
-                IF agent_kind = 'AGENT' THEN
+                SELECT is_bot, bot_type INTO agent_is_bot, agent_kind
+                FROM users WHERE id = membership_row.member_id;
+                IF agent_is_bot AND agent_kind = 'AGENT' THEN
                     IF TG_OP = 'DELETE' THEN
                         IF lifecycle_on THEN
                             RETURN OLD;

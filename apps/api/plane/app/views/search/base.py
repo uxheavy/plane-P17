@@ -41,6 +41,7 @@ from plane.db.models import (
     DocumentProject,
     WorkspaceMember,
 )
+from plane.utils.agent import human_or_agent_user_q
 
 
 class GlobalSearchEndpoint(BaseAPIView):
@@ -333,7 +334,7 @@ class SearchEndpoint(BaseAPIView):
                     users = (
                         ProjectMember.objects.filter(
                             q,
-                            Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                            human_or_agent_user_q("member__"),
                             is_active=True,
                             workspace__slug=slug,
                             project_id=project_id,
@@ -545,7 +546,7 @@ class SearchEndpoint(BaseAPIView):
                     users = (
                         WorkspaceMember.objects.filter(
                             q,
-                            Q(member__is_bot=False) | Q(member__bot_type="AGENT"),
+                            human_or_agent_user_q("member__"),
                             is_active=True,
                             workspace__slug=slug,
                         )

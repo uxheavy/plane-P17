@@ -23,6 +23,7 @@ import { getFileURL } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
+import { isNativeAgent } from "@/store/member/utils";
 export interface RowData extends Omit<IWorkspaceMember, "member" | "role"> {
   member: IWorkspaceMember["member"] & Pick<IWorkspaceMember, "last_login_medium">;
   role: EUserPermissions;
@@ -46,7 +47,7 @@ export function NameColumn(props: NameProps) {
   // derived values
   const { avatar_url, display_name, email, first_name, id, last_name } = rowData.member;
   const isSuspended = rowData.is_active === false;
-  const isAgent = rowData.member.bot_type === "AGENT";
+  const isAgent = isNativeAgent(rowData.member);
 
   return (
     <Disclosure>
@@ -76,7 +77,7 @@ export function NameColumn(props: NameProps) {
                 </Link>
               )}
               <span className={isSuspended ? "text-placeholder" : ""}>
-                {first_name} {last_name}
+                {isAgent ? display_name : `${first_name} ${last_name}`}
               </span>
             </div>
 
@@ -121,7 +122,7 @@ const AccountTypeColumnView = observer(function AccountTypeColumnView(props: Acc
 
   // derived values
   const isCurrentUser = currentUser?.id === rowData.member.id;
-  const isAgent = rowData.member.bot_type === "AGENT";
+  const isAgent = isNativeAgent(rowData.member);
   const isAdminRole = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
   const isRoleNonEditable = isAgent || isCurrentUser || !isAdminRole;
   const isSuspended = rowData.is_active === false;
