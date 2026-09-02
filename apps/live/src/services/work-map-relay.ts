@@ -92,7 +92,7 @@ export const parseWorkMapFrame = (data: RawData, isBinary: boolean): WorkMapFram
 };
 
 export const workMapRoomName = (authorization: WorkMapAuthorization) =>
-  `work-map:${encodeURIComponent(authorization.workspace_slug)}:${authorization.project_id}:${authorization.work_map_id}`;
+  `work-map:${encodeURIComponent(authorization.workspace_slug)}:${authorization.work_map_id}`;
 
 export class WorkMapRelay {
   private readonly authorizer: WorkMapAuthorizer;

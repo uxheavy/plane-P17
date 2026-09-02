@@ -14,6 +14,7 @@ from django.apps import apps as django_apps
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
+from botocore.exceptions import EndpointConnectionError
 
 from plane.app.permissions import ROLE
 from plane.app.serializers.asset import WORK_MAP_SCENE_ASSET_MIME_TYPES
@@ -144,14 +145,33 @@ class TestWorkMapApp:
             == "plane.bgtasks.work_map_binding_task.expire_stale_work_map_binding_placements"
         )
 
-    def test_partial_s3_delete_failure_remains_retryable(self):
+    def test_s3_storage_batches_deletes_and_aggregates_failures(self):
         storage = S3Storage.__new__(S3Storage)
         storage.aws_storage_bucket_name = "test-bucket"
         storage.s3_client = Mock(
-            delete_objects=Mock(return_value={"Errors": [{"Key": "retained-key", "Code": "AccessDenied"}]})
+            delete_objects=Mock(
+                side_effect=[
+                    {"Errors": [{"Key": "retained-key", "Code": "AccessDenied"}]},
+                    {"Deleted": [{"Key": "object-1000"}]},
+                ]
+            )
         )
 
-        assert storage.delete_files(["retained-key"]) is False
+        assert storage.delete_files([f"object-{index}" for index in range(1001)]) is False
+        assert [len(call.kwargs["Delete"]["Objects"]) for call in storage.s3_client.delete_objects.call_args_list] == [
+            1000,
+            1,
+        ]
+
+    def test_s3_storage_normalizes_copy_transport_failures(self):
+        storage = S3Storage.__new__(S3Storage)
+        storage.aws_storage_bucket_name = "test-bucket"
+        storage.s3_client = Mock(
+            copy_object=Mock(side_effect=EndpointConnectionError(endpoint_url="https://storage.invalid"))
+        )
+
+        with patch("plane.settings.storage.log_exception"):
+            assert storage.copy_object("source", "destination") is None
 
     def test_internal_work_map_validation_errors_are_not_disclosed(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "ERR")
@@ -400,13 +420,19 @@ class TestWorkMapApp:
     def test_realtime_authorization_returns_the_collaboration_epoch(self, session_client, workspace, create_user):
         project, membership = _project(workspace, create_user, "LIV")
         other_project, _ = _project(workspace, create_user, "ALT")
+        denied_project, _ = _project(workspace, create_user, "DEN")
         work_map = _create_work_map(session_client, workspace, project)
+        DocumentProject.objects.create(document_id=work_map["id"], project=other_project, workspace=workspace)
         realtime_url = _work_maps_url(workspace, project, work_map["id"], "realtime/")
 
         authorized = session_client.get(realtime_url)
         assert authorized.status_code == status.HTTP_200_OK
         assert authorized.json()["collaboration_epoch"] == 0
         assert authorized.json()["editable"] is True
+        linked_authorized = session_client.get(_work_maps_url(workspace, other_project, work_map["id"], "realtime/"))
+        assert linked_authorized.status_code == status.HTTP_200_OK
+        assert linked_authorized.json()["project_id"] == str(other_project.id)
+        assert linked_authorized.json()["work_map_id"] == work_map["id"]
 
         membership.role = 5
         membership.save(update_fields=["role"])
@@ -416,7 +442,7 @@ class TestWorkMapApp:
         workspace_membership.save(update_fields=["role"])
         assert session_client.get(realtime_url).json()["editable"] is False
         assert (
-            session_client.get(_work_maps_url(workspace, other_project, work_map["id"], "realtime/")).status_code
+            session_client.get(_work_maps_url(workspace, denied_project, work_map["id"], "realtime/")).status_code
             == status.HTTP_404_NOT_FOUND
         )
 
@@ -1428,6 +1454,41 @@ class TestWorkMapApp:
             document_version_id=version.json()["id"], asset_id=asset_ids[0]
         ).exists()
 
+        paste_target = _create_work_map(session_client, workspace, project)
+        paste_idempotency_key = uuid.uuid4()
+        paste_url = _work_maps_url(workspace, project, paste_target["id"], "paste-rebindings/")
+        with (
+            patch(
+                "plane.app.views.work_map.paste.S3Storage.copy_object",
+                side_effect=[{"ok": True}, None],
+            ),
+            patch("plane.app.views.work_map.paste.S3Storage.delete_files", return_value=True) as paste_cleanup,
+        ):
+            failed_paste = session_client.post(
+                paste_url,
+                {
+                    "generation": 0,
+                    "idempotency_key": paste_idempotency_key,
+                    "node_keys": [],
+                    "files": [
+                        {"file_id": "file-1", "asset_id": asset_ids[0]},
+                        {"file_id": "file-2", "asset_id": asset_ids[1]},
+                    ],
+                },
+                format="json",
+            )
+        assert failed_paste.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        paste_receipt = WorkMapPasteRebinding.objects.get(
+            work_map_id=paste_target["id"],
+            idempotency_key=paste_idempotency_key,
+        )
+        assert paste_receipt.status == WorkMapPasteRebinding.Status.FAILED
+        assert paste_receipt.lease_id is None
+        assert paste_receipt.lease_expires_at is None
+        assert not FileAsset.objects.filter(document_id=paste_target["id"]).exists()
+        paste_cleanup.assert_called_once()
+        assert len(paste_cleanup.call_args.args[0]) == 2
+
         duplicate_url = _work_maps_url(workspace, project, work_map["id"], "duplicate/")
         with (
             patch("plane.app.views.work_map.duplicate.S3Storage.copy_object", return_value={"ok": True}),
@@ -1506,6 +1567,11 @@ class TestWorkMapApp:
         assert session_client.post(linked_favorite_url).status_code == status.HTTP_204_NO_CONTENT
         listed = session_client.get(_work_maps_url(workspace, project)).json()
         assert listed[0]["is_favorite"] is True
+        favorites = session_client.get(f"/api/workspaces/{workspace.slug}/user-favorites/").json()
+        favorite = next(item for item in favorites if item["entity_type"] == "work_map")
+        assert favorite["entity_data"]["id"] == work_map["id"]
+        assert favorite["entity_data"]["name"] == "Planning map"
+        assert favorite["entity_data"]["project_id"] in {str(project.id), str(linked_project.id)}
 
         search = session_client.get(
             f"/api/workspaces/{workspace.slug}/search/",

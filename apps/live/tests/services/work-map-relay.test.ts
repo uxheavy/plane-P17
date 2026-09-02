@@ -13,6 +13,7 @@ import { workMapAuthorizationSchema } from "@/services/work-map.service";
 import { WorkMapRelay } from "@/services/work-map-relay";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_PROJECT_ID = "55555555-5555-4555-8555-555555555555";
 const WORK_MAP_ID = "22222222-2222-4222-8222-222222222222";
 const OTHER_WORK_MAP_ID = "33333333-3333-4333-8333-333333333333";
 const USER_ID = "44444444-4444-4444-8444-444444444444";
@@ -89,9 +90,9 @@ class TestRedisConnection extends EventEmitter {
   async quit() {}
 }
 
-const request = (workMapId = WORK_MAP_ID, generation = 7) =>
+const request = (workMapId = WORK_MAP_ID, generation = 7, projectId = PROJECT_ID) =>
   ({
-    url: `/?workspaceSlug=workspace&projectId=${PROJECT_ID}&workMapId=${workMapId}&generation=${generation}`,
+    url: `/?workspaceSlug=workspace&projectId=${projectId}&workMapId=${workMapId}&generation=${generation}`,
     headers: { cookie: "session=test" },
   }) as Request;
 
@@ -210,8 +211,8 @@ describe("WorkMapRelay", () => {
 
   it("forwards validated frames across instances without self-echo or cross-room leakage", async () => {
     const bus = new TestRedisBus();
-    const authorize = vi.fn(async (_workspace: string, _project: string, workMapId: string) =>
-      authorization({ work_map_id: workMapId })
+    const authorize = vi.fn(async (_workspace: string, projectId: string, workMapId: string) =>
+      authorization({ project_id: projectId, work_map_id: workMapId })
     );
     const firstRelay = await initializeRelay(bus, authorize);
     const secondRelay = await initializeRelay(bus, authorize);
@@ -219,7 +220,7 @@ describe("WorkMapRelay", () => {
     const peer = websocket();
     const otherRoom = websocket();
     void firstRelay.handleConnection(sender, request());
-    void secondRelay.handleConnection(peer, request());
+    void secondRelay.handleConnection(peer, request(WORK_MAP_ID, 7, OTHER_PROJECT_ID));
     void secondRelay.handleConnection(otherRoom, request(OTHER_WORK_MAP_ID));
     await nextTurn();
     const senderSocket = sender as unknown as TestWebSocket;

@@ -107,8 +107,8 @@ def authorized_paste_sources(*, user, workspace_id, node_keys, files, lock):
     binding_query = WorkMapBinding.objects
     asset_query = FileAsset.objects
     if lock:
-        binding_query = binding_query.select_for_update()
-        asset_query = asset_query.select_for_update()
+        binding_query = binding_query.select_for_update(of=("self",))
+        asset_query = asset_query.select_for_update(of=("self",))
 
     bindings = {
         binding.node_key: binding
@@ -403,5 +403,9 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
             if operation is not None:
                 mark_failed_after_cleanup(operation, lease_id, storage)
             return Response({"error": "Paste asset copy failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception:
+            if operation is not None:
+                mark_failed_after_cleanup(operation, lease_id, storage)
+            raise
 
         return Response(paste_response(operation, data["files"]), status=status.HTTP_201_CREATED)

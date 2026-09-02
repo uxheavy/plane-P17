@@ -18,7 +18,10 @@ export const generateFavoriteItemLink = (workspaceSlug: string, favorite: IFavor
   if (entityLinkDetails.itemLevel === "workspace") {
     return `/${workspaceSlug}/${entityLinkDetails.getLink(favorite)}`;
   } else if (entityLinkDetails.itemLevel === "project") {
-    return `/${workspaceSlug}/projects/${favorite.project_id}/${entityLinkDetails.getLink(favorite)}`;
+    const projectId = favorite.project_id ?? favorite.entity_data?.project_id;
+    return projectId
+      ? `/${workspaceSlug}/projects/${projectId}/${entityLinkDetails.getLink(favorite)}`
+      : `/${workspaceSlug}`;
   } else {
     return `/${workspaceSlug}`;
   }

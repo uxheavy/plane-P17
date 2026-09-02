@@ -6,13 +6,14 @@
 
 import { Briefcase, FileText, Layers, LayoutGrid } from "lucide-react";
 // plane imports
-import { ContrastIcon, DiceIcon } from "@plane/propel/icons";
+import { ContrastIcon, DiceIcon, TreeMapIcon } from "@plane/propel/icons";
 import type {
   IWorkspaceDefaultSearchResult,
   IWorkspaceIssueSearchResult,
   IWorkspacePageSearchResult,
   IWorkspaceProjectSearchResult,
   IWorkspaceSearchResult,
+  IWorkspaceWorkMapSearchResult,
 } from "@plane/types";
 import { generateWorkItemLink } from "@plane/utils";
 // components
@@ -110,5 +111,19 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
     itemName: (workspace: IWorkspaceSearchResult) => workspace?.name,
     path: (workspace: IWorkspaceSearchResult) => `/${workspace?.slug}/`,
     title: "Workspaces",
+  },
+  work_map: {
+    icon: TreeMapIcon,
+    itemName: (workMap: IWorkspaceWorkMapSearchResult) => (
+      <p>
+        <span className="text-11 text-tertiary">{workMap.project_identifiers?.[0]}</span> {workMap.name}
+      </p>
+    ),
+    path: (workMap: IWorkspaceWorkMapSearchResult, projectId: string | undefined) => {
+      const redirectProjectId =
+        projectId && workMap.project_ids.includes(projectId) ? projectId : workMap.project_ids[0];
+      return `/${workMap.workspace__slug}/projects/${redirectProjectId}/work-maps/${workMap.id}`;
+    },
+    title: "Work maps",
   },
 };
