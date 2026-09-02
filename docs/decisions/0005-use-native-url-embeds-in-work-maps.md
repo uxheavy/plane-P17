@@ -27,6 +27,19 @@ Work Map preserves Excalidraw's native Web Embed tool, click-drag link editor,
 URL parsing, intrinsic sizing, paste/drop, sandbox, and click-to-interact
 behavior. Plane does not implement a parallel URL insertion or gesture path.
 
+The Excalidraw fork adds exactly two generic host controls:
+
+- `shouldLoadEmbeddable(element)` is a pure render-time predicate. `false`
+  preserves the native placeholder and does not mount host-rendered or iframe
+  content; it does not change native interaction activation.
+- `onEmbeddableLoadRequest(element)` is called only from Excalidraw's native
+  click/tap activation gesture for an unloaded Web Embed. The host may then
+  change the state used by `shouldLoadEmbeddable`.
+
+These props contain no Plane permission, document, origin-policy, or persistence
+concept. Excalidraw remains the interaction and rendering owner; Plane supplies
+only its host policy.
+
 Override provider eligibility so every syntactically valid `http` or `https`
 URL may use Excalidraw's native generic iframe fallback. Non-web schemes are
 rejected. Provider transformation remains useful but is not an allowlist.
@@ -45,6 +58,22 @@ being represented as successful content.
 - Changing URL origin resets document enablement to inert. A same-origin path or
   query change does not reset solely because the full URL changed.
 - Excalidraw native duplication copies the node-owned enablement with the node.
+
+Plane stores document enablement as `customData.enabledOrigin` on the native
+embeddable element. It is enabled only when that exact normalized HTTP(S) origin
+matches the element's current URL origin. The viewer-session key is the pair of
+native element ID and normalized origin and exists only in the current browser
+session; it never enters the scene, API, relay, version, or persistent browser
+storage.
+
+Plane's `shouldLoadEmbeddable` returns true when either `enabledOrigin` matches
+or the current viewer session contains that element/origin pair. On
+`onEmbeddableLoadRequest`, a currently authorized editor writes the normalized
+origin to `enabledOrigin` through the normal scene mutation and durability path.
+A read-only viewer adds only the viewer-session pair. If edit authority is lost
+before persistence, document enablement fails closed and the viewer may still
+choose the ephemeral session load. Changing origin makes both old forms
+inapplicable without requiring iframe cooperation.
 
 Every arbitrary URL starts as an inert domain-labelled shell. Only a user with
 current Work Map edit permission may persist enablement. The enabled iframe uses
@@ -86,6 +115,13 @@ and a separate decision because it changes document and browser behavior.
   inert-first behavior, explicit interaction, canvas pan/select around and over
   the node, document-wide enablement, temporary viewer load, origin reset, and
   native duplication.
+- Excalidraw package tests must prove the two generic props preserve the native
+  placeholder, request loading only from native click/tap, never mount custom or
+  iframe content while denied, and leave activation behavior native after load.
+- Plane tests must prove exact-origin `enabledOrigin`, element/origin
+  viewer-session scoping, origin-change reset, editor persistence through the
+  scene contract, and absence of viewer-session state from every durable or
+  collaborative payload.
 - Tests must prove editor versus read-only persistence authority and scene
   mutation gating while iframe interaction remains available.
 - URL validation must reject non-web schemes; sandbox attributes must compare to
