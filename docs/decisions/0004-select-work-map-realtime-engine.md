@@ -55,10 +55,12 @@ instances and require fresh authorization on reconnect. Query-parameter casts
 and room knowledge are never authority.
 
 Existing Page realtime locators remain unchanged. Work Map room identity is
-derived server-side from the authorized workspace, project, and Work Map. Scene
-`generation` is the compare-and-swap revision and advances on a normal durable
-save. `collaboration_epoch` is a separate attachment revision and advances only
-when version restore or a lifecycle/authority reset invalidates the loaded
+derived server-side from the authorized workspace and Work Map. The requested
+project remains per-attachment authorization context and never partitions one
+shared Work Map into separate collaboration rooms. Scene `generation` is the
+compare-and-swap revision and advances on a normal durable save.
+`collaboration_epoch` is a separate attachment revision and advances only when
+version restore or a lifecycle/authority reset invalidates the loaded
 collaboration session. A normal scene save neither advances the epoch nor closes
 or partitions attached collaborators.
 
