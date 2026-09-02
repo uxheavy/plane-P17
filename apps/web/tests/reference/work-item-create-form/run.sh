@@ -21,6 +21,7 @@ web_port=""
 port_lock=""
 current_stage="suite.bootstrap"
 stage_open=0
+review_stop=0
 
 mkdir -p "$audit_dir"
 
@@ -72,7 +73,7 @@ claim_web_port() {
 
 cleanup() {
   local exit_code=$?
-  if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} != 1 || $exit_code != 0 ]]; then
+  if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} != 1 || $exit_code != 0 || $review_stop == 1 ]]; then
     audit "fixture.cleanup" "started"
     if run_django cleanup >/dev/null 2>&1; then
       audit "fixture.cleanup" "success"
@@ -139,7 +140,7 @@ complete_stage
 begin_stage "web.preview"
 (
   cd "$repo_root/apps/web"
-  ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
+  exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
 ) >/tmp/plane-reference-preview.log 2>&1 &
 preview_pid=$!
 for _ in {1..60}; do
@@ -191,6 +192,17 @@ run_django assert | tail -1
 complete_stage
 
 if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} == 1 ]]; then
-  printf 'Reference review URL: %s\nReference email: %s\nReference password: %s\nReference run: %s\n' \
-    "$project_url" "$reference_email" "$reference_password" "$reference_run_id"
+  curl -fsS "$api_url/api/instances/" >/dev/null
+  curl -fsS "$project_url" >/dev/null
+  trap 'review_stop=1' INT TERM
+  printf 'Reference review URL: %s\nReference email: %s\nReference password: %s\nReference run: %s\nReference cleanup: kill -TERM %s\n' \
+    "$project_url" "$reference_email" "$reference_password" "$reference_run_id" "$$"
+  while [[ $review_stop == 0 ]]; do
+    if ! kill -0 "$preview_pid" 2>/dev/null; then
+      echo "Reference preview exited before review cleanup." >&2
+      exit 1
+    fi
+    sleep 1 &
+    wait $! || true
+  done
 fi
