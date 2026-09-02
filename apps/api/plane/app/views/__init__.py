@@ -174,6 +174,7 @@ from .page.base import (
     PageDuplicateEndpoint,
 )
 from .page.version import PageVersionEndpoint
+from .work_map import WorkMapBindingEndpoint, WorkMapSceneEndpoint, WorkMapViewSet
 
 from .search.base import GlobalSearchEndpoint, SearchEndpoint
 from .search.issue import IssueSearchEndpoint

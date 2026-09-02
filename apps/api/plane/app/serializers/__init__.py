@@ -104,6 +104,12 @@ from .page import (
     PageBinaryUpdateSerializer,
     PageVersionDetailSerializer,
 )
+from .work_map import (
+    WorkMapBindingCreateSerializer,
+    WorkMapCreateSerializer,
+    WorkMapSceneSerializer,
+    WorkMapUpdateSerializer,
+)
 
 from .estimate import (
     EstimateSerializer,
