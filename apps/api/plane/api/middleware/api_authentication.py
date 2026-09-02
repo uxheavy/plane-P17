@@ -41,19 +41,19 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
                 return True
             match = re.fullmatch(
                 r"/api/v1/workspaces/(?P<workspace_slug>[^/]+)/projects/(?P<project_id>[^/]+)/"
-                r"work-items/(?P<issue_id>[^/]+)/comments/?",
+                r"work-items/(?P<issue_id>[^/]+)(?P<resource>/comments)?/?",
                 path,
             )
-            return (
-                method in {"GET", "POST"}
-                and bool(match)
-                and Issue.objects.filter(
-                    id=match.group("issue_id"),
-                    project_id=match.group("project_id"),
-                    project__workspace_id=api_token.workspace_id,
-                    project__workspace__slug=match.group("workspace_slug"),
-                ).exists()
-            )
+            if not match:
+                return False
+            if method not in {"GET", "POST"} or (method == "POST" and match.group("resource") != "/comments"):
+                return False
+            return Issue.objects.filter(
+                id=match.group("issue_id"),
+                project_id=match.group("project_id"),
+                project__workspace_id=api_token.workspace_id,
+                project__workspace__slug=match.group("workspace_slug"),
+            ).exists()
         return False
 
     def validate_api_token(self, token, workspace_slug=None, path="", method="GET"):

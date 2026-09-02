@@ -540,6 +540,40 @@ class TestWorkspaceAgentMemberships:
         assert response.status_code == 403
         assert not IssueComment.objects.filter(issue=other_issue).exists()
 
+    def test_runtime_token_reads_only_its_scoped_work_item_detail(self):
+        issue = Issue.objects.create(
+            name="Scoped work item",
+            workspace=self.workspace,
+            project=self.project,
+            state=State.objects.create(
+                name="Scoped Todo",
+                workspace=self.workspace,
+                project=self.project,
+                group="backlog",
+                default=True,
+            ),
+            created_by=self.admin,
+        )
+        other_project = ProjectFactory(
+            workspace=self.workspace,
+            name="Other project",
+            identifier="OTHER-DETAIL",
+        )
+        created = self.apply()
+        client = self.token_client(created["credential"])
+        own_url = f"/api/v1/workspaces/{self.workspace.slug}/projects/{self.project.id}/work-items/{issue.id}/"
+
+        response = client.get(own_url)
+
+        assert response.status_code == 200
+        assert str(response.data["id"]) == str(issue.id)
+        assert client.post(own_url, {}, format="json").status_code == 403
+
+        wrong_project_url = (
+            f"/api/v1/workspaces/{self.workspace.slug}/projects/{other_project.id}/work-items/{issue.id}/"
+        )
+        assert client.get(wrong_project_url).status_code == 403
+
     def test_agent_key_fits_activity_log_path_limit(self):
         maximum_key = "a" * MAX_AGENT_KEY_LENGTH
         result = WorkspaceAgentMemberships.apply(
