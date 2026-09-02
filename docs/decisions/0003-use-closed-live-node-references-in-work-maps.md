@@ -121,16 +121,17 @@ cleanup must not delete a binding referenced by an acknowledged carrier.
 Scene and skeletons render before hydration. The server batch-hydrates
 viewer-scoped projections, with each source resolving independently. Revalidate
 on open and browser focus/connectivity return; reuse same-client source-store
-updates and provide manual stale retry. V0 promises no Work Map-specific polling
-or continuous cross-client source-update stream.
+updates and provide manual stale retry. V0 adds no Work Map-specific polling or
+generic source-event feed.
 
-An active session must also consume an authorization or source-invalidation
-signal that causes affected viewer projections to reauthorize and fail closed.
-The concrete delivery transport is an implementation investigation, not a new
-source-of-truth. Until that seam is proved, V0 makes no promise of instantaneous
-cross-client business-data freshness; every hydration and source action still
-uses current authorization, and a known revocation immediately removes cached
-metadata.
+An active session consumes the durable, metadata-free source-projection
+invalidation stream selected in ADR-0004. Each authoritative source mutation and
+relevant authority change appends opaque affected binding keys in the same
+transaction; delivery retries at least once, and the client tombstones those
+projections before authoritative rehydration. This transport is not a new source
+of truth and does not expose source kind, identity, title, project, or mutation
+cause. V0 promises eventual fail-closed invalidation, not instantaneous delivery;
+every hydration and source action still uses current authorization.
 
 V1 may strengthen business-data freshness through a shared Plane entity-update
 channel owned by the authoritative sources. V0 adds neither Work Map-specific

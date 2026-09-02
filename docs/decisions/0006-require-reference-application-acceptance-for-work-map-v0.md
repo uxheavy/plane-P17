@@ -106,7 +106,8 @@ not satisfy this requirement. No production-capable secret is committed.
 On production-shaped data, prove Page ID, project route, supported API,
 permission, project association, hierarchy, asset, favorite, recent, search,
 version, and `project_page` realtime behavior before and after migration. Prove
-forward and rollback invariants and removal of permanent dual ownership.
+forward and rollback invariants and removal of permanent dual ownership,
+including the legacy `FileAsset.page` cascade before destructive contraction.
 
 #### Authority and disclosure
 
@@ -119,13 +120,15 @@ stale writers.
 While a connected focused map remains open, revoke one source permission. Prove
 the affected cached card becomes the uniform tombstone, protected metadata
 disappears, unrelated nodes remain usable, and the result creates no promise of
-continuous business-data freshness.
+instantaneous business-data freshness before durable invalidation delivery.
 
 Prove source mutation and `WorkMapProjectionInvalidation` creation are one
-transaction, failed delivery remains pending, successful delivery removes the
-outbox record, browser publication is rejected, and the client tombstones before
-rehydration. Hydrate opaque keys independently at concurrency eight and prove a
-slow, denied, or failed key does not block or disclose another key.
+transaction, failed or ambiguous delivery remains pending, successful delivery
+marks the record delivered with its publication receipt, later cleanup removes
+only eligible delivered records, browser publication is rejected, and the client
+tombstones before rehydration. Hydrate opaque keys independently at concurrency
+eight and prove a slow, denied, or failed key does not block or disclose another
+key.
 
 #### Two-client convergence and persistence
 
@@ -161,6 +164,11 @@ fresh target-owned keys. Inject a storage-copy failure and prove no target
 Document, Work Map, scene, binding, version-asset link, or asset row becomes
 visible and any staged object is removed.
 
+Interrupt native image insertion after upload finalization but before the scene
+save. Prove the expired `WorkMapSceneAssetPlacement` removes only that
+finalized-but-unreferenced asset and storage object. Prove a placement referenced
+by a durable scene generation is committed and never reclaimed.
+
 #### Native carrier and clipboard
 
 Using real Plane presentations, prove selection, transform, grouping, ordering,
@@ -173,10 +181,11 @@ retries are idempotent, and any unauthorized or unmaterializable mixed selection
 produces no inserted subset or scene, binding, or asset change.
 
 Kill the claimant at each external boundary of `WorkMapBindingPlacement`,
-`WorkMapPasteRebinding`, and `WorkMapDuplicateOperation`. Prove active leases
-cannot be stolen, expired leases resume idempotently, committed results become
-visible once, and cleanup removes only operation-owned bindings, replacement
-keys, staged objects, and incomplete aggregates.
+`WorkMapSceneAssetPlacement`, `WorkMapPasteRebinding`, and
+`WorkMapDuplicateOperation`. Prove active leases cannot be stolen, expired
+leases resume idempotently, committed results become visible once, and cleanup
+removes only operation-owned bindings, uploaded assets, replacement keys, staged
+objects, and incomplete aggregates.
 
 #### Experienced desktop and tablet behavior
 

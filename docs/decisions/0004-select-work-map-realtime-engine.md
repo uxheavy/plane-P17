@@ -76,9 +76,11 @@ Awareness is ephemeral and contains only Plane user identity, pointer,
 selection, and idle state. Each connection sends presence at least every 10
 seconds. Receiving clients key collaborators by the relay-issued `connectionId`,
 refresh the lease for pointer or presence frames, and remove it after 30 seconds
-without a frame or immediately when the socket closes. This represents the same
-user correctly across multiple tabs. Awareness is not stored in the database,
-scene, version, recovery record, or a durable Redis key.
+without a frame. The closing client clears its local connection state
+immediately; peers on this or another relay instance may retain its ephemeral
+presence until that bounded lease expires. This represents the same user
+correctly across multiple tabs. Awareness is not stored in the database, scene,
+version, recovery record, or a durable Redis key.
 
 ### Source-projection invalidation
 

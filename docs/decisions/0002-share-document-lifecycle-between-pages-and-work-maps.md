@@ -94,7 +94,9 @@ are removed and invariants prove one owner.
 The approved final cutover is destructive only after that caller proof and
 rollback window. It removes shared lifecycle columns from `Page`, retires
 `ProjectPage` as the association owner, and removes shared version identity,
-lifecycle, and asset ownership from `PageVersion`. `Page` and `PageVersion`
+lifecycle, and asset ownership from `PageVersion`. It also removes the legacy
+`FileAsset.page` relationship; retaining its cascading delete would leave Page
+as a second asset-lifecycle owner after the cutover. `Page` and `PageVersion`
 remain as rich-text subtype owners on the same preserved IDs; `Document`,
 Document project associations, Document versions, and `DocumentVersionAsset`
 are their sole shared owners. The contraction is not optional compatibility
@@ -150,12 +152,15 @@ reachability, and historical asset reachability unchanged.
 
 ### Durable multi-step operations
 
-The database transaction remains the visibility boundary, but object copies and
-client-mediated carrier insertion can cross that boundary. V0 therefore adds
-three narrow operation owners instead of a generic job or workflow registry:
+The database transaction remains the visibility boundary, but uploads, object
+copies, and client-mediated carrier insertion can cross that boundary. V0
+therefore adds four narrow operation owners instead of a generic job or workflow
+registry:
 
 - `WorkMapBindingPlacement` owns one newly created binding until its native
   carrier is durably inserted or the placement is cancelled;
+- `WorkMapSceneAssetPlacement` owns one newly uploaded Work Map asset until a
+  durable scene generation references it or the placement is cancelled;
 - `WorkMapPasteRebinding` owns the complete source-to-target key replacement for
   one cross-map paste before any pasted element enters the target scene; and
 - `WorkMapDuplicateOperation` owns one whole-map duplicate, including its target
@@ -166,10 +171,11 @@ bounded lease, explicit terminal state, and enough receipts to retry or clean up
 only the resources it created. A claimant may resume an expired lease but may
 not steal an active one. Success becomes visible once; failure and lease-expiry
 cleanup are idempotent. Crash recovery removes orphan binding placements,
-incomplete paste rebinding, staged object copies, and incomplete duplicate
-aggregates without touching pre-existing resources. These records are not a
-second scene, binding, asset, or workflow authority and are retained only for
-the bounded recovery window required to prove cleanup.
+finalized-but-unreferenced Work Map uploads, incomplete paste rebinding, staged
+object copies, and incomplete duplicate aggregates without touching
+pre-existing resources. These records are not a second scene, binding, asset,
+or workflow authority and are retained only for the bounded recovery window
+required to prove cleanup.
 
 Work Map V0 adds no activity/compliance subsystem. Creator, last editor,
 timestamps, and versions provide document-state attribution. Presence, cursors,
