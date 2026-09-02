@@ -186,6 +186,76 @@ class TestWorkMapSceneAssetPlacement:
         assert FileAsset.objects.filter(pk=asset_id, is_uploaded=True).exists()
         assert not WorkMapSceneAssetPlacement.all_objects.filter(pk=stale_placement.pk).exists()
         assert WorkMap.objects.get(pk=work_map_data["id"]).scene_binary
+
+    @patch("plane.app.views.asset.work_map.S3Storage.generate_presigned_post")
+    @patch("plane.app.views.asset.work_map.S3Storage.get_object_metadata")
+    def test_durably_deleted_image_can_release_its_file_metadata_and_asset(
+        self,
+        get_object_metadata,
+        generate_presigned_post,
+        session_client,
+        workspace,
+        create_user,
+    ):
+        generate_presigned_post.return_value = {"url": "https://upload.invalid", "fields": {}}
+        get_object_metadata.return_value = {
+            "ContentType": "image/png",
+            "ContentLength": 4,
+            "ETag": "etag",
+        }
+        project = _project(workspace, create_user)
+        work_map_data = session_client.post(_work_map_url(workspace, project), {"name": "Map"}, format="json").json()
+        asset_id = _create_scene_asset(session_client, workspace, project, work_map_data["id"])
+        image = {"id": "image", "type": "image", "fileId": "file"}
+        files = {"file": {"assetId": asset_id, "mimeType": "image/png", "created": 1}}
+        scene_url = _work_map_url(workspace, project, work_map_data["id"], "scene/")
+
+        inserted = session_client.patch(
+            scene_url,
+            {
+                "generation": 0,
+                "scene_binary": base64.b64encode(json.dumps({"elements": [image], "files": files}).encode()).decode(
+                    "ascii"
+                ),
+            },
+            format="json",
+        )
+        assert inserted.status_code == status.HTTP_200_OK
+
+        tombstoned = session_client.patch(
+            scene_url,
+            {
+                "generation": 1,
+                "scene_binary": base64.b64encode(
+                    json.dumps({"elements": [{**image, "isDeleted": True}], "files": files}).encode()
+                ).decode("ascii"),
+            },
+            format="json",
+        )
+        assert tombstoned.status_code == status.HTTP_200_OK
+
+        metadata_released = session_client.patch(
+            scene_url,
+            {
+                "generation": 2,
+                "scene_binary": base64.b64encode(
+                    json.dumps({"elements": [{**image, "isDeleted": True}], "files": {}}).encode()
+                ).decode("ascii"),
+            },
+            format="json",
+        )
+        assert metadata_released.status_code == status.HTTP_200_OK
+
+        with patch("plane.app.views.asset.work_map.S3Storage.delete_files", return_value=True) as delete_files:
+            deleted = session_client.delete(_scene_asset_url(workspace, project, work_map_data["id"], asset_id))
+
+        assert deleted.status_code == status.HTTP_204_NO_CONTENT
+        delete_files.assert_called_once()
+        assert not FileAsset.objects.filter(id=asset_id).exists()
+        persisted = json.loads(bytes(WorkMap.objects.get(pk=work_map_data["id"]).scene_binary))
+        assert persisted == {"elements": [{**image, "isDeleted": True}], "files": {}}
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

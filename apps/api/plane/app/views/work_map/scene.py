@@ -103,7 +103,11 @@ def work_map_scene_assets(scene):
     for element in scene["elements"]:
         if not isinstance(element, dict):
             raise ValueError("Scene element is invalid")
-        if element.get("type") == "image" and element.get("fileId") not in scene["files"]:
+        if (
+            element.get("type") == "image"
+            and not element.get("isDeleted", False)
+            and element.get("fileId") not in scene["files"]
+        ):
             raise ValueError("Image element file is unavailable")
     return assets
 
