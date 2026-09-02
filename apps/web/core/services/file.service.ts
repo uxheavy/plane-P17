@@ -8,7 +8,13 @@ import type { AxiosRequestConfig } from "axios";
 // plane types
 import { API_BASE_URL } from "@plane/constants";
 import { getFileMetaDataForUpload, generateFileUploadPayload } from "@plane/services";
-import type { EFileAssetType, TFileEntityInfo, TFileSignedURLResponse } from "@plane/types";
+import type {
+  EFileAssetType,
+  TFileEntityInfo,
+  TFileSignedURLResponse,
+  TWorkMapSceneAsset,
+  TWorkMapSceneAssetUploadResponse,
+} from "@plane/types";
 import { getAssetIdFromUrl } from "@plane/utils";
 // helpers
 // services
@@ -59,6 +65,51 @@ export class FileService extends APIService {
     this.cancelUpload = this.cancelUpload.bind(this);
     // upload service
     this.fileUploadService = new FileUploadService();
+  }
+
+  private workMapSceneAssetPath(workspaceSlug: string, projectId: string, workMapId: string, suffix = "") {
+    return `/api/assets/v2/workspaces/${workspaceSlug}/projects/${projectId}/work-maps/${workMapId}/scene-assets/${suffix}`;
+  }
+
+  async uploadWorkMapSceneAsset(
+    workspaceSlug: string,
+    projectId: string,
+    workMapId: string,
+    file: File
+  ): Promise<TWorkMapSceneAsset> {
+    const metadata = await getFileMetaDataForUpload(file);
+    const upload = await this.post(this.workMapSceneAssetPath(workspaceSlug, projectId, workMapId), {
+      name: metadata.name,
+      mime_type: metadata.type,
+      size: metadata.size,
+    }).then(({ data }) => data as TWorkMapSceneAssetUploadResponse);
+    const uploadPayload = generateFileUploadPayload(
+      {
+        asset_id: upload.asset.asset_id,
+        asset_url: upload.asset.asset_url,
+        upload_data: upload.upload_data,
+      },
+      file
+    );
+    await this.fileUploadService.uploadFile(upload.upload_data.url, uploadPayload);
+    return this.patch(
+      this.workMapSceneAssetPath(workspaceSlug, projectId, workMapId, `${upload.asset.asset_id}/`)
+    ).then(({ data }) => data);
+  }
+
+  async fetchWorkMapSceneAsset(
+    workspaceSlug: string,
+    projectId: string,
+    workMapId: string,
+    assetId: string
+  ): Promise<Blob> {
+    return this.get(
+      this.workMapSceneAssetPath(workspaceSlug, projectId, workMapId, `${assetId}/`),
+      {},
+      {
+        responseType: "blob",
+      }
+    ).then(({ data }) => data);
   }
 
   private async updateWorkspaceAssetUploadStatus(workspaceSlug: string, assetId: string): Promise<void> {

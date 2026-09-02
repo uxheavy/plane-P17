@@ -5,6 +5,12 @@ packages:
   - "!apps/proxy"
 
 catalog:
+  # UX Heavy Work Map seams, tag target 583b3c3c69320b4bf4d78d1de947ff8f44119d8a.
+  # Release asset SHA-256 values:
+  #   common: 5bf5604bdbcff34216c89e39526650885610ee95c38c8517347e1f00a1979375
+  #   excalidraw: 719ec132475cb5734437f6f76a23bddd2ea3f60bb389d5069cd3196666c64742
+  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.0-583b3c3c/uxheavy-excalidraw-common-0.18.0-583b3c3c.tgz"
+  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.0-583b3c3c/uxheavy-excalidraw-0.18.0-583b3c3c.tgz"
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
@@ -271,6 +277,9 @@ allowBuilds:
   sharp: false
 
 minimumReleaseAgeExclude:
+  # GitHub-only release artifacts reviewed above and pinned by exact SHA-256.
+  - "@uxheavy/excalidraw-common@0.18.0-583b3c3c"
+  - "@uxheavy/excalidraw@0.18.0-583b3c3c"
   - "@storybook/addon-docs@10.4.6"
   - "@storybook/builder-vite@10.4.6"
   - "@storybook/csf-plugin@10.4.6"

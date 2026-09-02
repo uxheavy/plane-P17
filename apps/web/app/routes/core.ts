@@ -194,6 +194,22 @@ export const coreRoutes: RouteConfigEntry[] = [
             ),
           ]),
 
+          // Work Map Detail
+          layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/work-maps/(detail)/layout.tsx", [
+            route(
+              ":workspaceSlug/projects/:projectId/work-maps/:workMapId",
+              "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/work-maps/(detail)/[workMapId]/page.tsx"
+            ),
+          ]),
+
+          // Work Maps List
+          layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/work-maps/(list)/layout.tsx", [
+            route(
+              ":workspaceSlug/projects/:projectId/work-maps",
+              "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/work-maps/(list)/page.tsx"
+            ),
+          ]),
+
           // Page Detail
           layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/pages/(detail)/layout.tsx", [
             route(
