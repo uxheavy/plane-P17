@@ -129,7 +129,8 @@ marks the record delivered with its publication receipt, later cleanup removes
 only eligible delivered records, browser publication is rejected, and the client
 tombstones before rehydration. Hydrate opaque keys independently at concurrency
 eight and prove a slow, denied, or failed key does not block or disclose another
-key.
+key. Prove read-only attached clients receive server-originated invalidations
+while browser publication of those frames remains rejected.
 
 #### Two-client convergence and persistence
 
@@ -152,6 +153,14 @@ changes generation without changing `collaboration_epoch`; restore and lifecycle
 resets advance the epoch, publish immediate force-close, and periodic
 epoch/authorization checks close a client when that Redis control message is
 deliberately dropped.
+
+Drop a successful scene PATCH response, then retry its byte-identical body with
+the stale generation and prove the endpoint returns the current generation as
+durable acknowledgement. Prove a genuinely different stale scene still
+conflicts. Drop a deletion frame and prove the periodic full-scene repair still
+carries the deleted element tombstone and removes it from the stale client;
+inspect relay, persistence, and recovery payloads to prove none filters deleted
+elements.
 
 #### Document-owned asset journey
 
@@ -205,12 +214,15 @@ Through the real project Work Map routes and real sign-in, prove create/list/
 open, native drawing, placement and canonical source action, hydration and
 tombstones, disconnected/read-only state, recovery retry, URL-embed behavior,
 duplicate, versions, lock/archive, search/favorite/recent, and project-scoped
-denial. Tablet proof uses touch and no-hover affordances rather than a resized
-desktop assertion.
+denial. URL-embed proof includes rejection of Plane application/API origins and
+hosts covered by the configured session-cookie domain, while an unrelated
+HTTP(S) origin remains eligible for explicit enablement. Tablet proof uses touch
+and no-hover affordances rather than a resized desktop assertion.
 
-Recovery proof covers HTTP durable-acknowledgement cleanup, explicit discard,
-tab close, generation-mismatch rejection, and authority-revocation rejection,
-without silent replay or document mutation. It proves there is at most one
+Recovery proof covers HTTP durable-acknowledgement cleanup, byte-identical
+stale-generation acknowledgement, explicit discard, tab close, rejection of a
+different stale-generation body, and authority-revocation rejection, without
+silent replay or document mutation. It proves there is at most one
 `sessionStorage` record scoped by user, Work Map, and generation and no durable
 awareness record. Awareness proof uses a 10-second heartbeat and 30-second lease
 expiry keyed by connection ID, including two tabs for the same user.

@@ -102,13 +102,16 @@ age, retry count, process restart, or lease expiry never authorizes hard deletio
 
 The Redis envelope is server-only. Plane Live rejects browser publication and
 translates a valid envelope to `SOURCE_PROJECTIONS_INVALIDATED` for same-room
-clients without adding metadata. On receipt, the web client immediately evicts
-the named cached projections to the uniform unavailable tombstone, then
-rehydrates each key independently with concurrency eight. One slow, denied, or
-failed key cannot block or reveal the outcome of another. A lost Redis
-subscription closes the socket; reconnect fails closed, tombstones cached
-projections, and authoritatively rehydrates rather than assuming no invalidation
-was missed.
+clients without adding metadata. This server-originated control frame is
+receivable by every currently authorized attached client, including read-only
+clients; the read-only restriction applies to browser-originated scene,
+pointer, and presence publication, not to authoritative invalidation delivery.
+On receipt, the web client immediately evicts the named cached projections to
+the uniform unavailable tombstone, then rehydrates each key independently with
+concurrency eight. One slow, denied, or failed key cannot block or reveal the
+outcome of another. A lost Redis subscription closes the socket; reconnect
+fails closed, tombstones cached projections, and authoritatively rehydrates
+rather than assuming no invalidation was missed.
 
 ### Persistence and failure semantics
 
@@ -118,9 +121,12 @@ relay accepts frames up to 5 MiB. That fixed headroom covers both encodings and
 prevents an API-valid scene from becoming impossible to persist, broadcast, or
 repair solely because transport framing adds bytes.
 
-Every transmitted update is a full serialized Work Map scene. On receipt, the
-client decodes it, calls `restoreElements(remote.elements, null)`, reconciles it
-against `getSceneElementsIncludingDeleted()` with
+Every transmitted update is a full serialized Work Map scene. Relay,
+persistence, periodic repair, and recovery serialization all source elements
+from `getSceneElementsIncludingDeleted()` and never filter deletion tombstones
+in V0. On receipt, the client decodes it, calls
+`restoreElements(remote.elements, null)`, reconciles it against
+`getSceneElementsIncludingDeleted()` with
 `reconcileElements(local, restoredRemote, appState)`, and applies the result with
 `updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })`. The same
 frame carries the closed opaque `files` metadata from the durable scene. Before
@@ -163,17 +169,23 @@ identity. Durable acknowledgement removes the record only when that exact
 snapshot identity is still current. If a newer edit replaced the record while
 an older request was in flight, the acknowledgement advances the newer snapshot
 to the returned generation and persistence continues; it never clears the newer
-bytes. Explicit discard removes the current record. The record is bounded by the
-browser tab session: it is not an offline document, does not outlive the tab,
-does not permit continued editing, and does not accumulate a multi-update queue.
+bytes. For an ambiguous retry, the scene endpoint checks byte identity before
+the generation comparison: if the submitted bytes already equal the
+authoritative scene, it returns the current generation as durable
+acknowledgement even when the submitted generation is stale. This
+acknowledgement still clears only the matching snapshot identity. Explicit
+discard removes the current record. The record is bounded by the browser tab
+session: it is not an offline document, does not outlive the tab, does not permit
+continued editing, and does not accumulate a multi-update queue.
 
 After persistence failure, freeze mutation and retain the pending update. A
 reload, reconnect, permission/lock/archive change, or generation change requires
 fresh authorization and authoritative resynchronization. The user may then
 explicitly retry if still authorized and the generation is current. Never
 replay, merge, discard, or mark recovered state durable silently. Failed retry
-remains visible and read-only. Generation mismatch or revoked authority makes
-the record non-replayable. Closing the tab ends its lifetime.
+remains visible and read-only. A generation mismatch whose submitted bytes are
+not already authoritative, or revoked authority, makes the record
+non-replayable. Closing the tab ends its lifetime.
 
 ### Versions and generation
 

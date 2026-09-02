@@ -73,7 +73,11 @@ Plane's `shouldLoadEmbeddable` returns true for a validated protected Plane
 carrier, because that path renders an authorized Plane projection rather than
 an arbitrary origin. For a native URL embed it returns true only when either
 `enabledOrigin` matches or the current viewer session contains that
-document/element/origin tuple. On
+document/element/origin tuple, and only when the origin is outside Plane's
+credential scope. Credential scope includes the configured Plane application
+and API origins and any host equal to or beneath the configured session-cookie
+domain. Native URL embeds in that scope remain inert; a protected Plane carrier
+is the only supported way to render authenticated Plane content. On
 `onEmbeddableLoadRequest`, a currently authorized editor writes the normalized
 origin to `enabledOrigin` through the normal scene mutation and durability path.
 A read-only viewer adds only the viewer-session tuple. If edit authority is lost
@@ -137,6 +141,9 @@ and a separate decision because it changes document and browser behavior.
   mutation gating while iframe interaction remains available.
 - URL validation must reject non-web schemes; sandbox attributes must compare to
   the exact native Excalidraw baseline.
+- URL validation must reject Plane credential-scoped origins, including a
+  configured session-cookie parent domain, while leaving unrelated HTTP(S)
+  origins eligible for explicit enablement.
 - A controlled frame-allowed page and controlled CSP/X-Frame-Options-denied page
   must produce distinct honest visible outcomes; a controlled slow destination
   must prove the canvas remains interactive.
