@@ -24,12 +24,12 @@ export const WORK_MAP_SOURCE_KINDS: TWorkMapSourceKind[] = [
 ];
 
 const SOURCE_KIND_LABEL_KEYS: Record<TWorkMapSourceKind, string> = {
-  "work-item": "common.work_items",
-  cycle: "common.cycles",
-  module: "common.modules",
-  "project-view": "common.view",
-  page: "common.pages",
-  "intake-item": "common.intake",
+  "work-item": "work_items",
+  cycle: "cycles",
+  module: "modules",
+  "project-view": "views",
+  page: "pages",
+  "intake-item": "intake",
 };
 
 const service = new WorkMapService();
@@ -108,7 +108,7 @@ export function WorkMapSourcePicker({
   return (
     <div
       role="dialog"
-      aria-label={t("common.add")}
+      aria-label={t("add")}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -120,7 +120,7 @@ export function WorkMapSourcePicker({
     >
       <div className="flex gap-2">
         <select
-          aria-label={t("common.add")}
+          aria-label={t("add")}
           className="rounded border border-subtle bg-surface-2 px-2 text-12"
           value={sourceKind}
           onChange={(event) => {
@@ -136,14 +136,14 @@ export function WorkMapSourcePicker({
           ))}
         </select>
         <label htmlFor="work-map-source-search" className="sr-only">
-          Search accessible sources
+          {t("search")}
         </label>
         <input
           ref={searchRef}
           id="work-map-source-search"
           data-testid="work-map-source-search"
           className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1.5 text-13"
-          placeholder={t("common.search.label")}
+          placeholder={t("search")}
           value={query}
           onChange={(event) => {
             const nextQuery = event.target.value;
@@ -152,7 +152,7 @@ export function WorkMapSourcePicker({
           }}
         />
         <button type="button" className="text-12 text-secondary" onClick={onClose}>
-          {t("common.close")}
+          {t("close")}
         </button>
       </div>
       <select
@@ -161,7 +161,7 @@ export function WorkMapSourcePicker({
         value={projectFilter}
         onChange={(event) => setProjectFilter(event.target.value)}
       >
-        <option value="">{t("common.show_all")}</option>
+        <option value="">{t("show_all")}</option>
         {projects.map(([id, name]) => (
           <option key={id} value={id}>
             {name}

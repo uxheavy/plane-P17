@@ -10,12 +10,12 @@ import type { TWorkMapSourceKind } from "@plane/types";
 import { Boxes, ListTodo } from "lucide-react";
 
 const SOURCE_KIND_KEYS: Record<TWorkMapSourceKind, string> = {
-  "work-item": "common.work_items",
-  cycle: "common.cycles",
-  module: "common.modules",
-  "project-view": "common.view",
-  page: "common.pages",
-  "intake-item": "common.intake",
+  "work-item": "work_items",
+  cycle: "cycles",
+  module: "modules",
+  "project-view": "views",
+  page: "pages",
+  "intake-item": "intake",
 };
 
 export const WORK_MAP_TOOL_SHORTCUTS: ToolShortcutOverrides = {
@@ -44,7 +44,7 @@ export function useWorkMapToolbarItems({
     () => [
       {
         id: "work-item",
-        label: t("common.add_work_item"),
+        label: t("work_items"),
         icon: <ListTodo />,
         shortcuts: [{ key: "W" }],
         disabled: !editable,
@@ -55,7 +55,7 @@ export function useWorkMapToolbarItems({
       {
         id: "source-menu",
         type: "menu" as const,
-        label: t("common.add"),
+        label: t("add"),
         icon: <Boxes />,
         disabled: !editable,
         items: (Object.keys(SOURCE_KIND_KEYS) as TWorkMapSourceKind[])
