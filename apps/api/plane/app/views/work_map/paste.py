@@ -28,6 +28,7 @@ from plane.db.models import (
     WorkMapBinding,
     WorkMapBindingPlacement,
     WorkMapPasteRebinding,
+    WorkMapSceneAssetPlacement,
 )
 from plane.settings.storage import S3Storage
 from plane.utils.path_validator import sanitize_filename
@@ -362,6 +363,16 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
                         )
                     )
                 FileAsset.objects.bulk_create(target_assets)
+                WorkMapSceneAssetPlacement.objects.bulk_create(
+                    [
+                        WorkMapSceneAssetPlacement(
+                            work_map=work_map,
+                            asset=asset,
+                            created_by=request.user,
+                        )
+                        for asset in target_assets
+                    ]
+                )
 
                 for source_key, source_binding in bindings.items():
                     target_key = uuid.UUID(operation.node_key_map[str(source_key)])
@@ -419,6 +430,8 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
             raise
 
         return Response(paste_response(operation, data["files"]), status=status.HTTP_201_CREATED)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

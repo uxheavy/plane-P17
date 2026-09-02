@@ -55,6 +55,7 @@ from plane.db.models import (
     WorkMapBindingPlacement,
     WorkMapDuplicateOperation,
     WorkMapPasteRebinding,
+    WorkMapSceneAssetPlacement,
     WorkMapVersion,
     WorkspaceMember,
 )
@@ -1017,6 +1018,14 @@ class TestWorkMapApp:
             },
             format="json",
         ).json()
+        source_asset = FileAsset.objects.create(
+            workspace=workspace,
+            document_id=source["id"],
+            asset="paste-source-asset",
+            attributes={"name": "source.png", "type": "image/png"},
+            entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+            is_uploaded=True,
+        )
         source_scene = json.dumps(
             {
                 "elements": [
@@ -1025,9 +1034,16 @@ class TestWorkMapApp:
                         "type": "embeddable",
                         "link": f"https://work-map.invalid/nodes/{source_binding['node_key']}",
                         "customData": {"nodeKey": source_binding["node_key"]},
-                    }
+                    },
+                    {"id": "source-image", "type": "image", "fileId": "source-file"},
                 ],
-                "files": {},
+                "files": {
+                    "source-file": {
+                        "assetId": str(source_asset.id),
+                        "mimeType": "image/png",
+                        "created": 1,
+                    }
+                },
             }
         ).encode()
         assert (
@@ -1045,20 +1061,27 @@ class TestWorkMapApp:
             "generation": 0,
             "idempotency_key": idempotency_key,
             "node_keys": [source_binding["node_key"]],
-            "files": [],
+            "files": [{"file_id": "source-file", "asset_id": source_asset.id}],
         }
-        pasted = session_client.post(paste_url, payload, format="json")
+        with patch("plane.app.views.work_map.paste.S3Storage.copy_object", return_value={}):
+            pasted = session_client.post(paste_url, payload, format="json")
         assert pasted.status_code == status.HTTP_201_CREATED
         assert set(pasted.json()) == {"generation", "node_keys", "files"}
         target_key = pasted.json()["node_keys"][source_binding["node_key"]]
+        target_asset_id = pasted.json()["files"]["source-file"]
         assert target_key != source_binding["node_key"]
-        assert pasted.json()["files"] == {}
+        assert target_asset_id != str(source_asset.id)
         assert str(issue.id) not in str(pasted.json())
         assert WorkMapBinding.objects.filter(work_map_id=target["id"], node_key=target_key).exists()
+        assert WorkMapSceneAssetPlacement.objects.filter(
+            work_map_id=target["id"],
+            asset_id=target_asset_id,
+        ).exists()
 
         target_scene = json.loads(source_scene)
         target_scene["elements"][0]["link"] = f"https://work-map.invalid/nodes/{target_key}"
         target_scene["elements"][0]["customData"]["nodeKey"] = target_key
+        target_scene["files"]["source-file"]["assetId"] = target_asset_id
         inserted = session_client.patch(
             _work_maps_url(workspace, project, target["id"], "scene/"),
             {
@@ -1068,6 +1091,7 @@ class TestWorkMapApp:
             format="json",
         )
         assert inserted.status_code == status.HTTP_200_OK
+        assert not WorkMapSceneAssetPlacement.objects.filter(asset_id=target_asset_id).exists()
 
         replayed = session_client.post(paste_url, payload, format="json")
         assert replayed.status_code == status.HTTP_200_OK
@@ -1091,9 +1115,16 @@ class TestWorkMapApp:
                 ProjectMember.objects.filter(id=membership.id).update(is_active=False)
             return result
 
-        with patch(
-            "plane.app.views.work_map.paste.authorized_paste_sources",
-            side_effect=revoke_after_source_recheck,
+        with (
+            patch(
+                "plane.app.views.work_map.paste.authorized_paste_sources",
+                side_effect=revoke_after_source_recheck,
+            ),
+            patch("plane.app.views.work_map.paste.S3Storage.copy_object", return_value={}),
+            patch(
+                "plane.app.views.work_map.paste.S3Storage.delete_files",
+                return_value=True,
+            ),
         ):
             denied = session_client.post(
                 _work_maps_url(workspace, project, denied_target["id"], "paste-rebindings/"),
