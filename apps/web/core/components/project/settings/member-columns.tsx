@@ -15,10 +15,10 @@ import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { EUserProjectRoles, IUser, IUserLite, TProjectMembership } from "@plane/types";
 import { CustomMenu, CustomSelect } from "@plane/ui";
 import { getFileURL } from "@plane/utils";
+
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
-
 export interface RowData extends Pick<TProjectMembership, "original_role"> {
   member: IUserLite;
 }
@@ -95,8 +95,7 @@ export function NameColumn(props: NameProps) {
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- MobX observer returns a React component.
-export const AccountTypeColumn = observer(function AccountTypeColumn(props: AccountTypeProps) {
+const AccountTypeColumnView = observer(function AccountTypeColumnView(props: AccountTypeProps) {
   const { rowData, projectId, workspaceSlug } = props;
   // store hooks
   const {
@@ -201,3 +200,7 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
     </>
   );
 });
+
+export function AccountTypeColumn(props: AccountTypeProps) {
+  return <AccountTypeColumnView {...props} />;
+}
