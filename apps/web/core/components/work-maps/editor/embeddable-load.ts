@@ -42,19 +42,21 @@ export const enableDocumentEmbeddable = <T extends Pick<ExcalidrawEmbeddableElem
 };
 
 export const getViewerEmbeddableKey = (
+  workMapId: string,
   element: Pick<ExcalidrawEmbeddableElement, "id" | "link" | "customData">
 ): string | null => {
   if (typeof element.customData?.nodeKey === "string") return null;
   const origin = getEmbeddableOrigin(element);
-  return origin ? `${element.id}:${origin}` : null;
+  return origin ? `${workMapId}:${element.id}:${origin}` : null;
 };
 
 export const shouldLoadEmbeddableContent = (
+  workMapId: string,
   element: ExcalidrawEmbeddableElement,
   viewerEnablement: ReadonlySet<string>
 ): boolean => {
   if (getNodeKey(element)) return true;
   if (isDocumentEmbeddableEnabled(element)) return true;
-  const viewerKey = getViewerEmbeddableKey(element);
+  const viewerKey = getViewerEmbeddableKey(workMapId, element);
   return !!viewerKey && viewerEnablement.has(viewerKey);
 };

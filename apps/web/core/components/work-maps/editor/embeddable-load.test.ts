@@ -35,10 +35,17 @@ describe("Work Map embeddable load ownership", () => {
   });
 
   it("scopes temporary viewer enablement to the element and current origin", () => {
-    expect(getViewerEmbeddableKey(embeddable("embed-a", "https://example.com/first"))).toBe(
-      "embed-a:https://example.com"
+    expect(getViewerEmbeddableKey("map-a", embeddable("embed-a", "https://example.com/first"))).toBe(
+      "map-a:embed-a:https://example.com"
     );
-    expect(getViewerEmbeddableKey(embeddable("embed-b", "javascript:alert(1)"))).toBeNull();
+    expect(getViewerEmbeddableKey("map-a", embeddable("embed-b", "javascript:alert(1)"))).toBeNull();
+    expect(
+      shouldLoadEmbeddableContent(
+        "map-b",
+        embeddable("embed-a", "https://example.com/first"),
+        new Set(["map-a:embed-a:https://example.com"])
+      )
+    ).toBe(false);
   });
 
   it("never treats a protected Plane carrier as a URL embed", () => {
@@ -50,7 +57,7 @@ describe("Work Map embeddable load ownership", () => {
     expect(isDocumentEmbeddableEnabled(carrier)).toBe(false);
     expect(isEmbeddableLinkAllowed(carrier.link ?? "")).toBe(true);
     expect(enableDocumentEmbeddable(carrier)).toBe(carrier);
-    expect(getViewerEmbeddableKey(carrier)).toBeNull();
-    expect(shouldLoadEmbeddableContent(carrier, new Set())).toBe(true);
+    expect(getViewerEmbeddableKey("map-a", carrier)).toBeNull();
+    expect(shouldLoadEmbeddableContent("map-a", carrier, new Set())).toBe(true);
   });
 });

@@ -17,6 +17,21 @@ import { clearRecovery, readRecovery, writeRecovery, type TRecoveryRecord } from
 import { decodeScene, isGenerationConflict } from "./scene";
 
 const service = new WorkMapService();
+const MAX_SAVE_ATTEMPTS = 10;
+const MAX_RETRY_DELAY_MS = 500;
+
+type TPendingRecovery = TRecoveryRecord & { sequence: number };
+
+const waitForConflictRetry = (attempt: number): Promise<void> => {
+  const exponentialDelay = Math.min(MAX_RETRY_DELAY_MS, 50 * 2 ** attempt);
+  const jitter = Math.floor(Math.random() * 100);
+  return new Promise((resolve) => window.setTimeout(resolve, exponentialDelay + jitter));
+};
+
+const readInitialRecovery = (userId: string, workMapId: string): TRecoveryRecord | null => {
+  if (!userId || typeof window === "undefined") return null;
+  return readRecovery(userId, workMapId);
+};
 
 export type TRecoveryState =
   | { status: "replayable" }
@@ -39,22 +54,29 @@ type TSceneOwners = {
 
 export const usePersistence = (context: TContext, scene: TSceneOwners) => {
   const { workspaceSlug, projectId, workMapId, userId } = context;
-  const [persistenceFailed, setPersistenceFailed] = useState(false);
-  const [recoveryRecord, setRecoveryRecord] = useState<TRecoveryRecord | null>(null);
+  const [persistenceFailed, setPersistenceFailed] = useState(() => readInitialRecovery(userId, workMapId) !== null);
+  const [recoveryRecord, setRecoveryRecord] = useState<TRecoveryRecord | null>(() =>
+    readInitialRecovery(userId, workMapId)
+  );
   const [recoveryState, setRecoveryState] = useState<TRecoveryState | null>(null);
-  const pendingRef = useRef<TRecoveryRecord | null>(null);
+  const pendingRef = useRef<TPendingRecovery | null>(null);
+  const pendingSequenceRef = useRef(0);
   const savingRef = useRef(false);
   const saveTimerRef = useRef<number | undefined>(undefined);
 
-  useEffect(() => {
-    if (!userId) return;
-    const record = readRecovery(userId, workMapId);
-    if (!record) return;
-    setRecoveryRecord(record);
-    setPersistenceFailed(true);
-  }, [userId, workMapId]);
-
-  useEffect(() => () => window.clearTimeout(saveTimerRef.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(saveTimerRef.current);
+      const pending = pendingRef.current;
+      if (!pending || !userId) return;
+      try {
+        writeRecovery(userId, workMapId, pending);
+      } catch {
+        // Recovery is best effort during unmount; the in-memory scene has no durable owner after this point.
+      }
+    },
+    [userId, workMapId]
+  );
 
   const retainRecovery = useCallback(
     (record: TRecoveryRecord) => {
@@ -73,13 +95,13 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
   );
 
   const save = useCallback(
-    async (pending: TRecoveryRecord) => {
+    async (pending: TPendingRecovery) => {
       const appState = scene.getAppState();
       if (!appState || savingRef.current) return;
       savingRef.current = true;
       let persisted = false;
       try {
-        for (let attempt = 0; attempt < 2; attempt += 1) {
+        for (let attempt = 0; attempt < MAX_SAVE_ATTEMPTS; attempt += 1) {
           // oxlint-disable-next-line eslint/no-await-in-loop -- each CAS retry must refetch the latest authoritative scene.
           const authoritative = await service.fetchScene(workspaceSlug, projectId, workMapId);
           const reconciled = mergeAuthoritativeScene(pending.scene_binary, authoritative.scene_binary, appState);
@@ -91,17 +113,21 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
             });
             scene.generationRef.current = result.generation;
             scene.durableSceneRef.current = reconciled.sceneBinary;
-            if (pendingRef.current?.scene_binary === pending.scene_binary) pendingRef.current = null;
-            clearRecovery(userId, workMapId);
-            setRecoveryRecord(null);
-            setRecoveryState(null);
-            setPersistenceFailed(false);
+            if (pendingRef.current?.sequence === pending.sequence) {
+              pendingRef.current = null;
+              clearRecovery(userId, workMapId);
+              setRecoveryRecord(null);
+              setRecoveryState(null);
+              setPersistenceFailed(false);
+            }
             // oxlint-disable-next-line eslint/no-await-in-loop -- applying the winning attempt is part of its ordered CAS flow.
             await scene.applyStoredScene({ elements: reconciled.elements, files: reconciled.files });
             persisted = true;
             return;
           } catch (error) {
-            if (!isGenerationConflict(error) || attempt === 1) throw error;
+            if (!isGenerationConflict(error) || attempt === MAX_SAVE_ATTEMPTS - 1) throw error;
+            // oxlint-disable-next-line eslint/no-await-in-loop -- each retry is delayed after the preceding CAS conflict.
+            await waitForConflictRetry(attempt);
           }
         }
       } catch (error) {
@@ -134,7 +160,12 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
 
   const queue = useCallback(
     (sceneBinary: string) => {
-      const pending = { generation: scene.generationRef.current, scene_binary: sceneBinary };
+      const pending = {
+        generation: scene.generationRef.current,
+        scene_binary: sceneBinary,
+        sequence: pendingSequenceRef.current + 1,
+      };
+      pendingSequenceRef.current = pending.sequence;
       pendingRef.current = pending;
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = window.setTimeout(() => void save(pending), 350);

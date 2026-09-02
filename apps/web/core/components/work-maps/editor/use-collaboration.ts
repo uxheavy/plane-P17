@@ -63,6 +63,9 @@ export const useCollaboration = (
     connectionStateRef.current = state;
     setConnectionState(state);
   }, []);
+  const assignSocket = useCallback((socket: WebSocket | null) => {
+    socketRef.current = socket;
+  }, []);
 
   const sendFrame = useCallback((frame: unknown) => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
@@ -72,10 +75,10 @@ export const useCollaboration = (
   const { applyAwareness, clearCollaborators, ...awarenessState } = awareness;
 
   useEffect(() => {
-    if (!enabled) return;
     let disposed = false;
     let reconnectTimer: number | undefined;
     let reconnectAttempts = 0;
+    let activeSocket: WebSocket | null = null;
     const queuedRemoteScenes: string[] = [];
     let ready = false;
     let readyBarrierStarted = false;
@@ -107,7 +110,8 @@ export const useCollaboration = (
       setRelayEditable(false);
       updateConnectionState("connecting");
       const socket = new WebSocket(relayUrl(workspaceSlug, projectId, workMapId, scene.generationRef.current));
-      socketRef.current = socket;
+      activeSocket = socket;
+      assignSocket(socket);
 
       const closeForTransportFailure = () => {
         setRelayEditable(false);
@@ -148,7 +152,7 @@ export const useCollaboration = (
                 // oxlint-disable-next-line eslint/no-await-in-loop -- whole-scene reconciliation must preserve relay order.
                 if (sceneBinary) await scene.applyRemoteScene(sceneBinary);
               }
-              if (disposed || socket !== socketRef.current || socket.readyState !== WebSocket.OPEN) return;
+              if (disposed || socket !== activeSocket || socket.readyState !== WebSocket.OPEN) return;
               ready = true;
               reconnectAttempts = 0;
               setRelayEditable(message.editable as boolean);
@@ -203,8 +207,9 @@ export const useCollaboration = (
         updateConnectionState("disconnected");
       });
       socket.addEventListener("close", (event) => {
-        if (socket !== socketRef.current) return;
-        socketRef.current = null;
+        if (socket !== activeSocket) return;
+        activeSocket = null;
+        assignSocket(null);
         setRelayEditable(false);
         updateConnectionState("disconnected");
         if (event.code === 1011) scene.failCloseSources();
@@ -214,27 +219,31 @@ export const useCollaboration = (
     };
 
     const reconnectOnResume = () => {
-      if (connectionStateRef.current !== "disconnected" || socketRef.current) return;
+      if (connectionStateRef.current !== "disconnected" || activeSocket) return;
       window.clearTimeout(reconnectTimer);
       reconnectAttempts = 0;
       connect();
     };
 
-    connect();
-    window.addEventListener("focus", reconnectOnResume);
-    window.addEventListener("online", reconnectOnResume);
+    if (enabled) {
+      connect();
+      window.addEventListener("focus", reconnectOnResume);
+      window.addEventListener("online", reconnectOnResume);
+    }
     return () => {
       disposed = true;
       window.clearTimeout(reconnectTimer);
       window.removeEventListener("focus", reconnectOnResume);
       window.removeEventListener("online", reconnectOnResume);
-      const socket = socketRef.current;
-      socketRef.current = null;
+      const socket = activeSocket;
+      activeSocket = null;
+      assignSocket(null);
       clearCollaborators();
-      socket?.close(1000, "Editor closed");
+      if (socket) socket.close(1000, "Editor closed");
     };
   }, [
     applyAwareness,
+    assignSocket,
     clearCollaborators,
     enabled,
     onAuthorized,

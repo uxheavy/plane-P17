@@ -89,6 +89,21 @@ export class WorkMapService extends APIService {
     }).then(({ data }) => data);
   }
 
+  async rebindPaste(
+    workspaceSlug: string,
+    projectId: string,
+    workMapId: string,
+    generation: number,
+    nodeKeys: string[]
+  ): Promise<{ generation: number; node_keys: Record<string, string> }> {
+    return this.post(this.path(workspaceSlug, projectId, `${workMapId}/paste-rebindings/`), {
+      generation,
+      idempotency_key: crypto.randomUUID(),
+      node_keys: nodeKeys,
+      files: [],
+    }).then(({ data }) => data);
+  }
+
   async searchSources(
     workspaceSlug: string,
     projectId: string,

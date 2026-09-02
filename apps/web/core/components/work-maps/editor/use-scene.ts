@@ -38,22 +38,27 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
   const { workspaceSlug, projectId, workMapId } = context;
   const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[]; files: BinaryFiles }>();
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
+  const [initialLoadAttempt, setInitialLoadAttempt] = useState(0);
   const [nodeKeys, setNodeKeys] = useState<string[]>([]);
   const [elementCount, setElementCount] = useState(0);
   const [liveNodeCount, setLiveNodeCount] = useState(0);
   const generationRef = useRef(0);
   const durableSceneRef = useRef("");
   const filesRef = useRef<TWorkMapFiles>({});
-  const uploadsRef = useRef(new Map<string, Promise<void>>());
+  const uploadsRef = useRef<Map<string, Promise<void>> | null>(null);
+  if (uploadsRef.current === null) uploadsRef.current = new Map();
   const applyingFingerprintRef = useRef<string | null>(null);
 
   const observeElements = useCallback((elements: readonly ExcalidrawElement[]) => {
-    const keys = elements
-      .filter((element) => !element.isDeleted)
-      .map(getNodeKey)
-      .filter((key): key is string => !!key);
-    // oxlint-disable-next-line eslint-plugin-unicorn/no-array-sort -- this app's TypeScript target predates toSorted.
-    const nextNodeKeys = [...new Set(keys)].sort();
+    const keys: string[] = [];
+    for (const element of elements) {
+      if (element.isDeleted) continue;
+      const key = getNodeKey(element);
+      if (key) keys.push(key);
+    }
+    const nextNodeKeys = Array.from(new Set(keys));
+    // oxlint-disable-next-line eslint-plugin-unicorn/no-array-sort -- sorting a newly allocated array keeps the target compatible.
+    nextNodeKeys.sort();
     setNodeKeys((current) =>
       current.length === nextNodeKeys.length && current.every((nodeKey, index) => nodeKey === nextNodeKeys[index])
         ? current
@@ -117,21 +122,23 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
 
   const serializeScene = useCallback(
     async (elements: readonly OrderedExcalidrawElement[], files: BinaryFiles) => {
+      const uploads = uploadsRef.current;
+      if (!uploads) throw new Error("Work Map upload state is unavailable");
       await Promise.all(
         Object.entries(files).map(async ([fileId, file]) => {
           if (filesRef.current[fileId]) return;
-          let upload = uploadsRef.current.get(fileId);
+          let upload = uploads.get(fileId);
           if (!upload) {
             upload = uploadFile(fileService, workspaceSlug, projectId, workMapId, fileId, file).then((metadata) => {
               filesRef.current = { ...filesRef.current, [fileId]: metadata };
               return undefined;
             });
-            uploadsRef.current.set(fileId, upload);
+            uploads.set(fileId, upload);
           }
           try {
             await upload;
           } finally {
-            uploadsRef.current.delete(fileId);
+            uploads.delete(fileId);
           }
         })
       );
@@ -141,21 +148,39 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
   );
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const scene = await workMapService.fetchScene(workspaceSlug, projectId, workMapId);
+    let cancelled = false;
+    workMapService
+      .fetchScene(workspaceSlug, projectId, workMapId)
+      .then((scene) => {
         const decoded = decodeScene(scene.scene_binary);
-        const files = await materializeFiles(fileService, workspaceSlug, projectId, workMapId, decoded.files);
+        return materializeFiles(fileService, workspaceSlug, projectId, workMapId, decoded.files).then((files) => ({
+          scene,
+          decoded,
+          files,
+        }));
+      })
+      .then(({ scene, decoded, files }) => {
+        if (cancelled) return undefined;
         generationRef.current = scene.generation;
         durableSceneRef.current = scene.scene_binary;
         filesRef.current = decoded.files;
         observeElements(decoded.elements);
         setInitialData({ elements: decoded.elements, files });
-      } catch {
-        setInitialLoadFailed(true);
-      }
-    })();
-  }, [observeElements, projectId, workMapId, workspaceSlug]);
+        return undefined;
+      })
+      .catch(() => {
+        if (!cancelled) setInitialLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialLoadAttempt, observeElements, projectId, workMapId, workspaceSlug]);
+
+  const retryInitialLoad = useCallback(() => {
+    setInitialLoadFailed(false);
+    setInitialData(undefined);
+    setInitialLoadAttempt((attempt) => attempt + 1);
+  }, []);
 
   const isProgrammaticChange = useCallback((elements: readonly ExcalidrawElement[]) => {
     const fingerprint = sceneFingerprint(elements);
@@ -175,6 +200,7 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
   return {
     initialData,
     initialLoadFailed,
+    retryInitialLoad,
     nodeKeys,
     elementCount,
     liveNodeCount,

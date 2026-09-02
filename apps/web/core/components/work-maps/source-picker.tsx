@@ -30,10 +30,7 @@ export function WorkMapSourcePicker({ workspaceSlug, projectId, workMapId, onSel
   const [results, setResults] = useState<TWorkMapSource[]>([]);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!query.trim()) return;
     let cancelled = false;
     const timeout = window.setTimeout(() => {
       service
@@ -67,12 +64,20 @@ export function WorkMapSourcePicker({ workspaceSlug, projectId, workMapId, onSel
             </option>
           ))}
         </select>
+        <label htmlFor="work-map-source-search" className="sr-only">
+          Search accessible sources
+        </label>
         <input
+          id="work-map-source-search"
           data-testid="work-map-source-search"
           className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1.5 text-13"
           placeholder="Search accessible sources"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
+            if (!nextQuery.trim()) setResults([]);
+          }}
         />
         <button type="button" className="text-12 text-secondary" onClick={onClose}>
           Close

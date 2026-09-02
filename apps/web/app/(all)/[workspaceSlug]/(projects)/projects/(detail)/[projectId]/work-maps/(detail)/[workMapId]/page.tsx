@@ -27,7 +27,7 @@ function ProjectWorkMapPage({ params }: Route.ComponentProps) {
   return (
     <>
       <PageHead title={workMap.name || "Work Map"} />
-      <WorkMapEditor workspaceSlug={workspaceSlug} projectId={projectId} workMap={workMap} />
+      <WorkMapEditor key={workMap.id} workspaceSlug={workspaceSlug} projectId={projectId} workMap={workMap} />
     </>
   );
 }

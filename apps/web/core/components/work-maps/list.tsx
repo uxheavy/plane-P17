@@ -12,13 +12,19 @@
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { Map } from "lucide-react";
+import useSWR from "swr";
+import type { TWorkMap } from "@plane/types";
 import { useWorkMap } from "@/hooks/store/use-work-map";
+
+const updatedAtFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "UTC" });
 
 type Props = { workspaceSlug: string; projectId: string };
 
 export const WorkMapList = observer(function WorkMapList({ workspaceSlug, projectId }: Props) {
-  const { maps } = useWorkMap();
-  const workMaps = Object.values(maps);
+  const store = useWorkMap();
+  const { data: workMaps = [] } = useSWR<TWorkMap[]>(`PROJECT_WORK_MAPS_${projectId}`, () =>
+    store.fetchAll(workspaceSlug, projectId)
+  );
 
   if (workMaps.length === 0)
     return (
@@ -43,7 +49,9 @@ export const WorkMapList = observer(function WorkMapList({ workspaceSlug, projec
             <Map className="size-4 text-secondary" />
             <h3 className="truncate text-14 font-medium">{workMap.name || "Untitled work map"}</h3>
           </div>
-          <p className="mt-3 text-11 text-tertiary">Updated {new Date(workMap.updated_at).toLocaleDateString()}</p>
+          <p className="mt-3 text-11 text-tertiary">
+            Updated {updatedAtFormatter.format(new Date(workMap.updated_at))}
+          </p>
         </Link>
       ))}
     </div>

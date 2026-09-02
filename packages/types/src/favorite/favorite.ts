@@ -14,7 +14,8 @@ export type IFavorite = {
     id?: string;
     name: string;
     logo_props?: TLogoProps | undefined;
-  };
+    project_id?: string;
+  } | null;
   is_folder: boolean;
   sort_order: number;
   parent: string | null;
