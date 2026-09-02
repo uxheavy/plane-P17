@@ -48,7 +48,7 @@ describe("Work Map protected paste", () => {
     const result = await rebindProtectedPaste({ elements: [element] }, [], async (nodeKeys) => ({
       [nodeKeys[0] as string]: targetKey,
     }));
-    if (!result || result === false || !result.elements) throw new Error("Expected rebound paste data");
+    if (!result || !result.elements) throw new Error("Expected rebound paste data");
     expect(result.elements[0]?.customData).toEqual({ nodeKey: targetKey });
     expect(result.elements[0]).not.toHaveProperty("link");
   });

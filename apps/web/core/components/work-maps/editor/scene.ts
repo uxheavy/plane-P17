@@ -45,7 +45,7 @@ const normalizeNodeCarrier = (element: ExcalidrawElement): ExcalidrawElement => 
   const nodeKey = getCustomDataNodeKey(element);
   if (!nodeKey) return element;
   const { link: _link, ...withoutLink } = element;
-  return { ...withoutLink, type: "rectangle", customData: { nodeKey } } as ExcalidrawElement;
+  return { ...withoutLink, type: "rectangle", customData: { nodeKey } } as unknown as ExcalidrawElement;
 };
 
 export const isAllowedEmbedUrl = (link: string): boolean => {

@@ -72,11 +72,11 @@ export function WorkMapSourcePicker({
           if (!cancelled) {
             setResults(sources);
             if (!projectFilter) {
-              setProjects(
-                [...new Map(sources.map((source) => [source.project_id, source.project_name])).entries()].toSorted(
-                  ([, first], [, second]) => first.localeCompare(second)
-                )
-              );
+              const projectOptions = [
+                ...new Map(sources.map((source) => [source.project_id, source.project_name])).entries(),
+              ];
+              projectOptions.sort(([, first], [, second]) => first.localeCompare(second));
+              setProjects(projectOptions);
             }
           }
           return undefined;

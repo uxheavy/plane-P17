@@ -95,7 +95,7 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
   );
 
   const save = useCallback(
-    async (pending: TRecoveryRecord) => {
+    async (pending: TPendingRecovery) => {
       const appState = scene.getAppState();
       if (!appState || savingRef.current) return;
       savingRef.current = true;

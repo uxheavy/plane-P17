@@ -45,8 +45,7 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
   const generationRef = useRef(0);
   const durableSceneRef = useRef("");
   const filesRef = useRef<TWorkMapFiles>({});
-  const uploadsRef = useRef<Map<string, Promise<void>> | null>(null);
-  if (uploadsRef.current === null) uploadsRef.current = new Map();
+  const uploadsRef = useRef(new Map<string, Promise<void>>());
   const applyingFingerprintRef = useRef<string | null>(null);
 
   const observeElements = useCallback((elements: readonly ExcalidrawElement[]) => {

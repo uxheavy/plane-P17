@@ -22,6 +22,7 @@ const available = (nodeKey: string): TWorkMapHydration => ({
     source_kind: "page",
     source_id: `${nodeKey}-source`,
     project_id: "project-id",
+    project_name: "Project",
     name: nodeKey,
   },
 });

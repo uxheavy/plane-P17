@@ -32,6 +32,7 @@ import { WorkMapService } from "@/services/work-map.service";
 import { WorkMapSourceNode } from "../source-node";
 import { WorkMapSourcePicker } from "../source-picker";
 import { RecoveryPanel } from "./recovery-panel";
+import type { TRecoveryRecord } from "./recovery";
 import { PendingScenePanel } from "./pending-scene-panel";
 import { rebindProtectedPaste } from "./paste";
 import { getNodeKey } from "./scene";
@@ -435,7 +436,9 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
 
   const onPointerDown = useCallback(
     (activeTool: AppState["activeTool"], pointerDownState: PointerDownState) => {
-      pointerDownNodeKeyRef.current = getNodeKey(pointerDownState.hit.element);
+      pointerDownNodeKeyRef.current = pointerDownState.hit.element
+        ? (getNodeKey(pointerDownState.hit.element) ?? null)
+        : null;
       if (activeTool.type !== "custom" || activeTool.customType !== "work-map-source" || !pendingSource) return;
       void placeSource(pendingSource, pointerDownState.origin);
     },
@@ -522,7 +525,7 @@ type EditorSurfaceProps = {
   connectionState: string;
   connectionDataState: string;
   pickerSourceKind: TWorkMapSourceKind | null;
-  recoveryRecord: unknown;
+  recoveryRecord: TRecoveryRecord | null;
   recoveryState: TRecoveryState | null;
   pendingScene: boolean;
   elementCount: number;
@@ -537,7 +540,7 @@ type EditorSurfaceProps = {
   onDiscardPending: () => void;
   onSelectSource: (source: TWorkMapSource) => void;
   onClosePicker: () => void;
-  onExcalidrawAPI: (api: ExcalidrawImperativeAPI) => void;
+  onExcalidrawAPI: (api: ExcalidrawImperativeAPI | null) => void;
   onChange: NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
   onPointerUpdate: NonNullable<ComponentProps<typeof Excalidraw>["onPointerUpdate"]>;
   onDoubleClick: MouseEventHandler<HTMLDivElement>;
