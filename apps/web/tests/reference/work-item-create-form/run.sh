@@ -205,8 +205,8 @@ if [[ ${PLANE_REFERENCE_KEEP_FIXTURE:-0} == 1 ]]; then
   trap 'review_stop=1' INT TERM
   printf 'Reference review URL: %s\nReference email: %s\nReference password: %s\nReference run: %s\nReference cleanup: kill -TERM %s\n' \
     "$project_url" "$reference_email" "$reference_password" "$reference_run_id" "$$"
-  while [[ $review_stop == 0 && -n "$preview_pid" ]]; do
-    if ! kill -0 "$preview_pid" 2>/dev/null; then
+  while [[ $review_stop == 0 ]]; do
+    if [[ -n "$preview_pid" ]] && ! kill -0 "$preview_pid" 2>/dev/null; then
       echo "Reference preview exited before review cleanup." >&2
       exit 1
     fi

@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useCallback } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -39,13 +40,14 @@ export const MemberDropdown = observer(function MemberDropdown(props: TMemberDro
       ? getProjectMemberIds(projectId, false)
       : workspaceMemberIds;
 
-  const onDropdownOpen = () => {
-    if (!workspaceSlug) return;
+  const workspaceSlugValue = workspaceSlug?.toString();
+  const onDropdownOpen = useCallback(() => {
+    if (!workspaceSlugValue) return;
     if (projectId) {
-      void fetchWorkspaceMembers(workspaceSlug.toString());
-      void fetchProjectMembers(workspaceSlug.toString(), projectId, true);
-    } else if (!propsMemberIds) void fetchWorkspaceMembers(workspaceSlug.toString());
-  };
+      void fetchWorkspaceMembers(workspaceSlugValue);
+      void fetchProjectMembers(workspaceSlugValue, projectId, true);
+    } else if (!propsMemberIds) void fetchWorkspaceMembers(workspaceSlugValue);
+  }, [fetchProjectMembers, fetchWorkspaceMembers, projectId, propsMemberIds, workspaceSlugValue]);
 
   return (
     <MemberDropdownBase

@@ -214,22 +214,61 @@ function LabelDropdownOptions(props: LabelDropdownOptionsProps) {
   );
 }
 
-export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLabelDropdownBaseProps) {
-  const {
-    buttonClassName,
-    buttonContainerClassName,
-    createLabelEnabled = false,
-    disabled = false,
-    getLabelById,
-    label: customLabel,
-    labelIds,
-    onChange,
-    onDropdownOpen,
-    placement,
-    createLabel,
-    tabIndex,
-    value,
-  } = props;
+function getLabelDropdownModel(
+  labelIds: string[],
+  getLabelById: TLabelDropdownBaseProps["getLabelById"],
+  query: string
+) {
+  const labelsList = labelIds.map((labelId) => getLabelById(labelId)).filter((label): label is IIssueLabel => !!label);
+  const labelsById = new Map(labelsList.map((label) => [label.id, label]));
+  const childLabelsByParentId = new Map<string, IIssueLabel[]>();
+  labelsList.forEach((label) => {
+    if (!label.parent) return;
+    const children = childLabelsByParentId.get(label.parent) ?? [];
+    children.push(label);
+    childLabelsByParentId.set(label.parent, children);
+  });
+  const selectableLabels = labelsList.flatMap((label) => {
+    const children = childLabelsByParentId.get(label.id);
+    if (children?.length) return children;
+    return label.parent ? [] : [label];
+  });
+  const normalizedQuery = query.toLowerCase();
+  const filteredOptions = selectableLabels.filter((label) => {
+    const parentLabel = label.parent ? labelsById.get(label.parent) : undefined;
+    return (
+      label.name.toLowerCase().includes(normalizedQuery) || parentLabel?.name.toLowerCase().includes(normalizedQuery)
+    );
+  });
+
+  return {
+    filteredOptions,
+    labelsById,
+    labelsList,
+    virtualOptions: filteredOptions.map((label) => label.id),
+  };
+}
+
+function useLabelDropdownState({
+  createLabel,
+  createLabelEnabled,
+  getLabelById,
+  labelIds,
+  onChange,
+  onDropdownOpen,
+  placement,
+  value,
+}: Pick<
+  TLabelDropdownBaseProps,
+  | "createLabel"
+  | "createLabelEnabled"
+  | "getLabelById"
+  | "labelIds"
+  | "onChange"
+  | "onDropdownOpen"
+  | "placement"
+  | "value"
+>) {
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -256,29 +295,11 @@ export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLab
       },
     ],
   });
-  // derived values
-  const labelsList = labelIds.map((labelId) => getLabelById(labelId)).filter((label) => !!label);
-  const labelsById = new Map(labelsList.map((label) => [label.id, label]));
-  const childLabelsByParentId = new Map<string, IIssueLabel[]>();
-  labelsList.forEach((label) => {
-    if (!label.parent) return;
-    const children = childLabelsByParentId.get(label.parent) ?? [];
-    children.push(label);
-    childLabelsByParentId.set(label.parent, children);
-  });
-  const selectableLabels = labelsList.flatMap((label) => {
-    const children = childLabelsByParentId.get(label.id);
-    if (children?.length) return children;
-    return label.parent ? [] : [label];
-  });
-  const normalizedQuery = query.toLowerCase();
-  const filteredOptions = selectableLabels.filter((label) => {
-    const parentLabel = label.parent ? labelsById.get(label.parent) : undefined;
-    return (
-      label.name.toLowerCase().includes(normalizedQuery) || parentLabel?.name.toLowerCase().includes(normalizedQuery)
-    );
-  });
-  const virtualOptions = filteredOptions.map((label) => label.id);
+  const { filteredOptions, labelsById, labelsList, virtualOptions } = getLabelDropdownModel(
+    labelIds,
+    getLabelById,
+    query
+  );
 
   const onOpen = () => {
     if (referenceElement) referenceElement.focus();
@@ -294,10 +315,6 @@ export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLab
   const toggleDropdown = () => {
     if (!isDropdownOpen) onOpen();
     setIsDropdownOpen((prevIsOpen) => !prevIsOpen);
-  };
-
-  const dropdownOnChange = (val: string[]) => {
-    onChange(val);
   };
 
   const searchInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -353,48 +370,83 @@ export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLab
     }
   };
 
+  return {
+    attributes,
+    dropdownRef,
+    handleAddLabel,
+    handleClose,
+    handleKeyDown,
+    handleOnClick,
+    inputRef,
+    isDropdownOpen,
+    labelsById,
+    query,
+    setReferenceElement,
+    searchInputKeyDown,
+    setPopperElement,
+    setQuery,
+    styles,
+    submitting,
+    t,
+    virtualOptions,
+  };
+}
+
+export const LabelDropdownBase = observer(function LabelDropdownBase(props: TLabelDropdownBaseProps) {
+  const {
+    buttonClassName,
+    buttonContainerClassName,
+    createLabelEnabled = false,
+    disabled = false,
+    label: customLabel,
+    onChange,
+    tabIndex,
+    value,
+  } = props;
+  const state = useLabelDropdownState(props);
+
   return (
     <Combobox
       as="div"
       role="group"
-      ref={dropdownRef}
+      ref={state.dropdownRef}
       tabIndex={tabIndex}
       value={value}
-      onChange={dropdownOnChange}
-      onClose={handleClose}
+      onChange={onChange}
+      onClose={state.handleClose}
       className="relative h-full flex-shrink-0"
       multiple
       disabled={disabled}
-      onKeyDown={handleKeyDown}
-      virtual={{ options: virtualOptions }}
+      onKeyDown={state.handleKeyDown}
+      virtual={{ options: state.virtualOptions }}
     >
       <LabelDropdownTrigger
         buttonClassName={buttonClassName}
         buttonContainerClassName={buttonContainerClassName}
         customLabel={customLabel}
-        isOpen={isDropdownOpen}
-        labelsById={labelsById}
-        onClick={handleOnClick}
-        referenceElement={setReferenceElement}
-        t={t}
+        isOpen={state.isDropdownOpen}
+        labelsById={state.labelsById}
+        onClick={state.handleOnClick}
+        referenceElement={state.setReferenceElement}
+        t={state.t}
         value={value}
       />
-      {isDropdownOpen && (
+      {state.isDropdownOpen && (
         <LabelDropdownOptions
-          attributes={attributes.popper}
+          attributes={state.attributes.popper}
           createLabelEnabled={createLabelEnabled}
-          handleAddLabel={handleAddLabel}
-          inputRef={inputRef}
-          labelsById={labelsById}
-          noMatchingResults={t("no_matching_results")}
-          popperElementRef={setPopperElement}
-          query={query}
-          searchInputKeyDown={searchInputKeyDown}
-          setQuery={setQuery}
-          style={styles.popper}
-          submitting={submitting}
-          t={t}
-          virtualOptions={virtualOptions}
+          handleAddLabel={state.handleAddLabel}
+          inputRef={state.inputRef}
+          labelsById={state.labelsById}
+          noMatchingResults={state.t("no_matching_results")}
+          popperElementRef={state.setPopperElement}
+          query={state.query}
+          searchInputKeyDown={state.searchInputKeyDown}
+          setQuery={state.setQuery}
+          style={state.styles.popper}
+          submitting={state.submitting}
+          t={state.t}
+          virtualOptions={state.virtualOptions}
         />
       )}
     </Combobox>

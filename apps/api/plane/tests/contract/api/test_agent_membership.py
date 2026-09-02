@@ -659,6 +659,8 @@ class TestWorkspaceAgentMemberships:
         hard_delete()
         assert not WorkspaceMember.objects.filter(member_id=workspace_agent["user_id"]).exists()
         assert not ProjectMember.objects.filter(member_id=workspace_agent["user_id"]).exists()
+        assert not User.objects.filter(id=workspace_agent["user_id"]).exists()
+        assert User.objects.filter(id=self.admin.id).exists()
 
     def test_direct_membership_deletion_remains_guarded(self):
         install_agent_membership_guards()
@@ -670,6 +672,21 @@ class TestWorkspaceAgentMemberships:
                 soft_delete_related_objects("db", "projectmember", project_member.id)
 
         assert ProjectMember.all_objects.get(id=project_member.id).deleted_at is None
+
+    def test_project_member_delete_rejects_agent_before_database_guard(self):
+        install_agent_membership_guards()
+        created = self.apply(key="api-lifecycle")
+        project_member = ProjectMember.objects.get(project=self.project, member_id=created["user_id"])
+        ProjectMemberFactory(project=self.project, workspace=self.workspace, member=self.admin, role=20)
+        client = APIClient()
+        client.force_authenticate(self.admin)
+
+        response = client.delete(
+            f"/api/v1/workspaces/{self.workspace.slug}/projects/{self.project.id}/members/{project_member.id}/"
+        )
+
+        assert response.status_code == 409
+        assert ProjectMember.objects.filter(id=project_member.id, is_active=True).exists()
 
     def test_token_creation_failure_rolls_back_partial_lifecycle_state(self):
         before = {

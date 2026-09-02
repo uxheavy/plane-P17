@@ -330,6 +330,11 @@ class ProjectMemberViewSet(BaseViewSet):
                 {"error": "You cannot remove a user having role higher than you"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if is_agent_user(project_member.member):
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         project_member.is_active = False
         project_member.save()

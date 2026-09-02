@@ -142,12 +142,29 @@ def hard_delete():
         CycleIssue,
         Estimate,
         EstimatePoint,
+        User,
+        WorkspaceAgentMembership,
+        BotTypeEnum,
     )
 
     days = settings.HARD_DELETE_AFTER_DAYS
-    # check delete workspace
+    expired_workspaces = Workspace.all_objects.filter(
+        deleted_at__lt=timezone.now() - timezone.timedelta(days=days)
+    )
+    agent_user_ids = list(
+        WorkspaceAgentMembership.all_objects.filter(
+            workspace__in=expired_workspaces
+        ).values_list("user_id", flat=True)
+    )
+
+    # check delete workspace and its lifecycle-owned agent users
     with agent_lifecycle():
-        _ = Workspace.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+        _ = expired_workspaces.delete()
+        _ = User.objects.filter(
+            id__in=agent_user_ids,
+            is_bot=True,
+            bot_type=BotTypeEnum.AGENT,
+        ).delete()
 
     # check delete project
     with agent_lifecycle():
