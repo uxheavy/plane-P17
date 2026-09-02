@@ -5,11 +5,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
-from plane.db.models import UserFavorite
+from plane.db.models import Document, UserFavorite
 
 from ..base import BaseViewSet
 from .base import visible_work_maps
@@ -20,15 +21,24 @@ class WorkMapFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id, work_map_id):
-        document = visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
-        if document is None:
-            return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
-        UserFavorite.objects.get_or_create(
-            workspace=document.workspace,
-            entity_identifier=work_map_id,
-            entity_type="work_map",
-            user=request.user,
-        )
+        with transaction.atomic():
+            visible_id = (
+                visible_work_maps(user=request.user, slug=slug, project_id=project_id)
+                .filter(id=work_map_id)
+                .values_list("id", flat=True)
+                .first()
+            )
+            document = Document.objects.select_for_update().filter(id=visible_id).first()
+            if document is None:
+                return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
+            if document.archived_at is not None:
+                return Response({"error": "Work map is archived"}, status=status.HTTP_409_CONFLICT)
+            UserFavorite.objects.get_or_create(
+                workspace=document.workspace,
+                entity_identifier=work_map_id,
+                entity_type="work_map",
+                user=request.user,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
@@ -45,6 +55,8 @@ class WorkMapFavoriteViewSet(BaseViewSet):
             return Response({"error": "Favorite not found"}, status=status.HTTP_404_NOT_FOUND)
         favorite.delete(soft=False)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

@@ -599,6 +599,11 @@ class ProjectAssetEndpoint(BaseAPIView):
                 {"error": "Invalid entity type.", "status": False},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION and not entity_identifier:
+            return Response(
+                {"error": "Page description assets require an entity identifier.", "status": False},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Check if the file type is allowed
         allowed_types = [

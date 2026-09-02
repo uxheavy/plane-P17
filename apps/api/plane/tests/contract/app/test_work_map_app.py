@@ -49,6 +49,7 @@ from plane.db.models import (
     ProjectMember,
     State,
     User,
+    UserFavorite,
     UserRecentVisit,
     WorkMap,
     WorkMapBinding,
@@ -382,6 +383,23 @@ class TestWorkMapApp:
         )
         with pytest.raises(RuntimeError, match="not owned by its Document"):
             asset_migration.backfill_page_version_assets(django_apps, None)
+
+    def test_page_description_asset_requires_an_owner(self, session_client, workspace, create_user):
+        project, _ = _project(workspace, create_user, "PGA")
+
+        response = session_client.post(
+            f"/api/assets/v2/workspaces/{workspace.slug}/projects/{project.id}/",
+            {
+                "name": "image.png",
+                "type": "image/png",
+                "size": 1,
+                "entity_type": FileAsset.EntityTypeContext.PAGE_DESCRIPTION,
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["error"] == "Page description assets require an entity identifier."
 
     def test_page_version_keeps_history_when_a_referenced_asset_is_missing(self, workspace, create_user):
         page = Page.objects.create(
@@ -1918,6 +1936,14 @@ class TestWorkMapApp:
 
         assert session_client.delete(linked_favorite_url).status_code == status.HTTP_204_NO_CONTENT
         assert session_client.get(_work_maps_url(workspace, project)).json()[0]["is_favorite"] is False
+
+        assert session_client.post(f"{_work_maps_url(workspace, project, work_map['id'])}archive/").status_code == 200
+        assert session_client.post(favorite_url).status_code == status.HTTP_409_CONFLICT
+        assert not UserFavorite.objects.filter(
+            user=create_user,
+            entity_type="work_map",
+            entity_identifier=work_map["id"],
+        ).exists()
 
         membership.is_active = False
         membership.save(update_fields=["is_active"])
