@@ -241,3 +241,6 @@ class WorkMapVersionRestoreEndpoint(BaseAPIView):
             document.save(update_fields=["updated_by", "updated_at"])
 
         return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

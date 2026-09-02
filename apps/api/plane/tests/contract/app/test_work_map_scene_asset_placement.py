@@ -183,3 +183,6 @@ class TestWorkMapSceneAssetPlacement:
         assert FileAsset.objects.filter(pk=asset_id, is_uploaded=True).exists()
         assert not WorkMapSceneAssetPlacement.all_objects.filter(pk=stale_placement.pk).exists()
         assert WorkMap.objects.get(pk=work_map_data["id"]).scene_binary
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

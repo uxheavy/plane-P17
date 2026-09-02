@@ -416,3 +416,6 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
             raise
 
         return Response(paste_response(operation, data["files"]), status=status.HTTP_201_CREATED)
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

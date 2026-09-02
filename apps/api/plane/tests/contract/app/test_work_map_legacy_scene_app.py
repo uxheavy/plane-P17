@@ -282,3 +282,6 @@ class TestWorkMapLegacySceneApp:
         assert response.status_code == status.HTTP_409_CONFLICT
         assert response.json() == {"error": "Work map scene requires upgrade"}
         assert not FileAsset.objects.filter(document=work_map.document).exists()
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

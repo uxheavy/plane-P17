@@ -501,3 +501,6 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
 
         duplicate.is_favorite = False
         return Response(serialize_work_map(duplicate), status=status.HTTP_201_CREATED)
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

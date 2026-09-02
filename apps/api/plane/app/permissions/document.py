@@ -58,3 +58,6 @@ def visible_page_in_any_project(*, user, workspace_id, document_id):
         .filter(Q(owned_by=user) | Q(access=Document.PUBLIC_ACCESS))
         .exists()
     )
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

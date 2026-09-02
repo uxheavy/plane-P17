@@ -304,3 +304,6 @@ class WorkMapViewSet(BaseViewSet):
             if len(active_link_ids) == 1:
                 document.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

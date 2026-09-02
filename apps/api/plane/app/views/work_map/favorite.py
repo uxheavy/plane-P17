@@ -42,3 +42,6 @@ class WorkMapFavoriteViewSet(BaseViewSet):
             return Response({"error": "Favorite not found"}, status=status.HTTP_404_NOT_FOUND)
         favorite.delete(soft=False)
         return Response(status=status.HTTP_204_NO_CONTENT)
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

@@ -58,3 +58,6 @@ def expire_stale_work_map_binding_placements():
             WorkMapBindingPlacement.objects.filter(id=placement.id).delete()
             if not WorkMapBindingPlacement.objects.filter(binding=binding).exists():
                 WorkMapBinding.objects.filter(id=binding.id).delete()
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.

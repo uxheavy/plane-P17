@@ -241,3 +241,6 @@ def cleanup_stale_work_map_asset_copies():
     cleanup_stale_operations(WorkMapDuplicateOperation)
     cleanup_stale_operations(WorkMapPasteRebinding)
     cleanup_stale_scene_asset_placements()
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
