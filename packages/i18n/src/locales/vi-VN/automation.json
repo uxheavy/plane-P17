@@ -6,17 +6,17 @@
     },
     "scope": {
       "label": "Phạm vi",
-      "run_on": "Chạy trên"
+      "run_on": "Áp dụng cho"
     },
     "trigger": {
-      "label": "Kích hoạt",
-      "add_trigger": "Thêm kích hoạt",
-      "sidebar_header": "Cấu hình kích hoạt",
-      "input_label": "Kích hoạt nào cho tự động hóa này?",
-      "input_placeholder": "Chọn một tùy chọn",
-      "section_plane_events": "Sự kiện Plane",
-      "section_time_based": "Dựa trên thời gian",
-      "fixed_schedule": "Lịch trình cố định",
+      "label": "Điều kiện kích hoạt",
+      "add_trigger": "Thêm điều kiện kích hoạt",
+      "sidebar_header": "Thiết lập điều kiện kích hoạt",
+      "input_label": "Tự động hóa này được kích hoạt bởi điều gì?",
+      "input_placeholder": "Chọn tùy chọn",
+      "section_plane_events": "Sự kiện trong Plane",
+      "section_time_based": "Theo thời gian",
+      "fixed_schedule": "Lịch cố định",
       "schedule": {
         "frequency": "Tần suất",
         "select_day": "Chọn ngày",
@@ -41,13 +41,13 @@
         "main_content_schedule_summary_daily": "Mỗi ngày lúc {time} ({timezone}).",
         "main_content_schedule_summary_weekly": "Mỗi tuần vào {days} lúc {time} ({timezone}).",
         "main_content_schedule_summary_monthly": "Mỗi tháng vào ngày {day} lúc {time} ({timezone}).",
-        "schedule_mode": "Chế độ lịch",
+        "schedule_mode": "Kiểu lịch",
         "schedule_mode_fixed": "Cố định",
         "schedule_mode_cron": "Cron",
         "cron_expression_label": "Nhập biểu thức Cron",
         "cron_expression_placeholder": "0 9 * * 1-5",
         "cron_invalid": "Biểu thức Cron không hợp lệ.",
-        "cron_preview": "Biểu thức Cron này chạy \"{description}\".",
+        "cron_preview": "Biểu thức Cron này sẽ chạy \"{description}\".",
         "main_content_cron_summary": "{description} ({timezone})."
       },
       "button": {
@@ -55,7 +55,7 @@
         "next": "Thêm hành động"
       },
       "warning": {
-        "disabled_trigger_switching": "Bạn không thể thay đổi loại kích hoạt sau khi đã tạo"
+        "disabled_trigger_switching": "Không thể thay đổi loại điều kiện kích hoạt sau khi đã tạo."
       }
     },
     "condition": {
@@ -67,26 +67,26 @@
       "label": "Hành động",
       "add_action": "Thêm hành động",
       "sidebar_header": "Hành động",
-      "input_label": "Tự động hóa làm gì?",
-      "input_placeholder": "Chọn một tùy chọn",
+      "input_label": "Tự động hóa này thực hiện việc gì?",
+      "input_placeholder": "Chọn tùy chọn",
       "handler_name": {
         "add_comment": "Thêm bình luận",
         "change_property": "Thay đổi thuộc tính",
-        "run_script": "Chạy script"
+        "run_script": "Chạy tập lệnh"
       },
       "configuration": {
-        "label": "Cấu hình",
+        "label": "Thiết lập",
         "change_property": {
           "placeholders": {
             "property_name": "Chọn thuộc tính",
-            "change_type": "Chọn",
-            "property_value_select": "{count, plural, one{Chọn giá trị} other{Chọn giá trị}}",
+            "change_type": "Chọn loại thay đổi",
+            "property_value_select": "{count, plural, one{Chọn giá trị} other{Chọn các giá trị}}",
             "property_value_select_date": "Chọn ngày"
           },
           "validation": {
-            "property_name_required": "Tên thuộc tính là bắt buộc",
-            "change_type_required": "Loại thay đổi là bắt buộc",
-            "property_value_required": "Giá trị thuộc tính là bắt buộc"
+            "property_name_required": "Hãy chọn tên thuộc tính.",
+            "change_type_required": "Hãy chọn loại thay đổi.",
+            "property_value_required": "Hãy chọn giá trị thuộc tính."
           }
         }
       },
@@ -94,13 +94,13 @@
         "title": "Thêm bình luận"
       },
       "run_script_block": {
-        "title": "Chạy script"
+        "title": "Chạy tập lệnh"
       },
       "change_property_block": {
         "title": "Thay đổi thuộc tính"
       },
       "validation": {
-        "delete_only_action": "Vô hiệu hóa tự động hóa trước khi xóa hành động duy nhất của nó."
+        "delete_only_action": "Trước khi xóa hành động duy nhất, hãy tắt tự động hóa."
       }
     },
     "conjunctions": {
@@ -110,27 +110,27 @@
       "then": "Thì"
     },
     "enable": {
-      "alert": "Nhấn 'Kích hoạt' khi tự động hóa của bạn hoàn tất. Sau khi được kích hoạt, tự động hóa sẽ sẵn sàng chạy.",
+      "alert": "Khi thiết lập xong, hãy nhấn 'Bật'. Tự động hóa sẽ sẵn sàng chạy sau khi được bật.",
       "validation": {
-        "required": "Tự động hóa phải có kích hoạt và ít nhất một hành động để được kích hoạt."
+        "required": "Để bật tự động hóa, cần có điều kiện kích hoạt và ít nhất một hành động."
       }
     },
     "delete": {
       "validation": {
-        "enabled": "Tự động hóa phải được vô hiệu hóa trước khi xóa."
+        "enabled": "Hãy tắt tự động hóa trước khi xóa."
       }
     },
     "table": {
-      "title": "Tiêu đề tự động hóa",
+      "title": "Tên của tự động hóa",
       "scope": "Phạm vi",
       "projects": "Dự án",
-      "last_run_on": "Chạy lần cuối vào",
-      "created_on": "Được tạo vào",
-      "last_updated_on": "Cập nhật lần cuối vào",
-      "last_run_status": "Trạng thái chạy lần cuối",
-      "average_duration": "Thời gian trung bình",
-      "owner": "Chủ sở hữu",
-      "executions": "Lần thực thi"
+      "last_run_on": "Lần chạy gần nhất",
+      "created_on": "Ngày tạo",
+      "last_updated_on": "Cập nhật gần nhất",
+      "last_run_status": "Trạng thái lần chạy gần nhất",
+      "average_duration": "Thời lượng trung bình",
+      "owner": "Người sở hữu",
+      "executions": "Số lần chạy"
     },
     "create_modal": {
       "heading": {
@@ -138,11 +138,11 @@
         "update": "Cập nhật tự động hóa"
       },
       "title": {
-        "placeholder": "Đặt tên cho tự động hóa của bạn.",
-        "required_error": "Tiêu đề là bắt buộc"
+        "placeholder": "Đặt tên cho tự động hóa.",
+        "required_error": "Chưa nhập tên của tự động hóa."
       },
       "description": {
-        "placeholder": "Mô tả tự động hóa của bạn."
+        "placeholder": "Mô tả tự động hóa."
       },
       "submit_button": {
         "create": "Tạo tự động hóa",
@@ -154,117 +154,117 @@
     },
     "activity": {
       "filters": {
-        "show_fails": "Hiển thị lỗi",
+        "show_fails": "Hiển thị lần chạy lỗi",
         "all": "Tất cả",
         "only_activity": "Chỉ hoạt động",
         "only_run_history": "Chỉ lịch sử chạy"
       },
       "run_history": {
-        "initiator": "Người khởi tạo"
+        "initiator": "Người khởi chạy"
       }
     },
     "toasts": {
       "create": {
         "success": {
-          "title": "Thành công!",
-          "message": "Tự động hóa đã được tạo thành công."
+          "title": "Đã tạo tự động hóa",
+          "message": "Tự động hóa đã được tạo."
         },
         "error": {
-          "title": "Lỗi!",
-          "message": "Tạo tự động hóa thất bại."
+          "title": "Không thể tạo tự động hóa",
+          "message": "Hãy thử lại."
         }
       },
       "update": {
         "success": {
-          "title": "Thành công!",
-          "message": "Tự động hóa đã được cập nhật thành công."
+          "title": "Đã cập nhật tự động hóa",
+          "message": "Tự động hóa đã được cập nhật."
         },
         "error": {
-          "title": "Lỗi!",
-          "message": "Cập nhật tự động hóa thất bại."
+          "title": "Không thể cập nhật tự động hóa",
+          "message": "Hãy thử lại."
         }
       },
       "enable": {
         "success": {
-          "title": "Thành công!",
-          "message": "Tự động hóa đã được kích hoạt thành công."
+          "title": "Đã bật tự động hóa",
+          "message": "Tự động hóa đã được bật."
         },
         "error": {
-          "title": "Lỗi!",
-          "message": "Kích hoạt tự động hóa thất bại."
+          "title": "Không thể bật tự động hóa",
+          "message": "Hãy thử lại."
         }
       },
       "disable": {
         "success": {
-          "title": "Thành công!",
-          "message": "Tự động hóa đã được vô hiệu hóa thành công."
+          "title": "Đã tắt tự động hóa",
+          "message": "Tự động hóa đã được tắt."
         },
         "error": {
-          "title": "Lỗi!",
-          "message": "Vô hiệu hóa tự động hóa thất bại."
+          "title": "Không thể tắt tự động hóa",
+          "message": "Hãy thử lại."
         }
       },
       "delete": {
         "success": {
           "title": "Đã xóa tự động hóa",
-          "message": "{name}, tự động hóa, hiện đã bị xóa khỏi dự án của bạn."
+          "message": "{name} đã được xóa khỏi dự án."
         },
         "error": {
-          "title": "Chúng tôi không thể xóa tự động hóa đó lần này.",
-          "message": "Hãy thử xóa lại hoặc quay lại sau. Nếu vẫn không thể xóa, hãy liên hệ với chúng tôi."
+          "title": "Không thể xóa tự động hóa",
+          "message": "Hãy thử lại sau. Nếu vẫn không xóa được, hãy liên hệ với chúng tôi."
         }
       },
       "action": {
         "create": {
           "error": {
-            "title": "Lỗi!",
-            "message": "Không thể tạo hành động. Vui lòng thử lại!"
+            "title": "Không thể tạo hành động",
+            "message": "Hãy thử lại."
           }
         },
         "update": {
           "error": {
-            "title": "Lỗi!",
-            "message": "Không thể cập nhật hành động. Vui lòng thử lại!"
+            "title": "Không thể cập nhật hành động",
+            "message": "Hãy thử lại."
           }
         }
       }
     },
     "empty_state": {
       "no_automations": {
-        "title": "Chưa có tự động hóa nào để hiển thị.",
-        "description": "Tự động hóa giúp bạn loại bỏ các tác vụ lặp lại bằng cách thiết lập kích hoạt, điều kiện và hành động. Tạo một cái để tiết kiệm thời gian và giữ cho công việc diễn ra một cách dễ dàng."
+        "title": "Chưa có tự động hóa nào.",
+        "description": "Tự động hóa giúp bạn giảm bớt các tác vụ lặp lại bằng cách thiết lập điều kiện kích hoạt, điều kiện và hành động. Tạo tự động hóa để tiết kiệm thời gian và giữ công việc luôn thông suốt."
       },
       "upgrade": {
         "title": "Tự động hóa",
-        "description": "Tự động hóa là cách để tự động hóa các tác vụ trong dự án của bạn.",
-        "sub_description": "Lấy lại 80% thời gian quản trị của bạn khi sử dụng Tự động hóa."
+        "description": "Tự động hóa giúp các tác vụ trong dự án tự chạy theo quy tắc bạn đặt.",
+        "sub_description": "Tiết kiệm đến 80% thời gian quản trị với tính năng tự động hóa."
       }
     },
     "global_automations": {
       "project_select": {
-        "label": "Chọn các dự án để chạy tự động hóa này",
+        "label": "Chọn dự án để chạy tự động hóa này",
         "all_projects": {
           "label": "Tất cả dự án",
-          "description": "Tự động hóa sẽ chạy cho tất cả dự án trong không gian làm việc."
+          "description": "Tự động hóa sẽ chạy trong mọi dự án của không gian làm việc."
         },
         "select_projects": {
           "label": "Chọn dự án",
-          "description": "Tự động hóa sẽ chạy cho các dự án đã chọn trong không gian làm việc.",
+          "description": "Tự động hóa sẽ chạy trong các dự án đã chọn của không gian làm việc.",
           "placeholder": "Chọn dự án"
         }
       },
       "settings": {
         "sidebar_label": "Tự động hóa",
         "title": "Tự động hóa",
-        "description": "Chuẩn hóa quy trình trong toàn bộ không gian làm việc với tự động hóa toàn cục."
+        "description": "Chuẩn hóa quy trình trên toàn bộ không gian làm việc bằng tự động hóa dùng chung."
       },
       "table": {
         "scope": {
-          "global": "Toàn cục",
+          "global": "Toàn bộ",
           "project": {
             "label": "Dự án",
-            "multiple": "Nhiều",
-            "all": "Tất cả"
+            "multiple": "Nhiều dự án",
+            "all": "Tất cả dự án"
           }
         }
       }

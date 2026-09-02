@@ -3,14 +3,14 @@
     "predefined": {
       "general": "Chung",
       "private": "Riêng tư",
-      "shared": "Được chia sẻ",
+      "shared": "Dùng chung",
       "archived": "Đã lưu trữ"
     },
     "fallback_name": "Bộ sưu tập",
     "form": {
-      "name_required": "Tiêu đề bộ sưu tập là bắt buộc",
-      "name_max_length": "Tên bộ sưu tập phải ít hơn 255 ký tự",
-      "name_placeholder_create": "Đặt tiêu đề cho bộ sưu tập",
+      "name_required": "Vui lòng nhập tiêu đề bộ sưu tập.",
+      "name_max_length": "Tên bộ sưu tập không được dài quá 255 ký tự.",
+      "name_placeholder_create": "Đặt tên cho bộ sưu tập",
       "name_placeholder_edit": "Tên bộ sưu tập"
     },
     "create_modal": {
@@ -22,14 +22,14 @@
     },
     "delete_modal": {
       "title": "Xóa bộ sưu tập",
-      "page_count": "Bộ sưu tập này có {pageCount} trang. Chọn điều sẽ xảy ra với chúng.",
+      "page_count": "Bộ sưu tập này có {pageCount} {pageCount, plural, one {trang} other {trang}}. Chọn cách xử lý các trang này.",
       "transfer_title": "Chuyển trang và xóa bộ sưu tập",
-      "transfer_description": "Di chuyển tất cả các trang sang bộ sưu tập khác trước khi xóa. Các trang và quyền của chúng sẽ được giữ nguyên.",
-      "transfer_warning": "Các trang được chuyển sẽ kế thừa quyền của bộ sưu tập đã chọn.",
-      "transfer_target_label": "Chuyển trang đến",
-      "transfer_target_placeholder": "Chọn một bộ sưu tập",
-      "delete_with_pages_title": "Xóa bộ sưu tập cùng các trang",
-      "delete_with_pages_description": "Xóa vĩnh viễn bộ sưu tập và tất cả các trang của nó. Hành động này không thể hoàn tác.",
+      "transfer_description": "Chuyển tất cả trang sang bộ sưu tập khác trước khi xóa. Trang và quyền truy cập sẽ được giữ nguyên.",
+      "transfer_warning": "Các trang được chuyển sẽ nhận quyền truy cập của bộ sưu tập đã chọn.",
+      "transfer_target_label": "Chuyển trang sang",
+      "transfer_target_placeholder": "Chọn bộ sưu tập",
+      "delete_with_pages_title": "Xóa bộ sưu tập và các trang",
+      "delete_with_pages_description": "Xóa vĩnh viễn bộ sưu tập cùng tất cả trang trong đó. Bạn không thể hoàn tác thao tác này.",
       "submit": "Xóa bộ sưu tập"
     },
     "header": {
@@ -37,58 +37,58 @@
     },
     "menu": {
       "create_new_page": "Tạo trang mới",
-      "add_existing_page": "Thêm trang hiện có",
+      "add_existing_page": "Thêm trang có sẵn",
       "edit_collection": "Chỉnh sửa bộ sưu tập",
       "collection_options": "Tùy chọn bộ sưu tập"
     },
     "add_existing_page_modal": {
-      "search_placeholder": "Tìm kiếm trang",
-      "success_message": "Đã thêm {count} trang vào bộ sưu tập.",
+      "search_placeholder": "Tìm trang",
+      "success_message": "Đã thêm {count} {count, plural, one {trang} other {trang}} vào bộ sưu tập.",
       "error_message": "Không thể di chuyển các trang. Vui lòng thử lại.",
-      "no_pages_found": "Không tìm thấy trang nào khớp với tìm kiếm của bạn",
-      "no_pages_available": "Không có trang nào để di chuyển",
+      "no_pages_found": "Không tìm thấy trang nào phù hợp với nội dung tìm kiếm.",
+      "no_pages_available": "Không có trang nào để di chuyển.",
       "submit": "Di chuyển"
     },
     "list": {
-      "invite_only": "Chỉ dành cho người được mời",
+      "invite_only": "Chỉ người được mời",
       "remove_error": "Không thể xóa trang khỏi bộ sưu tập.",
-      "no_matching_pages": "Không có trang nào phù hợp",
-      "remove_search_criteria": "Xóa tiêu chí tìm kiếm để xem tất cả các trang",
-      "remove_filters": "Xóa bộ lọc để xem tất cả các trang",
+      "no_matching_pages": "Không có trang phù hợp.",
+      "remove_search_criteria": "Xóa tiêu chí tìm kiếm để xem tất cả trang",
+      "remove_filters": "Xóa bộ lọc để xem tất cả trang",
       "no_pages_title": "Chưa có trang nào",
-      "no_pages_description": "Bộ sưu tập này hiện chưa có trang nào.",
-      "untitled": "Không tiêu đề",
-      "restricted_access": "Truy cập bị hạn chế",
+      "no_pages_description": "Bộ sưu tập này hiện chưa có trang.",
+      "untitled": "Chưa đặt tên",
+      "restricted_access": "Quyền truy cập bị hạn chế",
       "collapse_page": "Thu gọn trang",
       "expand_page": "Mở rộng trang",
-      "page_actions": "Thao tác trang",
-      "page_link_copied": "Đã sao chép liên kết trang vào bộ nhớ tạm.",
+      "page_actions": "Thao tác với trang",
+      "page_link_copied": "Đã sao chép liên kết trang vào bảng tạm.",
       "columns": {
         "page_name": "Tên trang",
         "owner": "Chủ sở hữu",
-        "nested_pages": "Trang lồng nhau",
+        "nested_pages": "Trang con",
         "last_activity": "Hoạt động gần nhất",
         "actions": "Thao tác"
       }
     },
     "toasts": {
-      "created": "Đã tạo bộ sưu tập thành công.",
+      "created": "Đã tạo bộ sưu tập.",
       "create_error": "Không thể tạo bộ sưu tập. Vui lòng thử lại.",
-      "renamed": "Đã đổi tên bộ sưu tập thành công.",
+      "renamed": "Đã đổi tên bộ sưu tập.",
       "rename_error": "Không thể cập nhật bộ sưu tập. Vui lòng thử lại.",
-      "transferred_deleted": "Các trang đã được chuyển và bộ sưu tập đã bị xóa.",
-      "deleted_with_pages": "Bộ sưu tập và các trang của nó đã bị xóa.",
+      "transferred_deleted": "Đã chuyển các trang và xóa bộ sưu tập.",
+      "deleted_with_pages": "Đã xóa bộ sưu tập cùng các trang.",
       "delete_error": "Không thể xóa bộ sưu tập. Vui lòng thử lại.",
-      "target_required": "Vui lòng chọn một bộ sưu tập để chuyển các trang đến.",
+      "target_required": "Vui lòng chọn bộ sưu tập để chuyển các trang sang.",
       "create_page_error": "Không thể tạo trang. Vui lòng thử lại.",
-      "create_page_in_collection_error": "Không thể tạo trang hoặc thêm trang vào bộ sưu tập. Vui lòng thử lại.",
-      "collection_link_copied": "Đã sao chép liên kết bộ sưu tập vào bộ nhớ tạm."
+      "create_page_in_collection_error": "Không thể tạo hoặc thêm trang vào bộ sưu tập. Vui lòng thử lại.",
+      "collection_link_copied": "Đã sao chép liên kết bộ sưu tập vào bảng tạm."
     }
   },
   "wiki": {
     "upgrade_flow": {
       "title": "Nâng cấp để mở khóa Wiki",
-      "description": "Mở khóa trang công khai, lịch sử phiên bản, trang được chia sẻ, cộng tác thời gian thực và trang không gian làm việc cho wiki, tài liệu toàn công ty và cơ sở kiến thức với Plane Pro.",
+      "description": "Với Plane Pro, bạn có thể mở khóa trang công khai, lịch sử phiên bản, trang dùng chung, cộng tác theo thời gian thực và các trang trong không gian làm việc cho wiki, tài liệu nội bộ và cơ sở kiến thức.",
       "upgrade_button": {
         "text": "Nâng cấp"
       },
@@ -100,14 +100,14 @@
         "loading": "Đang tải xuống"
       },
       "tabs": {
-        "nested_pages": "Trang lồng nhau",
+        "nested_pages": "Trang con",
         "add_embeds": "Thêm nội dung nhúng",
         "publish_pages": "Xuất bản trang",
         "comments": "Bình luận"
       }
     },
     "nested_pages_download_banner": {
-      "title": "Trang lồng nhau yêu cầu gói trả phí. Nâng cấp để mở khóa."
+      "title": "Trang con chỉ có trong gói trả phí. Nâng cấp để mở khóa."
     }
   }
 }

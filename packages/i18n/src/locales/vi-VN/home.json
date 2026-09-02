@@ -1,49 +1,49 @@
 {
   "home": {
     "empty": {
-      "quickstart_guide": "Hướng dẫn nhanh",
-      "not_right_now": "Không phải bây giờ",
+      "quickstart_guide": "Hướng dẫn bắt đầu nhanh",
+      "not_right_now": "Để sau",
       "create_project": {
         "title": "Tạo dự án",
-        "description": "Trong Plane, hầu hết mọi thứ đều bắt đầu từ dự án.",
+        "description": "Hầu hết mọi việc trong Plane đều bắt đầu từ một dự án.",
         "cta": "Bắt đầu"
       },
       "invite_team": {
-        "title": "Mời nhóm của bạn",
-        "description": "Xây dựng, phát hành và quản lý cùng với đồng nghiệp.",
-        "cta": "Mời họ tham gia"
+        "title": "Mời đội ngũ của bạn",
+        "description": "Cùng đồng nghiệp xây dựng, phát hành và quản lý công việc.",
+        "cta": "Mời tham gia"
       },
       "configure_workspace": {
-        "title": "Thiết lập không gian làm việc của bạn",
-        "description": "Bật hoặc tắt tính năng, hoặc thiết lập thêm.",
-        "cta": "Cấu hình không gian làm việc này"
+        "title": "Thiết lập không gian làm việc",
+        "description": "Bật hoặc tắt tính năng và tùy chỉnh thêm theo nhu cầu.",
+        "cta": "Cấu hình không gian làm việc"
       },
       "personalize_account": {
-        "title": "Cá nhân hóa Plane cho bạn",
-        "description": "Chọn ảnh đại diện, màu sắc và nhiều hơn nữa.",
+        "title": "Tùy chỉnh Plane theo ý bạn",
+        "description": "Chọn ảnh đại diện, màu sắc và nhiều tùy chọn khác.",
         "cta": "Cá nhân hóa ngay"
       },
       "widgets": {
-        "title": "Không có tiện ích nào trông có vẻ yên tĩnh, hãy bật chúng lên",
-        "description": "Có vẻ như tất cả tiện ích của bạn đều đã bị tắt. Bật chúng ngay\nđể nâng cao trải nghiệm của bạn!",
+        "title": "Không gian đang trống vì chưa có thẻ thông tin",
+        "description": "Có vẻ bạn đã tắt tất cả thẻ thông tin. Bật chúng ngay\nđể trải nghiệm tốt hơn.",
         "primary_button": {
-          "text": "Quản lý tiện ích"
+          "text": "Quản lý thẻ thông tin"
         }
       }
     },
     "quick_links": {
-      "empty": "Lưu liên kết liên quan đến công việc mà bạn muốn truy cập thuận tiện.",
+      "empty": "Lưu các liên kết công việc bạn muốn mở nhanh.",
       "add": "Thêm liên kết nhanh",
       "title": "Liên kết nhanh",
-      "title_plural": "Liên kết nhanh"
+      "title_plural": "Các liên kết nhanh"
     },
     "recents": {
       "title": "Gần đây",
       "empty": {
-        "project": "Sau khi truy cập dự án, các dự án gần đây của bạn sẽ xuất hiện ở đây.",
-        "page": "Sau khi truy cập trang, các trang gần đây của bạn sẽ xuất hiện ở đây.",
-        "issue": "Sau khi truy cập mục công việc, các mục công việc gần đây của bạn sẽ xuất hiện ở đây.",
-        "default": "Bạn chưa có dự án gần đây nào."
+        "project": "Dự án bạn vừa truy cập sẽ xuất hiện tại đây.",
+        "page": "Trang bạn vừa truy cập sẽ xuất hiện tại đây.",
+        "issue": "Mục công việc bạn vừa truy cập sẽ xuất hiện tại đây.",
+        "default": "Chưa có mục nào gần đây."
       },
       "filters": {
         "all": "Tất cả",
@@ -53,23 +53,23 @@
       }
     },
     "new_at_plane": {
-      "title": "Tính năng mới của Plane"
+      "title": "Mới trên Plane"
     },
     "quick_tutorial": {
       "title": "Hướng dẫn nhanh"
     },
     "widget": {
-      "reordered_successfully": "Đã sắp xếp lại tiện ích thành công.",
-      "reordering_failed": "Đã xảy ra lỗi khi sắp xếp lại tiện ích."
+      "reordered_successfully": "Đã sắp xếp lại thẻ thông tin.",
+      "reordering_failed": "Không thể sắp xếp lại thẻ thông tin."
     },
-    "manage_widgets": "Quản lý tiện ích",
+    "manage_widgets": "Quản lý thẻ thông tin",
     "title": "Trang chủ",
-    "star_us_on_github": "Gắn sao cho chúng tôi trên GitHub",
+    "star_us_on_github": "Đánh giá sao cho chúng tôi trên GitHub",
     "business_trial_banner": {
-      "title": "Bản dùng thử 14 ngày gói Business của bạn đã được kích hoạt!",
-      "description": "Khám phá tất cả các tính năng Business. Khi bạn sẵn sàng, hãy chọn đăng ký. Bạn sẽ không bị tính phí tự động.",
+      "title": "Gói Business dùng thử 14 ngày của bạn đã bắt đầu!",
+      "description": "Khám phá mọi tính năng của Business. Khi sẵn sàng, bạn có thể đăng ký. Bạn sẽ không bị tính phí tự động.",
       "trial_ends_today": "Bản dùng thử kết thúc hôm nay",
-      "trial_ends_in_days": "Bản dùng thử kết thúc sau {days} ngày",
+      "trial_ends_in_days": "Bản dùng thử kết thúc sau {days, plural, one {# ngày} other {# ngày}}",
       "start_subscription": "Bắt đầu đăng ký",
       "explore_business_features": "Khám phá tính năng Business"
     }

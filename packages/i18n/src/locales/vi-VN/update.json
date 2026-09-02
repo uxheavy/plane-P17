@@ -2,67 +2,67 @@
   "updates": {
     "progress": {
       "title": "Tiến độ",
-      "since_last_update": "Từ lần cập nhật cuối cùng",
+      "since_last_update": "Kể từ lần cập nhật trước",
       "comments": "{count, plural, one{# bình luận} other{# bình luận}}"
     },
     "add_update": "Thêm cập nhật",
-    "add_update_placeholder": "Thêm cập nhật của bạn ở đây",
+    "add_update_placeholder": "Nhập nội dung cập nhật",
     "empty": {
       "title": "Chưa có cập nhật",
-      "description": "Bạn có thể xem cập nhật ở đây."
+      "description": "Các cập nhật sẽ hiển thị tại đây."
     },
     "reaction": {
       "create": {
         "success": {
-          "title": "Reaction đã được tạo",
-          "message": "Reaction đã được tạo thành công."
+          "title": "Đã thêm cảm xúc",
+          "message": "Đã thêm cảm xúc."
         },
         "error": {
-          "title": "Không thể tạo reaction",
-          "message": "Không thể tạo reaction"
+          "title": "Không thể thêm cảm xúc",
+          "message": "Không thể thêm cảm xúc."
         }
       },
       "remove": {
         "success": {
-          "title": "Reaction đã được xóa",
-          "message": "Reaction đã được xóa thành công."
+          "title": "Đã xóa cảm xúc",
+          "message": "Đã xóa cảm xúc."
         },
         "error": {
-          "title": "Không thể xóa reaction",
-          "message": "Không thể xóa reaction"
+          "title": "Không thể xóa cảm xúc",
+          "message": "Không thể xóa cảm xúc."
         }
       }
     },
     "create": {
       "success": {
-        "title": "Cập nhật đã được tạo",
-        "message": "Cập nhật đã được tạo thành công."
+        "title": "Đã tạo cập nhật",
+        "message": "Đã tạo cập nhật."
       },
       "error": {
         "title": "Không thể tạo cập nhật",
-        "message": "Không thể tạo cập nhật. Vui lòng thử lại!"
+        "message": "Không thể tạo cập nhật. Vui lòng thử lại."
       }
     },
     "delete": {
-      "title": "Xóa cập nhật",
+      "title": "Xóa bản cập nhật",
       "confirmation": "Bạn có chắc chắn muốn xóa cập nhật này? Đây là hành động không thể hoàn tác.",
       "success": {
-        "title": "Cập nhật đã được xóa",
-        "message": "Cập nhật đã được xóa thành công."
+        "title": "Đã xóa bản cập nhật",
+        "message": "Đã xóa bản cập nhật."
       },
       "error": {
-        "title": "Không thể xóa cập nhật",
-        "message": "Không thể xóa cập nhật. Vui lòng thử lại!"
+        "title": "Không thể xóa bản cập nhật",
+        "message": "Không thể xóa bản cập nhật. Vui lòng thử lại."
       }
     },
     "update": {
       "success": {
-        "title": "Cập nhật đã được cập nhật",
-        "message": "Cập nhật đã được cập nhật thành công."
+        "title": "Đã cập nhật",
+        "message": "Đã lưu thay đổi cho bản cập nhật."
       },
       "error": {
-        "title": "Không thể cập nhật cập nhật",
-        "message": "Không thể cập nhật cập nhật. Vui lòng thử lại!"
+        "title": "Không thể cập nhật",
+        "message": "Không thể lưu thay đổi. Vui lòng thử lại."
       }
     }
   }

@@ -2,79 +2,79 @@
   "page_navigation_pane": {
     "tabs": {
       "outline": {
-        "label": "Phác thảo",
+        "label": "Đề cương",
         "empty_state": {
-          "title": "Thiếu tiêu đề",
-          "description": "Hãy thêm một số tiêu đề vào trang này để xem chúng ở đây."
+          "title": "Chưa có tiêu đề",
+          "description": "Thêm tiêu đề vào trang để xem chúng tại đây."
         }
       },
       "info": {
         "label": "Thông tin",
         "document_info": {
-          "words": "Từ",
+          "words": "Số từ",
           "characters": "Ký tự",
           "paragraphs": "Đoạn văn",
           "read_time": "Thời gian đọc"
         },
         "actors_info": {
-          "edited_by": "Được chỉnh sửa bởi",
-          "created_by": "Được tạo bởi"
+          "edited_by": "Chỉnh sửa bởi",
+          "created_by": "Tạo bởi"
         },
         "version_history": {
           "label": "Lịch sử phiên bản",
           "current_version": "Phiên bản hiện tại",
-          "highlight_changes": "Đánh dấu thay đổi"
+          "highlight_changes": "Tô sáng thay đổi"
         }
       },
       "assets": {
-        "label": "Tài sản",
+        "label": "Tài nguyên",
         "download_button": "Tải xuống",
         "empty_state": {
-          "title": "Thiếu hình ảnh",
-          "description": "Thêm hình ảnh để xem chúng ở đây."
+          "title": "Chưa có hình ảnh",
+          "description": "Thêm hình ảnh để xem chúng tại đây."
         }
       },
       "comments": {
         "label": "Bình luận",
         "empty_state": {
           "title": "Không có bình luận",
-          "description": "Thêm bình luận để xem chúng ở đây."
+          "description": "Thêm bình luận để xem chúng tại đây."
         }
       }
     },
     "toasts": {
       "errors": {
-        "wrong_name": "Tên ghi chú không được dài hơn 100 ký tự.",
-        "already_exists": "Đã tồn tại một ghi chú không có mô tả"
+        "wrong_name": "Tên Sticky không được dài quá 100 ký tự.",
+        "already_exists": "Đã có một Sticky không có mô tả"
       },
       "created": {
-        "title": "Đã tạo ghi chú",
-        "message": "Ghi chú đã được tạo thành công"
+        "title": "Đã tạo Sticky",
+        "message": "Đã tạo Sticky."
       },
       "not_created": {
-        "title": "Không tạo được ghi chú",
-        "message": "Không thể tạo ghi chú"
+        "title": "Không thể tạo Sticky",
+        "message": "Không thể tạo Sticky."
       },
       "updated": {
-        "title": "Đã cập nhật ghi chú",
-        "message": "Ghi chú đã được cập nhật thành công"
+        "title": "Đã cập nhật Sticky",
+        "message": "Đã cập nhật Sticky."
       },
       "not_updated": {
-        "title": "Không cập nhật được ghi chú",
-        "message": "Không thể cập nhật ghi chú"
+        "title": "Không thể cập nhật Sticky",
+        "message": "Không thể cập nhật Sticky."
       },
       "removed": {
-        "title": "Đã xóa ghi chú",
-        "message": "Ghi chú đã được xóa thành công"
+        "title": "Đã xóa Sticky",
+        "message": "Đã xóa Sticky."
       },
       "not_removed": {
-        "title": "Không xóa được ghi chú",
-        "message": "Không thể xóa ghi chú"
+        "title": "Không thể xóa Sticky",
+        "message": "Không thể xóa Sticky."
       }
     },
-    "open_button": "Mở bảng điều hướng",
-    "close_button": "Đóng bảng điều hướng",
-    "outline_floating_button": "Mở phác thảo"
+    "open_button": "Mở ngăn điều hướng",
+    "close_button": "Đóng ngăn điều hướng",
+    "outline_floating_button": "Mở đề cương"
   },
   "page_actions": {
     "move_page": {
@@ -82,7 +82,7 @@
         "default": "Di chuyển",
         "loading": "Đang di chuyển"
       },
-      "cannot_move_to_teamspace": "Không thể di chuyển trang riêng tư và trang đã chia sẻ đến không gian nhóm.",
+      "cannot_move_to_teamspace": "Không thể chuyển trang riêng tư hoặc trang dùng chung vào không gian nhóm.",
       "placeholders": {
         "workspace_to_all": "Tìm dự án và không gian nhóm",
         "workspace_to_project": "Tìm dự án",
@@ -93,16 +93,16 @@
       },
       "toasts": {
         "success": {
-          "title": "Thành công!",
+          "title": "Thành công",
           "message": "Đã di chuyển trang thành công."
         },
         "error": {
-          "title": "Lỗi!",
+          "title": "Lỗi",
           "message": "Không thể di chuyển trang. Vui lòng thử lại sau."
         },
         "collection_error": {
           "title": "Đã chuyển vào wiki",
-          "message": "Trang đã được chuyển vào wiki, nhưng không thể thêm vào bộ sưu tập đã chọn. Trang vẫn nằm trong General."
+          "message": "Trang đã được chuyển vào wiki nhưng không thể thêm vào bộ sưu tập đã chọn. Trang vẫn ở mục Chung."
         }
       }
     },

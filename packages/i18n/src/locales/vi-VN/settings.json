@@ -2,30 +2,30 @@
   "account_settings": {
     "profile": {
       "change_email_modal": {
-        "title": "Đổi email",
+        "title": "Đổi địa chỉ email",
         "description": "Nhập địa chỉ email mới để nhận liên kết xác minh.",
         "toasts": {
-          "success_title": "Thành công!",
-          "success_message": "Email đã được cập nhật. Vui lòng đăng nhập lại."
+          "success_title": "Thành công",
+          "success_message": "Đã cập nhật email. Vui lòng đăng nhập lại."
         },
         "form": {
           "email": {
             "label": "Email mới",
-            "placeholder": "Nhập email của bạn",
+            "placeholder": "Nhập email",
             "errors": {
-              "required": "Email là bắt buộc",
-              "invalid": "Email không hợp lệ",
-              "exists": "Email đã tồn tại. Vui lòng dùng email khác.",
-              "validation_failed": "Xác thực email thất bại. Thử lại."
+              "required": "Vui lòng nhập email",
+              "invalid": "Email không hợp lệ.",
+              "exists": "Email này đã tồn tại. Vui lòng dùng địa chỉ khác.",
+              "validation_failed": "Không thể xác thực email. Vui lòng thử lại."
             }
           },
           "code": {
-            "label": "Mã duy nhất",
+            "label": "Mã xác minh",
             "placeholder": "123456",
-            "helper_text": "Mã xác minh đã được gửi tới email mới của bạn.",
+            "helper_text": "Mã xác minh đã được gửi đến email mới.",
             "errors": {
-              "required": "Mã duy nhất là bắt buộc",
-              "invalid": "Mã xác minh không hợp lệ. Thử lại."
+              "required": "Vui lòng nhập mã xác minh",
+              "invalid": "Mã xác minh không hợp lệ. Vui lòng thử lại."
             }
           }
         },
@@ -35,18 +35,18 @@
           "cancel": "Hủy"
         },
         "states": {
-          "sending": "Đang gửi…"
+          "sending": "Đang gửi"
         }
       }
     },
     "preferences": {
       "heading": "Tùy chọn",
-      "description": "Tùy chỉnh trải nghiệm ứng dụng theo cách bạn làm việc"
+      "description": "Tùy chỉnh ứng dụng theo cách bạn làm việc."
     },
     "notifications": {
       "heading": "Thông báo qua email",
-      "description": "Cập nhật những mục công việc bạn đã đăng ký. Bật tính năng này để nhận thông báo.",
-      "select_default_view": "Chọn chế độ xem mặc định",
+      "description": "Theo dõi các mục công việc bạn đã đăng ký. Bật để nhận thông báo.",
+      "select_default_view": "Chọn cách hiển thị mặc định",
       "compact": "Gọn",
       "full": "Toàn màn hình"
     },
@@ -55,16 +55,16 @@
     },
     "api_tokens": {
       "title": "Mã truy cập cá nhân",
-      "description": "Tạo mã API bảo mật để tích hợp dữ liệu của bạn với các hệ thống và ứng dụng bên ngoài."
+      "description": "Tạo mã API an toàn để tích hợp dữ liệu với các hệ thống và ứng dụng bên ngoài."
     },
     "activity": {
       "heading": "Hoạt động",
-      "description": "Theo dõi các hành động và thay đổi gần đây của bạn trong tất cả dự án và mục công việc."
+      "description": "Theo dõi các hành động và thay đổi gần đây trên tất cả dự án và mục công việc."
     },
     "connections": {
       "title": "Kết nối",
       "heading": "Kết nối",
-      "description": "Quản lý cài đặt kết nối không gian làm việc của bạn."
+      "description": "Quản lý cài đặt kết nối của không gian làm việc."
     }
   },
   "profile": {
@@ -72,7 +72,7 @@
     "page_label": "Công việc của bạn",
     "work": "Công việc",
     "details": {
-      "joined_on": "Tham gia vào",
+      "joined_on": "Ngày tham gia",
       "time_zone": "Múi giờ"
     },
     "stats": {
@@ -83,16 +83,16 @@
       "subscribed": "Mục công việc đã đăng ký",
       "state_distribution": {
         "title": "Mục công việc theo trạng thái",
-        "empty": "Tạo mục công việc để xem phân loại theo trạng thái trong biểu đồ để phân tích tốt hơn."
+        "empty": "Tạo mục công việc để xem biểu đồ phân bổ theo trạng thái và phân tích dữ liệu."
       },
       "priority_distribution": {
         "title": "Mục công việc theo mức độ ưu tiên",
-        "empty": "Tạo mục công việc để xem phân loại theo mức độ ưu tiên trong biểu đồ để phân tích tốt hơn."
+        "empty": "Tạo mục công việc để xem biểu đồ phân bổ theo mức độ ưu tiên và phân tích dữ liệu."
       },
       "recent_activity": {
         "title": "Hoạt động gần đây",
-        "empty": "Chúng tôi không tìm thấy dữ liệu. Vui lòng kiểm tra đầu vào của bạn",
-        "button": "Tải xuống hoạt động hôm nay",
+        "empty": "Không tìm thấy dữ liệu. Vui lòng kiểm tra thông tin bạn đã nhập.",
+        "button": "Tải hoạt động hôm nay xuống",
         "button_loading": "Đang tải xuống"
       }
     },
@@ -106,7 +106,7 @@
       "connections": "Kết nối"
     },
     "tabs": {
-      "summary": "Tóm tắt",
+      "summary": "Tổng quan",
       "assigned": "Đã giao",
       "created": "Đã tạo",
       "subscribed": "Đã đăng ký",
@@ -114,27 +114,27 @@
     },
     "empty_state": {
       "activity": {
-        "title": "Chưa có hoạt động",
-        "description": "Bắt đầu bằng cách tạo mục công việc mới! Thêm chi tiết và thuộc tính cho nó. Khám phá thêm trong Plane để xem hoạt động của bạn."
+        "title": "Chưa có hoạt động nào",
+        "description": "Bắt đầu bằng cách tạo mục công việc mới. Thêm chi tiết và thuộc tính, rồi khám phá Plane để xem hoạt động của bạn."
       },
       "assigned": {
         "title": "Không có mục công việc nào được giao cho bạn",
-        "description": "Có thể theo dõi mục công việc được giao cho bạn từ đây."
+        "description": "Bạn có thể theo dõi các mục công việc được giao cho mình tại đây."
       },
       "created": {
         "title": "Chưa có mục công việc",
-        "description": "Tất cả mục công việc bạn tạo sẽ xuất hiện ở đây, theo dõi chúng trực tiếp tại đây."
+        "description": "Các mục công việc bạn tạo sẽ xuất hiện tại đây để bạn theo dõi."
       },
       "subscribed": {
         "title": "Chưa có mục công việc",
-        "description": "Đăng ký mục công việc bạn quan tâm, theo dõi tất cả chúng tại đây."
+        "description": "Đăng ký các mục công việc bạn quan tâm để theo dõi tất cả tại đây."
       }
     }
   },
   "themes": {
     "theme_options": {
       "system_preference": {
-        "label": "Tùy chọn hệ thống"
+        "label": "Tùy chọn theo hệ thống"
       },
       "light": {
         "label": "Sáng"
@@ -143,10 +143,10 @@
         "label": "Tối"
       },
       "light_contrast": {
-        "label": "Sáng tương phản cao"
+        "label": "Sáng - tương phản cao"
       },
       "dark_contrast": {
-        "label": "Tối tương phản cao"
+        "label": "Tối - tương phản cao"
       },
       "custom": {
         "label": "Chủ đề tùy chỉnh"

@@ -1,7 +1,7 @@
 {
   "module": {
-    "label": "{count, plural, one {mô-đun} other {mô-đun}}",
-    "no_module": "Không có mô-đun",
-    "select": "Thêm mô-đun"
+    "label": "{count, plural, one {Nhóm công việc} other {Nhóm công việc}}",
+    "no_module": "Không có nhóm công việc",
+    "select": "Thêm nhóm công việc"
   }
 }
