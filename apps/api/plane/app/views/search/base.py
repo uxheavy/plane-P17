@@ -38,7 +38,7 @@ from plane.db.models import (
     Page,
     IssueView,
     ProjectMember,
-    ProjectPage,
+    DocumentProject,
     WorkspaceMember,
 )
 
@@ -195,9 +195,11 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
         if workspace_search == "false" and project_id:
-            project_subquery = ProjectPage.objects.filter(page_id=OuterRef("id"), project_id=project_id).values_list(
-                "project_id", flat=True
-            )[:1]
+            project_subquery = DocumentProject.objects.filter(
+                document_id=OuterRef("id"),
+                project_id=project_id,
+                deleted_at__isnull=True,
+            ).values_list("project_id", flat=True)[:1]
 
             pages = pages.annotate(project_id=Subquery(project_subquery)).filter(project_id=project_id)
 

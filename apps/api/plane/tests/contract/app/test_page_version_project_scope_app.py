@@ -19,11 +19,11 @@ from django.utils import timezone
 from rest_framework import status
 
 from plane.db.models import (
+    DocumentProject,
     Page,
     PageVersion,
     Project,
     ProjectMember,
-    ProjectPage,
     User,
 )
 
@@ -48,14 +48,14 @@ def _make_page(workspace, project, owner, access=Page.PUBLIC_ACCESS):
         access=access,
         name="Secret page",
     )
-    ProjectPage.objects.create(workspace=workspace, project=project, page=page)
+    DocumentProject.objects.create(workspace=workspace, project=project, document=page)
     return page
 
 
 def _make_version(workspace, page, owner):
     return PageVersion.objects.create(
         workspace=workspace,
-        page=page,
+        document=page,
         owned_by=owner,
         description_html="<p>secret</p>",
     )
@@ -96,9 +96,7 @@ class TestPageVersionProjectScope:
         """Reading a single cross-project page version must be denied."""
         _, project_a, _, page_b, version_b = self._setup(workspace, create_user)
 
-        response = session_client.get(
-            _page_versions_url(workspace.slug, project_a.id, page_b.id, pk=version_b.id)
-        )
+        response = session_client.get(_page_versions_url(workspace.slug, project_a.id, page_b.id, pk=version_b.id))
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -121,18 +119,14 @@ class TestPageVersionProjectScope:
 
     @pytest.mark.django_db
     def test_revoked_project_link_denied(self, session_client, workspace, create_user):
-        """A page whose ProjectPage link to the attacker's project was
+        """A page whose document link to the attacker's project was
         soft-deleted (page removed from the project) must be denied, even
         though the attacker is a member of that project."""
         victim, project_a, _, _, _ = self._setup(workspace, create_user)
 
-        page = Page.objects.create(
-            workspace=workspace, owned_by=victim, access=Page.PUBLIC_ACCESS, name="Removed page"
-        )
+        page = Page.objects.create(workspace=workspace, owned_by=victim, access=Page.PUBLIC_ACCESS, name="Removed page")
         # Link exists but is soft-deleted → the page no longer belongs to A.
-        ProjectPage.objects.create(
-            workspace=workspace, project=project_a, page=page, deleted_at=timezone.now()
-        )
+        DocumentProject.objects.create(workspace=workspace, project=project_a, document=page, deleted_at=timezone.now())
         _make_version(workspace, page, victim)
 
         response = session_client.get(_page_versions_url(workspace.slug, project_a.id, page.id))

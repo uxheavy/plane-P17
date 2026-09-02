@@ -110,7 +110,7 @@ def get_page_versions_queryset():
         PageVersion.all_objects.annotate(
             row_num=Window(
                 expression=RowNumber(),
-                partition_by=[F("page_id")],
+                partition_by=[F("document_id")],
                 order_by=F("created_at").desc(),
             )
         )

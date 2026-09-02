@@ -4,6 +4,7 @@
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from .base import BaseModel
 
@@ -49,3 +50,14 @@ class DocumentProject(BaseModel):
                 name="document_project_unique_active_link",
             )
         ]
+
+
+class DocumentVersion(BaseModel):
+    document = models.ForeignKey("db.Document", on_delete=models.CASCADE, related_name="document_versions")
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="document_versions")
+    last_saved_at = models.DateTimeField(default=timezone.now)
+    owned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="document_versions")
+
+    class Meta:
+        db_table = "document_versions"
+        ordering = ("-created_at",)

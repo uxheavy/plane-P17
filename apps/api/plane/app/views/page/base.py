@@ -41,7 +41,7 @@ from plane.db.models import (
     PageLog,
     UserFavorite,
     ProjectMember,
-    ProjectPage,
+    DocumentProject,
     Project,
     UserRecentVisit,
 )
@@ -65,7 +65,7 @@ def unarchive_archive_page_and_descendants(page_id, archived_at):
         UNION ALL
         SELECT pages.id FROM pages, descendants WHERE pages.parent_id = descendants.id
     )
-    UPDATE pages SET archived_at = %s WHERE id IN (SELECT id FROM descendants);
+    UPDATE documents SET archived_at = %s WHERE id IN (SELECT id FROM descendants);
     """
 
     # Execute the SQL query
@@ -120,7 +120,11 @@ class PageViewSet(BaseViewSet):
             )
             .annotate(
                 project=Exists(
-                    ProjectPage.objects.filter(page_id=OuterRef("id"), project_id=self.kwargs.get("project_id"))
+                    DocumentProject.objects.filter(
+                        document_id=OuterRef("id"),
+                        project_id=self.kwargs.get("project_id"),
+                        deleted_at__isnull=True,
+                    )
                 )
             )
             .annotate(
@@ -172,7 +176,7 @@ class PageViewSet(BaseViewSet):
                 pk=page_id,
                 workspace__slug=slug,
                 projects__id=project_id,
-                project_pages__deleted_at__isnull=True,
+                document_projects__deleted_at__isnull=True,
             )
 
             if page.is_locked:
@@ -184,7 +188,7 @@ class PageViewSet(BaseViewSet):
                     pk=parent,
                     workspace__slug=slug,
                     projects__id=project_id,
-                    project_pages__deleted_at__isnull=True,
+                    document_projects__deleted_at__isnull=True,
                 )
 
             # Only update access if the page owner is the requesting  user
@@ -263,7 +267,7 @@ class PageViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         page.is_locked = True
@@ -275,7 +279,7 @@ class PageViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         page.is_locked = False
@@ -289,7 +293,7 @@ class PageViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         # Only update access if the page owner is the requesting user
@@ -325,7 +329,7 @@ class PageViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         # only the owner or admin can archive the page
@@ -356,7 +360,7 @@ class PageViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         # only the owner or admin can un archive the page
@@ -385,7 +389,7 @@ class PageViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         if page.archived_at is None:
@@ -413,7 +417,7 @@ class PageViewSet(BaseViewSet):
             parent_id=page_id,
             projects__id=project_id,
             workspace__slug=slug,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         ).update(parent=None)
 
         page.delete()
@@ -445,7 +449,11 @@ class PageViewSet(BaseViewSet):
             .filter(Q(owned_by=request.user) | Q(access=0))
             .annotate(
                 project=Exists(
-                    ProjectPage.objects.filter(page_id=OuterRef("id"), project_id=self.kwargs.get("project_id"))
+                    DocumentProject.objects.filter(
+                        document_id=OuterRef("id"),
+                        project_id=self.kwargs.get("project_id"),
+                        deleted_at__isnull=True,
+                    )
                 )
             )
             .filter(project=True)
@@ -519,7 +527,7 @@ class PagesDescriptionViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
         binary_data = page.description_binary
 
@@ -539,7 +547,7 @@ class PagesDescriptionViewSet(BaseViewSet):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         if page.is_locked:
@@ -598,7 +606,7 @@ class PageDuplicateEndpoint(BaseAPIView):
             pk=page_id,
             workspace__slug=slug,
             projects__id=project_id,
-            project_pages__deleted_at__isnull=True,
+            document_projects__deleted_at__isnull=True,
         )
 
         # check for permission
@@ -606,9 +614,13 @@ class PageDuplicateEndpoint(BaseAPIView):
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
         # get all the project ids where page is present
-        project_ids = ProjectPage.objects.filter(page_id=page_id).values_list("project_id", flat=True)
+        project_ids = DocumentProject.objects.filter(
+            document_id=page_id,
+            deleted_at__isnull=True,
+        ).values_list("project_id", flat=True)
 
         page.pk = None
+        page.id = None
         page.name = f"{page.name} (Copy)"
         page.description_binary = None
         page.owned_by = request.user
@@ -617,10 +629,10 @@ class PageDuplicateEndpoint(BaseAPIView):
         page.save()
 
         for project_id in project_ids:
-            ProjectPage.objects.create(
+            DocumentProject.objects.create(
                 workspace_id=page.workspace_id,
                 project_id=project_id,
-                page_id=page.id,
+                document_id=page.id,
                 created_by_id=page.created_by_id,
                 updated_by_id=page.updated_by_id,
             )

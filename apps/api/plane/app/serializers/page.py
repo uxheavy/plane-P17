@@ -16,7 +16,7 @@ from plane.db.models import (
     Page,
     PageLabel,
     Label,
-    ProjectPage,
+    DocumentProject,
     Project,
     PageVersion,
 )
@@ -79,11 +79,11 @@ class PageSerializer(BaseSerializer):
             workspace_id=project.workspace_id,
         )
 
-        # Create the project page
-        ProjectPage.objects.create(
+        # Create the project association owned by the shared document.
+        DocumentProject.objects.create(
             workspace_id=page.workspace_id,
             project_id=project_id,
-            page_id=page.id,
+            document_id=page.id,
             created_by_id=page.created_by_id,
             updated_by_id=page.updated_by_id,
         )
@@ -134,6 +134,8 @@ class PageDetailSerializer(PageSerializer):
 
 
 class PageVersionSerializer(BaseSerializer):
+    page = serializers.UUIDField(source="document_id", read_only=True)
+
     class Meta:
         model = PageVersion
         fields = [
@@ -151,6 +153,8 @@ class PageVersionSerializer(BaseSerializer):
 
 
 class PageVersionDetailSerializer(BaseSerializer):
+    page = serializers.UUIDField(source="document_id", read_only=True)
+
     class Meta:
         model = PageVersion
         fields = [
