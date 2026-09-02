@@ -112,10 +112,11 @@ was missed.
 
 ### Persistence and failure semantics
 
-The durable scene API accepts at most 4 MiB of serialized scene bytes. The Live
-relay accepts frames up to 5 MiB. That fixed headroom covers the JSON envelope
-and prevents an API-valid scene from becoming impossible to broadcast or repair
-solely because relay framing adds bytes.
+The durable scene API accepts at most 3 MiB of serialized scene bytes. Its
+base64 JSON request remains below Plane's 5 MiB request-body cap, and the Live
+relay accepts frames up to 5 MiB. That fixed headroom covers both encodings and
+prevents an API-valid scene from becoming impossible to persist, broadcast, or
+repair solely because transport framing adds bytes.
 
 Every transmitted update is a full serialized Work Map scene. On receipt, the
 client decodes it, calls `restoreElements(remote.elements, null)`, reconciles it

@@ -144,7 +144,7 @@ without treating ordinary conflicts as infrastructure failure. Replace a
 recovery record with a newer edit while an older PATCH is in flight and prove the
 older acknowledgement cannot clear the newer snapshot. Prove the API
 compare-and-swap, not relay receipt, is the durability acknowledgement and
-survives API, Live, Redis, and browser restart. Prove a scene above 4 MiB is
+survives API, Live, Redis, and browser restart. Prove a scene above 3 MiB is
 rejected by the durable API and the largest accepted scene remains below the
 5 MiB relay-frame limit after framing. Prove atomic version restore with
 matching protected bindings and retained asset reachability. Prove normal CAS
