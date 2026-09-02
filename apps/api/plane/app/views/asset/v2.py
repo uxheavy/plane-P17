@@ -228,7 +228,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
         # Page Description
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            return {"page_id": entity_id}
+            return {"page_id": entity_id, "document_id": entity_id}
 
         # Comment Description
         if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
@@ -323,6 +323,8 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         (WORKSPACE_LOGO, USER_AVATAR, USER_COVER) have project_id=None and are
         always allowed.
         """
+        if asset.entity_type == FileAsset.EntityTypeContext.WORK_MAP_SCENE:
+            return False
         if asset.project_id is None:
             return True
         # Scope the membership lookup to the asset's workspace as well as its
@@ -346,7 +348,10 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         entity_identifier = request.data.get("entity_identifier", False)
 
         # Check if the entity type is allowed
-        if entity_type not in FileAsset.EntityTypeContext.values:
+        if (
+            entity_type not in FileAsset.EntityTypeContext.values
+            or entity_type == FileAsset.EntityTypeContext.WORK_MAP_SCENE
+        ):
             return Response(
                 {"error": "Invalid entity type.", "status": False},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -521,9 +526,7 @@ class StaticFileAssetEndpoint(BaseAPIView):
         # same-origin XSS when assets are served on the application's origin.
         storage = S3Storage(request=request)
         asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
-        disposition = (
-            "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
-        )
+        disposition = "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
         # Generate a presigned URL to share an S3 object
         signed_url = storage.generate_presigned_url(
             object_name=asset.asset.name,
@@ -538,7 +541,9 @@ class AssetRestoreEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug, asset_id):
-        asset = FileAsset.all_objects.get(id=asset_id, workspace__slug=slug)
+        asset = FileAsset.all_objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            id=asset_id, workspace__slug=slug
+        )
         asset.is_deleted = False
         asset.deleted_at = None
         asset.save(update_fields=["is_deleted", "deleted_at"])
@@ -568,7 +573,7 @@ class ProjectAssetEndpoint(BaseAPIView):
             return {"issue_id": entity_id}
 
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            return {"page_id": entity_id}
+            return {"page_id": entity_id, "document_id": entity_id}
 
         if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
             return {"comment_id": entity_id}
@@ -586,7 +591,10 @@ class ProjectAssetEndpoint(BaseAPIView):
         entity_identifier = request.data.get("entity_identifier")
 
         # Check if the entity type is allowed
-        if entity_type not in FileAsset.EntityTypeContext.values:
+        if (
+            entity_type not in FileAsset.EntityTypeContext.values
+            or entity_type == FileAsset.EntityTypeContext.WORK_MAP_SCENE
+        ):
             return Response(
                 {"error": "Invalid entity type.", "status": False},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -647,7 +655,9 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, pk):
         # get the asset id
-        asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id)
+        asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            id=pk, workspace__slug=slug, project_id=project_id
+        )
         # get the storage metadata
         asset.is_uploaded = True
         # get the storage metadata
@@ -663,7 +673,9 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def delete(self, request, slug, project_id, pk):
         # Get the asset
-        asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id)
+        asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            id=pk, workspace__slug=slug, project_id=project_id
+        )
         # Check deleted assets
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -674,7 +686,9 @@ class ProjectAssetEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, pk):
         # get the asset id
-        asset = FileAsset.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
+        asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            workspace__slug=slug, project_id=project_id, pk=pk
+        )
 
         # Check if the asset is uploaded
         if not asset.is_uploaded:
@@ -717,11 +731,15 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
         # unassociated-or-same-project bound prevent cross-project/user IDOR (a caller can
         # only touch their own uploads, cannot move an asset in from another project, and
         # @allow_permission already scopes them to this project).
-        assets = FileAsset.objects.filter(
-            id__in=asset_ids,
-            workspace__slug=slug,
-            created_by=request.user,
-        ).filter(Q(project_id=project_id) | Q(project_id__isnull=True))
+        assets = (
+            FileAsset.objects.filter(
+                id__in=asset_ids,
+                workspace__slug=slug,
+                created_by=request.user,
+            )
+            .exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE)
+            .filter(Q(project_id=project_id) | Q(project_id__isnull=True))
+        )
 
         # Get the first asset
         asset = assets.first()
@@ -754,7 +772,9 @@ class ProjectBulkAssetEndpoint(BaseAPIView):
                 pass
 
         if asset.entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            assets.update(page_id=entity_id)
+            # Temporary Page compatibility bridge. Document remains the shared
+            # read authority while legacy Page asset callers keep their FK.
+            assets.update(page_id=entity_id, document_id=entity_id)
 
         if asset.entity_type == FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION:
             # For some cases, the bulk api is called after the draft issue is deleted
@@ -772,7 +792,11 @@ class AssetCheckEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
-        asset = FileAsset.all_objects.filter(id=asset_id, workspace__slug=slug, deleted_at__isnull=True).exists()
+        asset = (
+            FileAsset.all_objects.filter(id=asset_id, workspace__slug=slug, deleted_at__isnull=True)
+            .exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE)
+            .exists()
+        )
         return Response({"exists": asset}, status=status.HTTP_200_OK)
 
 
@@ -804,7 +828,7 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
         # Page Description
         if entity_type == FileAsset.EntityTypeContext.PAGE_DESCRIPTION:
-            return {"page_id": entity_id}
+            return {"page_id": entity_id, "document_id": entity_id}
 
         # Comment Description
         if entity_type == FileAsset.EntityTypeContext.COMMENT_DESCRIPTION:
@@ -818,7 +842,11 @@ class DuplicateAssetEndpoint(BaseAPIView):
         entity_id = request.data.get("entity_id", None)
         entity_type = request.data.get("entity_type", None)
 
-        if not entity_type or entity_type not in FileAsset.EntityTypeContext.values:
+        if (
+            not entity_type
+            or entity_type not in FileAsset.EntityTypeContext.values
+            or entity_type == FileAsset.EntityTypeContext.WORK_MAP_SCENE
+        ):
             return Response(
                 {"error": "Invalid entity type or entity id"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -832,11 +860,15 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
         storage = S3Storage(request=request)
         # Restrict the source asset to the same destination workspace to prevent cross-workspace asset copying
-        original_asset = FileAsset.objects.filter(
-            id=asset_id,
-            is_uploaded=True,
-            workspace=workspace,
-        ).first()
+        original_asset = (
+            FileAsset.objects.filter(
+                id=asset_id,
+                is_uploaded=True,
+                workspace=workspace,
+            )
+            .exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE)
+            .first()
+        )
 
         if not original_asset:
             return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -871,7 +903,7 @@ class WorkspaceAssetDownloadEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
         try:
-            asset = FileAsset.objects.get(
+            asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
                 id=asset_id,
                 workspace__slug=slug,
                 is_uploaded=True,
@@ -898,7 +930,7 @@ class ProjectAssetDownloadEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="PROJECT")
     def get(self, request, slug, project_id, asset_id):
         try:
-            asset = FileAsset.objects.get(
+            asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
                 id=asset_id,
                 workspace__slug=slug,
                 project_id=project_id,

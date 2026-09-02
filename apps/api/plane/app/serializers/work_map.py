@@ -4,12 +4,10 @@
 
 import base64
 import binascii
-import uuid
-
 from django.conf import settings
 from rest_framework import serializers
 
-from plane.db.models import WorkMapBinding
+from plane.db.models import WorkMapBinding, WorkMapVersion
 
 
 class WorkMapCreateSerializer(serializers.Serializer):
@@ -37,7 +35,8 @@ class WorkMapSceneSerializer(serializers.Serializer):
 
 
 class WorkMapBindingCreateSerializer(serializers.Serializer):
-    node_key = serializers.UUIDField(required=False, default=uuid.uuid4)
+    generation = serializers.IntegerField(min_value=0)
+    placement_id = serializers.UUIDField()
     source_kind = serializers.ChoiceField(choices=WorkMapBinding.SourceKind.values)
     source_id = serializers.UUIDField()
 
@@ -53,3 +52,48 @@ class WorkMapBindingHydrationSerializer(serializers.Serializer):
 
 class WorkMapBindingOpenSerializer(serializers.Serializer):
     node_key = serializers.UUIDField()
+
+
+class WorkMapBindingCancelSerializer(serializers.Serializer):
+    generation = serializers.IntegerField(min_value=0)
+
+
+class WorkMapPasteFileSerializer(serializers.Serializer):
+    file_id = serializers.CharField(max_length=128)
+    asset_id = serializers.UUIDField()
+
+
+class WorkMapPasteRebindingSerializer(serializers.Serializer):
+    generation = serializers.IntegerField(min_value=0)
+    idempotency_key = serializers.UUIDField()
+    node_keys = serializers.ListField(child=serializers.UUIDField(), allow_empty=True, max_length=100)
+    files = WorkMapPasteFileSerializer(many=True, required=False, default=list)
+
+    def validate(self, attrs):
+        node_keys = attrs["node_keys"]
+        files = attrs["files"]
+        if not node_keys and not files:
+            raise serializers.ValidationError("Paste rebinding requires Plane-owned nodes or files.")
+        if len(node_keys) != len(set(node_keys)):
+            raise serializers.ValidationError("Paste node keys must be unique.")
+        file_ids = [item["file_id"] for item in files]
+        asset_ids = [item["asset_id"] for item in files]
+        if len(file_ids) != len(set(file_ids)) or len(asset_ids) != len(set(asset_ids)):
+            raise serializers.ValidationError("Paste files must be unique.")
+        return attrs
+
+
+class WorkMapVersionSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="document_version_id")
+    work_map = serializers.UUIDField(source="document_version.document_id")
+    owned_by = serializers.UUIDField(source="document_version.owned_by_id")
+    created_at = serializers.DateTimeField(source="document_version.created_at")
+
+    class Meta:
+        model = WorkMapVersion
+        fields = ["id", "work_map", "generation", "owned_by", "created_at"]
+        read_only_fields = fields
+
+
+class WorkMapVersionRestoreSerializer(serializers.Serializer):
+    generation = serializers.IntegerField(min_value=0)

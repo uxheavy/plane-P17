@@ -25,7 +25,9 @@ class FileAssetEndpoint(BaseAPIView):
 
     def get(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        files = FileAsset.objects.filter(asset=asset_key)
+        files = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).filter(
+            asset=asset_key
+        )
         if files.exists():
             serializer = FileAssetSerializer(files, context={"request": request}, many=True)
             return Response({"data": serializer.data, "status": True}, status=status.HTTP_200_OK)
@@ -41,13 +43,17 @@ class FileAssetEndpoint(BaseAPIView):
         workspace = Workspace.objects.get(slug=slug)
         serializer = FileAssetSerializer(data=request.data)
         if serializer.is_valid():
+            if serializer.validated_data.get("entity_type") == FileAsset.EntityTypeContext.WORK_MAP_SCENE:
+                return Response({"error": "Invalid entity type."}, status=status.HTTP_400_BAD_REQUEST)
             serializer.save(workspace_id=workspace.id)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        file_asset = FileAsset.objects.get(asset=asset_key)
+        file_asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            asset=asset_key
+        )
         file_asset.is_deleted = True
         file_asset.save(update_fields=["is_deleted"])
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -58,7 +64,9 @@ class FileAssetViewSet(BaseViewSet):
 
     def restore(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        file_asset = FileAsset.objects.get(asset=asset_key)
+        file_asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            asset=asset_key
+        )
         file_asset.is_deleted = False
         file_asset.save(update_fields=["is_deleted"])
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -68,7 +76,9 @@ class UserAssetsEndpoint(BaseAPIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def get(self, request, asset_key):
-        files = FileAsset.objects.filter(asset=asset_key, created_by=request.user)
+        files = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).filter(
+            asset=asset_key, created_by=request.user
+        )
         if files.exists():
             serializer = FileAssetSerializer(files, context={"request": request})
             return Response({"data": serializer.data, "status": True}, status=status.HTTP_200_OK)
@@ -81,12 +91,16 @@ class UserAssetsEndpoint(BaseAPIView):
     def post(self, request):
         serializer = FileAssetSerializer(data=request.data)
         if serializer.is_valid():
+            if serializer.validated_data.get("entity_type") == FileAsset.EntityTypeContext.WORK_MAP_SCENE:
+                return Response({"error": "Invalid entity type."}, status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, asset_key):
-        file_asset = FileAsset.objects.get(asset=asset_key, created_by=request.user)
+        file_asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            asset=asset_key, created_by=request.user
+        )
         file_asset.is_deleted = True
         file_asset.save(update_fields=["is_deleted"])
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -131,6 +131,7 @@ def hard_delete():
         CycleIssue,
         Estimate,
         EstimatePoint,
+        FileAsset,
     )
 
     days = settings.HARD_DELETE_AFTER_DAYS
@@ -188,6 +189,9 @@ def hard_delete():
         # Check if the model has a 'deleted_at' field
         if hasattr(model, "deleted_at"):
             # Get all instances where 'deleted_at' is greater than 30 days ago
-            _ = model.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+            expired = model.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days))
+            if model is FileAsset:
+                expired = expired.filter(document_version_links__isnull=True)
+            _ = expired.delete()
 
     return

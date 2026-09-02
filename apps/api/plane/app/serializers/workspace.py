@@ -25,6 +25,8 @@ from plane.db.models import (
     WorkspaceHomePreference,
     Sticky,
     WorkspaceUserPreference,
+    Document,
+    WorkMap,
 )
 from plane.utils.constants import RESTRICTED_WORKSPACE_SLUGS
 from plane.utils.url import contains_url
@@ -37,6 +39,7 @@ from plane.utils.content_validator import (
 # Django imports
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 import re
 
 
@@ -53,9 +56,7 @@ class WorkSpaceSerializer(DynamicBaseSerializer):
         # digit. Mirrors the frontend HAS_ALPHANUMERIC_REGEX check so the rule
         # cannot be bypassed via a direct API call.
         if not has_alphanumeric(value):
-            raise serializers.ValidationError(
-                "Name must contain at least one letter or number"
-            )
+            raise serializers.ValidationError("Name must contain at least one letter or number")
         return value
 
     def validate_slug(self, value):
@@ -296,6 +297,26 @@ class PageRecentVisitSerializer(serializers.ModelSerializer):
         return project.identifier if project else None
 
 
+class WorkMapRecentVisitSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(source="document_id")
+    name = serializers.CharField(source="document.name")
+    owned_by = serializers.UUIDField(source="document.owned_by_id")
+    project_id = serializers.SerializerMethodField()
+    project_identifier = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkMap
+        fields = ["id", "name", "project_id", "owned_by", "project_identifier"]
+
+    def get_project_id(self, obj):
+        project = self.context.get("project")
+        return project.id if project else None
+
+    def get_project_identifier(self, obj):
+        project = self.context.get("project")
+        return project.identifier if project else None
+
+
 def get_entity_model_and_serializer(entity_type):
     entity_map = {
         "issue": (Issue, IssueRecentVisitSerializer),
@@ -316,6 +337,24 @@ class WorkspaceRecentVisitSerializer(BaseSerializer):
     def get_entity_data(self, obj):
         entity_name = obj.entity_name
         entity_identifier = obj.entity_identifier
+
+        if entity_name == "work_map":
+            work_map = (
+                WorkMap.objects.filter(
+                    pk=entity_identifier,
+                    document__workspace=obj.workspace,
+                    document__document_projects__workspace=obj.workspace,
+                    document__document_projects__project=obj.project,
+                    document__document_projects__deleted_at__isnull=True,
+                    document__document_projects__project__workspace=obj.workspace,
+                    document__document_projects__project__project_projectmember__member=obj.user,
+                    document__document_projects__project__project_projectmember__is_active=True,
+                    document__document_projects__project__archived_at__isnull=True,
+                )
+                .filter(Q(document__owned_by=obj.user) | Q(document__access=Document.PUBLIC_ACCESS))
+                .first()
+            )
+            return WorkMapRecentVisitSerializer(work_map, context={"project": obj.project}).data if work_map else None
 
         entity_model, entity_serializer = get_entity_model_and_serializer(entity_name)
 

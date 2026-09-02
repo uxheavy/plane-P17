@@ -17,6 +17,7 @@ class WorkMap(models.Model):
     )
     scene_binary = models.BinaryField(default=bytes)
     generation = models.PositiveBigIntegerField(default=0)
+    collaboration_epoch = models.PositiveBigIntegerField(default=0)
 
     class Meta:
         db_table = "work_maps"
@@ -47,3 +48,98 @@ class WorkMapBinding(BaseModel):
                 name="work_map_binding_unique_active_source",
             )
         ]
+
+
+class WorkMapBindingPlacement(BaseModel):
+    work_map = models.ForeignKey("db.WorkMap", on_delete=models.CASCADE, related_name="binding_placements")
+    binding = models.ForeignKey("db.WorkMapBinding", on_delete=models.CASCADE, related_name="placements")
+    placement_id = models.UUIDField()
+    acknowledged_at = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = "work_map_binding_placements"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["work_map", "created_by", "placement_id"],
+                name="work_map_binding_placement_unique_request",
+            )
+        ]
+
+
+class WorkMapPasteRebinding(BaseModel):
+    class Status(models.TextChoices):
+        COPYING = "copying", "Copying"
+        COMMITTED = "committed", "Committed"
+        FAILED = "failed", "Failed"
+
+    work_map = models.ForeignKey("db.WorkMap", on_delete=models.CASCADE, related_name="paste_rebindings")
+    idempotency_key = models.UUIDField()
+    request_hash = models.CharField(max_length=64)
+    generation = models.PositiveBigIntegerField()
+    node_key_map = models.JSONField(default=dict)
+    asset_id_map = models.JSONField(default=dict)
+    destination_keys = models.JSONField(default=list)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.COPYING)
+    lease_id = models.UUIDField(null=True)
+    lease_expires_at = models.DateTimeField(null=True)
+    committed_at = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = "work_map_paste_rebindings"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["work_map", "created_by", "idempotency_key"],
+                name="work_map_paste_rebinding_unique_request",
+            )
+        ]
+
+
+class WorkMapDuplicateOperation(BaseModel):
+    class Status(models.TextChoices):
+        COPYING = "copying", "Copying"
+        COMMITTED = "committed", "Committed"
+        FAILED = "failed", "Failed"
+
+    source_work_map = models.ForeignKey(
+        "db.WorkMap",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="duplicate_operations",
+    )
+    idempotency_key = models.UUIDField()
+    source_generation = models.PositiveBigIntegerField()
+    source_scene_hash = models.CharField(max_length=64)
+    source_snapshot = models.JSONField(default=dict)
+    target_document_id = models.UUIDField()
+    node_key_map = models.JSONField(default=dict)
+    target_asset_ids = models.JSONField(default=dict)
+    destination_keys = models.JSONField(default=list)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.COPYING)
+    lease_id = models.UUIDField(null=True)
+    lease_expires_at = models.DateTimeField(null=True)
+    committed_at = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = "work_map_duplicate_operations"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_work_map", "created_by", "idempotency_key"],
+                name="work_map_duplicate_operation_unique_request",
+            )
+        ]
+
+
+class WorkMapVersion(models.Model):
+    document_version = models.OneToOneField(
+        "db.DocumentVersion",
+        db_column="id",
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="work_map",
+    )
+    scene_binary = models.BinaryField(default=bytes)
+    binding_snapshot = models.JSONField(default=list)
+    generation = models.PositiveBigIntegerField()
+
+    class Meta:
+        db_table = "work_map_versions"

@@ -9,6 +9,7 @@ import type { Request } from "express";
 import type { WebSocket } from "ws";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkMapAuthorization } from "@/services/work-map.service";
+import { workMapAuthorizationSchema } from "@/services/work-map.service";
 import { WorkMapRelay } from "@/services/work-map-relay";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
@@ -23,6 +24,7 @@ const authorization = (overrides: Partial<WorkMapAuthorization> = {}): WorkMapAu
   work_map_id: WORK_MAP_ID,
   sender_id: USER_ID,
   generation: 7,
+  collaboration_epoch: 2,
   readable: true,
   editable: true,
   is_locked: false,
@@ -112,6 +114,12 @@ const initializeRelay = async (
 };
 
 describe("WorkMapRelay", () => {
+  it("requires a nonnegative collaboration epoch in authorization", () => {
+    expect(() => workMapAuthorizationSchema.parse({ ...authorization(), collaboration_epoch: -1 })).toThrow();
+    expect(() => workMapAuthorizationSchema.parse({ ...authorization(), collaboration_epoch: undefined })).toThrow();
+    expect(workMapAuthorizationSchema.parse(authorization()).collaboration_epoch).toBe(2);
+  });
+
   it("does not accept frames before authorization and limits read-only viewers to awareness", async () => {
     let resolveAuthorization!: (value: WorkMapAuthorization) => void;
     const pendingAuthorization = new Promise<WorkMapAuthorization>((resolve) => {
@@ -176,6 +184,26 @@ describe("WorkMapRelay", () => {
 
     expect(authorize).toHaveBeenCalledTimes(2);
     expect((ws as unknown as TestWebSocket).closed?.code).toBe(4403);
+    await relay.destroy();
+    vi.useRealTimers();
+  });
+
+  it("closes on collaboration epoch changes but not routine generation changes", async () => {
+    vi.useFakeTimers();
+    const bus = new TestRedisBus();
+    const authorize = vi
+      .fn()
+      .mockResolvedValueOnce(authorization())
+      .mockResolvedValueOnce(authorization({ generation: 8 }))
+      .mockResolvedValueOnce(authorization({ generation: 9, collaboration_epoch: 3 }));
+    const relay = await initializeRelay(bus, authorize);
+    const ws = websocket();
+    void relay.handleConnection(ws, request());
+    await vi.runAllTicks();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((ws as unknown as TestWebSocket).closed).toBeNull();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((ws as unknown as TestWebSocket).closed).toEqual({ code: 4409, reason: "Work map authority changed" });
     await relay.destroy();
     vi.useRealTimers();
   });

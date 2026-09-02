@@ -44,6 +44,7 @@ class FileAsset(BaseModel):
         PROJECT_COVER = "PROJECT_COVER"
         DRAFT_ISSUE_ATTACHMENT = "DRAFT_ISSUE_ATTACHMENT"
         DRAFT_ISSUE_DESCRIPTION = "DRAFT_ISSUE_DESCRIPTION"
+        WORK_MAP_SCENE = "WORK_MAP_SCENE"
 
     attributes = models.JSONField(default=dict)
     asset = models.FileField(upload_to=get_upload_path, max_length=800)
@@ -54,6 +55,7 @@ class FileAsset(BaseModel):
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, null=True, related_name="assets")
     comment = models.ForeignKey("db.IssueComment", on_delete=models.CASCADE, null=True, related_name="assets")
     page = models.ForeignKey("db.Page", on_delete=models.CASCADE, null=True, related_name="assets")
+    document = models.ForeignKey("db.Document", on_delete=models.CASCADE, null=True, related_name="document_assets")
     entity_type = models.CharField(max_length=255, null=True, blank=True)
     entity_identifier = models.CharField(max_length=255, null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
@@ -74,6 +76,32 @@ class FileAsset(BaseModel):
             models.Index(fields=["entity_identifier"], name="asset_entity_identifier_idx"),
             models.Index(fields=["entity_type", "entity_identifier"], name="asset_entity_idx"),
             models.Index(fields=["asset"], name="asset_asset_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(entity_type__in=["PAGE_DESCRIPTION", "WORK_MAP_SCENE"])
+                | models.Q(document__isnull=False),
+                name="content_asset_has_document",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(entity_type="WORK_MAP_SCENE")
+                | (
+                    models.Q(document__isnull=False)
+                    & models.Q(workspace__isnull=False)
+                    & models.Q(project__isnull=True)
+                    & models.Q(page__isnull=True)
+                    & models.Q(user__isnull=True)
+                    & models.Q(draft_issue__isnull=True)
+                    & models.Q(issue__isnull=True)
+                    & models.Q(comment__isnull=True)
+                ),
+                name="work_map_scene_asset_has_document_only",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(document__isnull=True)
+                | models.Q(entity_type__in=["PAGE_DESCRIPTION", "WORK_MAP_SCENE"]),
+                name="file_asset_document_owner_is_closed",
+            ),
         ]
 
     def __str__(self):

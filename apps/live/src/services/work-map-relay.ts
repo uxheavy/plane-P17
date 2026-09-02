@@ -160,6 +160,8 @@ export class WorkMapRelay {
               current.work_map_id !== authorization.work_map_id
             ) {
               ws.close(4409, "Work map changed");
+            } else if (current.collaboration_epoch !== authorization.collaboration_epoch) {
+              ws.close(4409, "Work map authority changed");
             } else if (current.editable !== authorization.editable) {
               ws.close(4403, "Work map access changed");
             }
