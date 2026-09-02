@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-repo_root=$(git rev-parse --show-toplevel)
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd -P)
 web_url=${PLANE_REFERENCE_WEB_URL:-}
 api_url=${PLANE_REFERENCE_API_URL:-http://localhost:8000}
 api_container=${PLANE_REFERENCE_API_CONTAINER:-}
