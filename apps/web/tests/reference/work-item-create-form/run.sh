@@ -133,10 +133,8 @@ if [[ ! -d "$repo_root/node_modules" ]]; then
 fi
 
 begin_stage "web.build"
-(
-  cd "$repo_root/apps/web"
-  VITE_API_BASE_URL="$api_url" VITE_WEB_BASE_URL="$web_url" ./node_modules/.bin/react-router build
-)
+VITE_API_BASE_URL="$api_url" VITE_WEB_BASE_URL="$web_url" \
+  pnpm --dir "$repo_root" build --filter=web... --env-mode=loose
 complete_stage
 begin_stage "web.preview"
 (
