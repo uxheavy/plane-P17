@@ -36,7 +36,7 @@ from plane.db.models import (
     Issue,
     StateGroup,
     IntakeIssue,
-    ProjectPage,
+    DocumentProject,
 )
 from plane.bgtasks.webhook_task import model_activity, webhook_activity
 from plane.utils.exception_logger import log_exception
@@ -743,7 +743,6 @@ class ProjectSummaryAPIEndpoint(BaseAPIView):
     def _get_all_summary_counts(self, project_id, requested_fields):
         """Return requested summary counts in one ORM query; only runs subqueries for requested fields."""
 
-        # Using a different annotation name for 'pages' to avoid conflict with Project.pages (M2M from Page)
         def _annotation_name(field):
             return "pages_count" if field == "pages" else field
 
@@ -792,7 +791,11 @@ class ProjectSummaryAPIEndpoint(BaseAPIView):
                 .values("count")
             ),
             "pages": lambda: (
-                ProjectPage.objects.filter(project_id=OuterRef("pk"))
+                DocumentProject.objects.filter(
+                    project_id=OuterRef("pk"),
+                    document__kind="page",
+                    deleted_at__isnull=True,
+                )
                 .values("project_id")
                 .annotate(count=Count("*"))
                 .values("count")

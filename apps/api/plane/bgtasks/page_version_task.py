@@ -18,6 +18,7 @@ from plane.utils.exception_logger import log_exception
 
 PAGE_VERSION_TASK_TIMEOUT = 600
 
+
 @shared_task
 def track_page_version(page_id, existing_instance, user_id):
     try:
@@ -28,11 +29,10 @@ def track_page_version(page_id, existing_instance, user_id):
         current_instance = json.loads(existing_instance) if existing_instance is not None else {}
         sub_pages = {}
 
-
         # Create a version if description_html is updated
         if current_instance.get("description_html") != page.description_html:
             # Fetch the latest page version
-            page_version = PageVersion.objects.filter(page_id=page_id).order_by("-last_saved_at").first()
+            page_version = PageVersion.objects.filter(document_id=page_id).order_by("-last_saved_at").first()
 
             # Get the latest page version if it exists and is owned by the user
             if (
@@ -52,13 +52,13 @@ def track_page_version(page_id, existing_instance, user_id):
                         "description_json",
                         "description_stripped",
                         "sub_pages_data",
-                        "updated_at"
+                        "updated_at",
                     ]
                 )
             else:
                 # Create a new page version
                 PageVersion.objects.create(
-                    page_id=page_id,
+                    document_id=page_id,
                     workspace_id=page.workspace_id,
                     description_json=page.description,
                     description_html=page.description_html,
@@ -69,9 +69,9 @@ def track_page_version(page_id, existing_instance, user_id):
                     sub_pages_data=sub_pages,
                 )
             # If page versions are greater than 20 delete the oldest one
-            if PageVersion.objects.filter(page_id=page_id).count() > 20:
+            if PageVersion.objects.filter(document_id=page_id).count() > 20:
                 # Delete the old page version
-                PageVersion.objects.filter(page_id=page_id).order_by("last_saved_at").first().delete()
+                PageVersion.objects.filter(document_id=page_id).order_by("last_saved_at").first().delete()
 
         return
     except Page.DoesNotExist:
