@@ -4,6 +4,7 @@
 
 # Django imports
 from django.db.models import Count, Q, OuterRef, Subquery, IntegerField
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models.functions import Coalesce
 
@@ -77,7 +78,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
-        workspace_member = WorkspaceMember.objects.get(pk=pk, workspace__slug=slug, is_active=True)
+        workspace_member = get_object_or_404(self.get_queryset(), pk=pk, is_active=True)
         if is_agent_user(workspace_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
@@ -103,7 +104,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, slug, pk):
         # Check the user role who is deleting the user
-        workspace_member = WorkspaceMember.objects.get(workspace__slug=slug, pk=pk, is_active=True)
+        workspace_member = get_object_or_404(self.get_queryset(), pk=pk, is_active=True)
         if is_agent_user(workspace_member.member):
             return Response(
                 {"error": "Agent membership is lifecycle-managed"},
