@@ -990,10 +990,17 @@ class TestWorkMapApp:
         with patch("plane.db.mixins.soft_delete_related_objects.delay") as recursive_delete:
             expire_stale_work_map_binding_placements()
 
-        assert WorkMapBindingPlacement.objects.get(binding__node_key=kept["node_key"]).acknowledged_at is not None
+        kept_placement = WorkMapBindingPlacement.objects.get(binding__node_key=kept["node_key"])
+        assert kept_placement.acknowledged_at is not None
         assert not WorkMapBinding.objects.filter(node_key=abandoned["node_key"]).exists()
         assert WorkMapBinding.all_objects.filter(node_key=abandoned["node_key"], deleted_at__isnull=False).exists()
         recursive_delete.assert_not_called()
+
+        WorkMapBindingPlacement.objects.filter(id=kept_placement.id).update(
+            acknowledged_at=timezone.now() - timedelta(days=settings.HARD_DELETE_AFTER_DAYS + 1)
+        )
+        expire_stale_work_map_binding_placements()
+        assert not WorkMapBindingPlacement.all_objects.filter(id=kept_placement.id).exists()
 
     def test_cross_map_paste_rebinds_before_native_insertion_and_replays(self, session_client, workspace, create_user):
         project, membership = _project(workspace, create_user, "PST")

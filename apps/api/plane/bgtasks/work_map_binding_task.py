@@ -10,6 +10,7 @@ import uuid
 from datetime import timedelta
 
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -35,7 +36,8 @@ def persisted_scene_node_keys(scene_binary):
 
 @shared_task
 def expire_stale_work_map_binding_placements():
-    cutoff = timezone.now() - WORK_MAP_BINDING_PLACEMENT_LEASE
+    now = timezone.now()
+    cutoff = now - WORK_MAP_BINDING_PLACEMENT_LEASE
     placement_ids = WorkMapBindingPlacement.objects.filter(
         acknowledged_at__isnull=True,
         created_at__lt=cutoff,
@@ -61,6 +63,12 @@ def expire_stale_work_map_binding_placements():
             WorkMapBindingPlacement.objects.filter(id=placement.id).delete()
             if not WorkMapBindingPlacement.objects.filter(binding=binding).exists():
                 WorkMapBinding.objects.filter(id=binding.id).delete()
+
+    WorkMapBindingPlacement.objects.filter(
+        acknowledged_at__lt=now - timedelta(days=settings.HARD_DELETE_AFTER_DAYS)
+    ).delete(soft=False)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
