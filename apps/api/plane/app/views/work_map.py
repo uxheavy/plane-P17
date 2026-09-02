@@ -17,7 +17,15 @@ from plane.app.serializers import (
     WorkMapSceneSerializer,
     WorkMapUpdateSerializer,
 )
-from plane.db.models import Document, DocumentProject, Project, WorkMap, WorkMapBinding
+from plane.db.models import (
+    Document,
+    DocumentProject,
+    Project,
+    ProjectMember,
+    WorkMap,
+    WorkMapBinding,
+    WorkspaceMember,
+)
 
 from .base import BaseAPIView, BaseViewSet
 
@@ -146,20 +154,67 @@ class WorkMapSceneEndpoint(BaseAPIView):
             document = Document.objects.select_for_update().filter(id=visible_id).first()
             if document is None:
                 return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
-            if document.is_locked or document.archived_at is not None:
-                return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
             work_map = WorkMap.objects.select_for_update().get(document=document)
             if serializer.validated_data["generation"] != work_map.generation:
+                if (
+                    serializer.validated_data["generation"] + 1 == work_map.generation
+                    and serializer.validated_data["scene_binary"] == bytes(work_map.scene_binary)
+                ):
+                    return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
                 return Response(
                     {"error": "Work map generation is stale", "generation": work_map.generation},
                     status=status.HTTP_409_CONFLICT,
                 )
+            if document.is_locked or document.archived_at is not None:
+                return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
             work_map.scene_binary = serializer.validated_data["scene_binary"]
             work_map.generation += 1
             work_map.save(update_fields=["scene_binary", "generation"])
             document.updated_by = request.user
             document.save(update_fields=["updated_by", "updated_at"])
         return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
+
+
+class WorkMapRealtimeEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id, work_map_id):
+        document = (
+            _visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
+        )
+        if document is None:
+            return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        project_member = ProjectMember.objects.filter(
+            workspace__slug=slug,
+            project_id=project_id,
+            member=request.user,
+            is_active=True,
+        )
+        editable = project_member.filter(role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value]).exists() or (
+            project_member.exists()
+            and WorkspaceMember.objects.filter(
+                workspace__slug=slug,
+                member=request.user,
+                role=ROLE.ADMIN.value,
+                is_active=True,
+            ).exists()
+        )
+
+        return Response(
+            {
+                "document_type": "work_map",
+                "workspace_slug": slug,
+                "project_id": project_id,
+                "work_map_id": document.id,
+                "sender_id": request.user.id,
+                "generation": document.work_map.generation,
+                "readable": True,
+                "editable": editable and not document.is_locked and document.archived_at is None,
+                "is_locked": document.is_locked,
+                "archived_at": document.archived_at,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class WorkMapBindingEndpoint(BaseAPIView):

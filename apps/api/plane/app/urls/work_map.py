@@ -4,7 +4,7 @@
 
 from django.urls import path
 
-from plane.app.views import WorkMapBindingEndpoint, WorkMapSceneEndpoint, WorkMapViewSet
+from plane.app.views import WorkMapBindingEndpoint, WorkMapRealtimeEndpoint, WorkMapSceneEndpoint, WorkMapViewSet
 
 
 urlpatterns = [
@@ -22,6 +22,11 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/work-maps/<uuid:work_map_id>/scene/",
         WorkMapSceneEndpoint.as_view(),
         name="project-work-map-scene",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-maps/<uuid:work_map_id>/realtime/",
+        WorkMapRealtimeEndpoint.as_view(),
+        name="project-work-map-realtime",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/work-maps/<uuid:work_map_id>/bindings/",
