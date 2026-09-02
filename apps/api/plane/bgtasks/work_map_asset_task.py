@@ -27,6 +27,7 @@ from plane.settings.storage import S3Storage
 
 WORK_MAP_ASSET_COPY_LEASE = timedelta(minutes=15)
 WORK_MAP_SCENE_ASSET_PLACEMENT_LEASE = timedelta(minutes=15)
+WORK_MAP_ASSET_DELETE_BATCH_SIZE = 1000
 
 
 def cleanup_stale_operations(model):
@@ -240,10 +241,36 @@ def cleanup_stale_scene_asset_placements():
 
 
 @shared_task
+def cleanup_deleted_work_map_assets(document_id=None):
+    storage = S3Storage()
+    while True:
+        assets = FileAsset.all_objects.filter(
+            entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+            deleted_at__isnull=False,
+            document__deleted_at__isnull=False,
+        ).exclude(asset="")
+        if document_id is not None:
+            assets = assets.filter(document_id=document_id)
+        rows = list(assets.order_by("id").values_list("id", "asset")[:WORK_MAP_ASSET_DELETE_BATCH_SIZE])
+        if not rows:
+            return
+        if not storage.delete_files([object_name for _, object_name in rows]):
+            return
+        FileAsset.all_objects.filter(
+            id__in=[asset_id for asset_id, _ in rows],
+            deleted_at__isnull=False,
+            document__deleted_at__isnull=False,
+        ).update(asset="")
+
+
+@shared_task
 def cleanup_stale_work_map_asset_copies():
     cleanup_stale_operations(WorkMapDuplicateOperation)
     cleanup_stale_operations(WorkMapPasteRebinding)
     cleanup_stale_scene_asset_placements()
+    cleanup_deleted_work_map_assets()
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

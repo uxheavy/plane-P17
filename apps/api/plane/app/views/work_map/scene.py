@@ -189,6 +189,7 @@ class WorkMapSceneEndpoint(BaseAPIView):
                     return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
                 assets = validate_work_map_scene_assets(scene, document.id, lock=True)
                 scene_asset_ids = set(assets)
+                current_carrier_keys = protected_binding_keys(current_scene) if current_scene is not None else set()
                 carrier_keys = protected_binding_keys(scene)
                 referenced_bindings = {
                     binding.node_key: binding
@@ -205,7 +206,8 @@ class WorkMapSceneEndpoint(BaseAPIView):
                         source_kind=binding.source_kind,
                         source_id=binding.source_id,
                     )
-                    for binding in referenced_bindings.values()
+                    for node_key, binding in referenced_bindings.items()
+                    if node_key not in current_carrier_keys
                 ):
                     raise ValueError("Plane carrier binding source is unavailable")
 
@@ -261,6 +263,8 @@ class WorkMapSceneEndpoint(BaseAPIView):
             document.updated_by = request.user
             document.save(update_fields=["updated_by", "updated_at"])
         return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

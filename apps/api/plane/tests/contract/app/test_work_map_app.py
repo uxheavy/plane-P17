@@ -28,7 +28,7 @@ from plane.app.views.work_map.paste import WorkMapPasteSourceUnavailable
 from plane.app.views.work_map.paste import authorized_paste_sources
 from plane.bgtasks.deletion_task import hard_delete
 from plane.bgtasks.page_version_task import track_page_version
-from plane.bgtasks.work_map_asset_task import cleanup_stale_work_map_asset_copies
+from plane.bgtasks.work_map_asset_task import cleanup_deleted_work_map_assets, cleanup_stale_work_map_asset_copies
 from plane.bgtasks.work_map_binding_task import expire_stale_work_map_binding_placements
 from plane.db.models import (
     Cycle,
@@ -508,7 +508,7 @@ class TestWorkMapApp:
         assert archived.status_code == status.HTTP_200_OK
         assert Document.objects.get(id=work_map["id"]).archived_at is not None
 
-    def test_work_map_unlinks_projects_before_archive_and_preserves_document_assets(
+    def test_work_map_unlinks_projects_before_archive_and_reclaims_final_document_assets(
         self, session_client, workspace, create_user
     ):
         first_project, _ = _project(workspace, create_user, "DEL")
@@ -548,9 +548,34 @@ class TestWorkMapApp:
 
         assert session_client.delete(second_url).status_code == status.HTTP_409_CONFLICT
         assert session_client.post(f"{second_url}archive/").status_code == status.HTTP_200_OK
-        assert session_client.delete(second_url).status_code == status.HTTP_204_NO_CONTENT
+        with (
+            patch("plane.app.views.work_map.base.transaction.on_commit", side_effect=lambda callback: callback()),
+            patch("plane.bgtasks.work_map_asset_task.cleanup_deleted_work_map_assets.delay") as schedule_cleanup,
+        ):
+            assert session_client.delete(second_url).status_code == status.HTTP_204_NO_CONTENT
+        schedule_cleanup.assert_called_once_with(work_map["id"])
         assert not Document.objects.filter(id=work_map["id"]).exists()
         assert Document.all_objects.filter(id=work_map["id"], deleted_at__isnull=False).exists()
+        deleted_asset = FileAsset.all_objects.get(id=asset.id)
+        assert deleted_asset.deleted_at is not None
+        assert deleted_asset.asset.name == "document-owned-scene-asset"
+
+        with patch("plane.bgtasks.work_map_asset_task.S3Storage.delete_files", return_value=False):
+            cleanup_deleted_work_map_assets(work_map["id"])
+        deleted_asset.refresh_from_db()
+        assert deleted_asset.asset.name == "document-owned-scene-asset"
+
+        expired_at = timezone.now() - timedelta(days=settings.HARD_DELETE_AFTER_DAYS + 1)
+        Document.all_objects.filter(id=work_map["id"]).update(deleted_at=expired_at)
+        FileAsset.all_objects.filter(id=asset.id).update(deleted_at=expired_at)
+        hard_delete()
+        assert Document.all_objects.filter(id=work_map["id"]).exists()
+
+        with patch("plane.bgtasks.work_map_asset_task.S3Storage.delete_files", return_value=True) as delete_files:
+            cleanup_deleted_work_map_assets(work_map["id"])
+        delete_files.assert_called_once_with(["document-owned-scene-asset"])
+        hard_delete()
+        assert not Document.all_objects.filter(id=work_map["id"]).exists()
 
     def test_wrong_project_and_inactive_member_cannot_read_or_write_scene(self, session_client, workspace, create_user):
         project, membership = _project(workspace, create_user, "OWN")
@@ -570,6 +595,69 @@ class TestWorkMapApp:
         work_map_row = WorkMap.objects.get(pk=work_map["id"])
         assert bytes(work_map_row.scene_binary) == b""
         assert work_map_row.generation == 0
+
+    def test_editor_can_preserve_an_existing_carrier_without_source_access(
+        self, session_client, workspace, create_user
+    ):
+        map_project, _ = _project(workspace, create_user, "MAPAUTH")
+        source_project, _ = _project(workspace, create_user, "SRCAUTH")
+        state = State.objects.create(
+            project=source_project,
+            workspace=workspace,
+            name="Backlog",
+            color="#000000",
+            group="backlog",
+            default=True,
+        )
+        issue = Issue.objects.create(project=source_project, workspace=workspace, state=state, name="Protected")
+        work_map = _create_work_map(session_client, workspace, map_project)
+        binding = session_client.post(
+            _work_maps_url(workspace, map_project, work_map["id"], "bindings/"),
+            {
+                "generation": 0,
+                "placement_id": uuid.uuid4(),
+                "source_kind": "work-item",
+                "source_id": issue.id,
+            },
+            format="json",
+        ).json()
+        carrier = {
+            "id": "protected",
+            "type": "embeddable",
+            "link": f"https://work-map.invalid/nodes/{binding['node_key']}",
+            "customData": {"nodeKey": binding["node_key"]},
+        }
+        scene_url = _work_maps_url(workspace, map_project, work_map["id"], "scene/")
+        initial_scene = json.dumps({"elements": [carrier], "files": {}}).encode()
+        assert (
+            session_client.patch(
+                scene_url,
+                {"generation": 0, "scene_binary": base64.b64encode(initial_scene).decode("ascii")},
+                format="json",
+            ).status_code
+            == status.HTTP_200_OK
+        )
+
+        editor = User.objects.create_user(email="work-map-editor@plane.so", username="work-map-editor")
+        WorkspaceMember.objects.create(workspace=workspace, member=editor, role=ROLE.MEMBER.value, is_active=True)
+        ProjectMember.objects.create(
+            workspace=workspace,
+            project=map_project,
+            member=editor,
+            role=ROLE.MEMBER.value,
+            is_active=True,
+        )
+        session_client.force_authenticate(user=editor)
+        edited_scene = json.dumps({"elements": [carrier, {"id": "note", "type": "rectangle"}], "files": {}}).encode()
+
+        preserved = session_client.patch(
+            scene_url,
+            {"generation": 1, "scene_binary": base64.b64encode(edited_scene).decode("ascii")},
+            format="json",
+        )
+
+        assert preserved.status_code == status.HTTP_200_OK
+        assert preserved.json() == {"generation": 2}
 
     def test_bindings_are_closed_authorized_and_absent_from_scene(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "BND")
@@ -812,6 +900,36 @@ class TestWorkMapApp:
         )
         assert restored.status_code == status.HTTP_200_OK
         assert WorkMapBinding.objects.filter(id=binding.id).exists()
+
+        removed_again = session_client.patch(
+            scene_url,
+            {
+                "generation": 4,
+                "scene_binary": base64.b64encode(b'{"elements":[],"files":{}}').decode("ascii"),
+            },
+            format="json",
+        )
+        assert removed_again.status_code == status.HTTP_200_OK
+        replacement_placement = uuid.uuid4()
+        replacement = session_client.post(
+            bindings_url,
+            {
+                "generation": 5,
+                "placement_id": replacement_placement,
+                "source_kind": "work-item",
+                "source_id": issue.id,
+            },
+            format="json",
+        )
+        assert replacement.status_code == status.HTTP_201_CREATED
+        cancel_replacement = _work_maps_url(
+            workspace,
+            project,
+            work_map["id"],
+            f"binding-placements/{replacement_placement}/",
+        )
+        assert session_client.delete(f"{cancel_replacement}?generation=5").status_code == status.HTTP_204_NO_CONTENT
+        assert not WorkMapBinding.objects.filter(id=binding.id).exists()
 
     def test_stale_binding_placements_finalize_or_expire_from_the_persisted_scene(
         self, session_client, workspace, create_user

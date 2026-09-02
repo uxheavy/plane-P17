@@ -215,9 +215,14 @@ class WorkMapBindingEndpoint(BaseAPIView):
                     placement.save(update_fields=["acknowledged_at", "updated_at"])
                 return Response(status=status.HTTP_204_NO_CONTENT)
             placement.delete()
-            if not WorkMapBindingPlacement.objects.filter(binding=binding).exists():
+            if not WorkMapBindingPlacement.objects.filter(
+                binding=binding,
+                acknowledged_at__isnull=True,
+            ).exists():
                 binding.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.

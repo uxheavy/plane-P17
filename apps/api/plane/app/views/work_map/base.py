@@ -21,6 +21,7 @@ from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.db.models import (
     Document,
     DocumentProject,
+    FileAsset,
     Project,
     ProjectMember,
     UserFavorite,
@@ -305,8 +306,18 @@ class WorkMapViewSet(BaseViewSet):
             work_map.collaboration_epoch += 1
             work_map.save(update_fields=["collaboration_epoch"])
             if len(active_link_ids) == 1:
+                from plane.bgtasks.work_map_asset_task import cleanup_deleted_work_map_assets
+
+                deletion_marker = timezone.now()
+                FileAsset.objects.filter(
+                    document=document,
+                    entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+                ).update(deleted_at=deletion_marker, is_deleted=True)
                 document.delete()
+                transaction.on_commit(lambda: cleanup_deleted_work_map_assets.delay(str(document.id)))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 # Copyright (c) 2023-present Plane Software, Inc. and contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
