@@ -14,6 +14,7 @@ import { WorkMapService } from "@/services/work-map.service";
 
 const MAX_FRAME_BYTES = 5 * 1024 * 1024;
 const REAUTHORIZE_INTERVAL_MS = 15_000;
+const WORK_MAP_CONTROL_CHANNEL = "work-map:control";
 
 const workMapConnectionSchema = z.object({
   workspaceSlug: z.string().min(1),
@@ -53,6 +54,15 @@ const presenceUpdateSchema = z
 
 const workMapFrameSchema = z.discriminatedUnion("type", [sceneUpdateSchema, pointerUpdateSchema, presenceUpdateSchema]);
 
+const workMapForceCloseSchema = z
+  .object({
+    type: z.literal("FORCE_CLOSE"),
+    workspaceSlug: z.string().min(1),
+    workMapId: z.string().uuid(),
+    reason: z.enum(["generation_changed", "authority_changed"]),
+  })
+  .strict();
+
 type WorkMapConnection = z.infer<typeof workMapConnectionSchema>;
 type WorkMapFrame = z.infer<typeof workMapFrameSchema>;
 type WorkMapAuthorizer = (
@@ -71,7 +81,13 @@ export type WorkMapRelaySubscriber = {
   subscribe(channel: string): Promise<unknown>;
   unsubscribe(channel: string): Promise<unknown>;
   on(event: "message", listener: (channel: string, message: string) => void): unknown;
+  on(event: "close", listener: () => void): unknown;
+  on(event: "error", listener: () => void): unknown;
+  on(event: "ready", listener: () => void): unknown;
   removeListener(event: "message", listener: (channel: string, message: string) => void): unknown;
+  removeListener(event: "close", listener: () => void): unknown;
+  removeListener(event: "error", listener: () => void): unknown;
+  removeListener(event: "ready", listener: () => void): unknown;
   quit(): Promise<unknown>;
 };
 
@@ -98,6 +114,7 @@ export class WorkMapRelay {
   private readonly authorizer: WorkMapAuthorizer;
   private publisher: WorkMapRelayPublisher | null = null;
   private subscriber: WorkMapRelaySubscriber | null = null;
+  private subscriberAvailable = false;
   private readonly rooms = new Map<string, Map<WebSocket, string>>();
 
   constructor(authorizer?: WorkMapAuthorizer) {
@@ -113,6 +130,11 @@ export class WorkMapRelay {
     this.publisher = publisher;
     this.subscriber = subscriber;
     this.subscriber.on("message", this.handleRedisMessage);
+    this.subscriber.on("close", this.handleSubscriberLoss);
+    this.subscriber.on("error", this.handleSubscriberError);
+    this.subscriber.on("ready", this.handleSubscriberReady);
+    await this.subscriber.subscribe(WORK_MAP_CONTROL_CHANNEL);
+    this.subscriberAvailable = true;
   }
 
   async handleConnection(ws: WebSocket, request: Request) {
@@ -136,6 +158,10 @@ export class WorkMapRelay {
         cookie
       );
       if (closed) return;
+      if (!authorization.readable) {
+        ws.close(4403, "Work map unavailable");
+        return;
+      }
       if (authorization.generation !== connection.generation) {
         ws.close(4409, "Work map generation changed");
         return;
@@ -162,7 +188,12 @@ export class WorkMapRelay {
               ws.close(4409, "Work map changed");
             } else if (current.collaboration_epoch !== authorization.collaboration_epoch) {
               ws.close(4409, "Work map authority changed");
-            } else if (current.editable !== authorization.editable) {
+            } else if (
+              current.readable !== authorization.readable ||
+              current.editable !== authorization.editable ||
+              current.is_locked !== authorization.is_locked ||
+              current.archived_at !== authorization.archived_at
+            ) {
               ws.close(4403, "Work map access changed");
             }
             return undefined;
@@ -189,9 +220,13 @@ export class WorkMapRelay {
 
   async destroy() {
     this.subscriber?.removeListener("message", this.handleRedisMessage);
+    this.subscriber?.removeListener("close", this.handleSubscriberLoss);
+    this.subscriber?.removeListener("error", this.handleSubscriberError);
+    this.subscriber?.removeListener("ready", this.handleSubscriberReady);
     await Promise.all([this.publisher?.quit(), this.subscriber?.quit()]);
     this.publisher = null;
     this.subscriber = null;
+    this.subscriberAvailable = false;
     this.rooms.clear();
   }
 
@@ -201,7 +236,7 @@ export class WorkMapRelay {
   }
 
   private async join(room: string, ws: WebSocket, connectionId: string) {
-    if (!this.subscriber) throw new Error("Work Map relay is not initialized");
+    if (!this.subscriber || !this.subscriberAvailable) throw new Error("Work Map relay is not initialized");
     let connections = this.rooms.get(room);
     if (!connections) {
       connections = new Map();
@@ -252,6 +287,14 @@ export class WorkMapRelay {
   }
 
   private handleRedisMessage = (room: string, message: string) => {
+    if (room === WORK_MAP_CONTROL_CHANNEL) {
+      try {
+        this.closeLocalConnections(workMapForceCloseSchema.parse(JSON.parse(message)));
+      } catch {
+        logger.warn("WORK_MAP_RELAY: Rejected invalid control command");
+      }
+      return;
+    }
     const connections = this.rooms.get(room);
     if (!connections) return;
     try {
@@ -270,4 +313,28 @@ export class WorkMapRelay {
       logger.warn("WORK_MAP_RELAY: Rejected invalid Redis frame");
     }
   };
+
+  private handleSubscriberLoss = () => {
+    this.subscriberAvailable = false;
+    logger.error("WORK_MAP_RELAY: Redis subscription lost");
+    const sockets: WebSocket[] = [];
+    for (const connections of this.rooms.values()) sockets.push(...connections.keys());
+    for (const socket of sockets) socket.close(1011, "Realtime subscription lost");
+  };
+
+  private handleSubscriberError = () => {
+    logger.error("WORK_MAP_RELAY: Redis subscriber error");
+  };
+
+  private handleSubscriberReady = () => {
+    this.subscriberAvailable = true;
+  };
+
+  private closeLocalConnections(command: z.infer<typeof workMapForceCloseSchema>) {
+    const room = `work-map:${encodeURIComponent(command.workspaceSlug)}:${command.workMapId}`;
+    const sockets = [...(this.rooms.get(room)?.keys() ?? [])];
+    const code = command.reason === "generation_changed" ? 4409 : 4403;
+    const message = command.reason === "generation_changed" ? "Work map generation changed" : "Work map unavailable";
+    for (const socket of sockets) socket.close(code, message);
+  }
 }

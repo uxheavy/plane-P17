@@ -66,6 +66,12 @@ class TestRedisBus {
     }
     return Promise.resolve(this.connections.size);
   }
+
+  disconnectSubscribers() {
+    for (const connection of this.connections) {
+      if (connection.channels.size > 0) connection.emit("close");
+    }
+  }
 }
 
 class TestRedisConnection extends EventEmitter {
@@ -173,10 +179,13 @@ describe("WorkMapRelay", () => {
     await relay.destroy();
   });
 
-  it("reauthorizes active connections and closes revoked access", async () => {
+  it("reauthorizes active connections and closes changed map authority", async () => {
     vi.useFakeTimers();
     const bus = new TestRedisBus();
-    const authorize = vi.fn().mockResolvedValueOnce(authorization()).mockRejectedValueOnce(new Error("revoked"));
+    const authorize = vi
+      .fn()
+      .mockResolvedValueOnce(authorization({ editable: false }))
+      .mockResolvedValueOnce(authorization({ editable: false, is_locked: true }));
     const relay = await initializeRelay(bus, authorize);
     const ws = websocket();
     void relay.handleConnection(ws, request());
@@ -205,8 +214,54 @@ describe("WorkMapRelay", () => {
     expect((ws as unknown as TestWebSocket).closed).toBeNull();
     await vi.advanceTimersByTimeAsync(15_000);
     expect((ws as unknown as TestWebSocket).closed).toEqual({ code: 4409, reason: "Work map authority changed" });
+    expect(bus.published.some(({ channel }) => channel === "work-map:control")).toBe(false);
     await relay.destroy();
     vi.useRealTimers();
+  });
+
+  it("force closes one Work Map across instances without closing another map", async () => {
+    const bus = new TestRedisBus();
+    const authorize = vi.fn(async (_workspace: string, _project: string, workMapId: string) =>
+      authorization({ work_map_id: workMapId })
+    );
+    const firstRelay = await initializeRelay(bus, authorize);
+    const secondRelay = await initializeRelay(bus, authorize);
+    const firstSocket = websocket();
+    const secondSocket = websocket();
+    const otherMapSocket = websocket();
+    void firstRelay.handleConnection(firstSocket, request());
+    void secondRelay.handleConnection(secondSocket, request());
+    void secondRelay.handleConnection(otherMapSocket, request(OTHER_WORK_MAP_ID));
+    await nextTurn();
+
+    await bus.publish(
+      "work-map:control",
+      JSON.stringify({
+        type: "FORCE_CLOSE",
+        workspaceSlug: "workspace",
+        workMapId: WORK_MAP_ID,
+        reason: "authority_changed",
+      })
+    );
+
+    expect((firstSocket as unknown as TestWebSocket).closed?.code).toBe(4403);
+    expect((secondSocket as unknown as TestWebSocket).closed?.code).toBe(4403);
+    expect((otherMapSocket as unknown as TestWebSocket).closed).toBeNull();
+    (otherMapSocket as unknown as TestWebSocket).close(1000, "Test complete");
+    await Promise.all([firstRelay.destroy(), secondRelay.destroy()]);
+  });
+
+  it("fails closed when the Redis subscription is lost", async () => {
+    const bus = new TestRedisBus();
+    const relay = await initializeRelay(bus, async () => authorization());
+    const socket = websocket();
+    void relay.handleConnection(socket, request());
+    await nextTurn();
+
+    bus.disconnectSubscribers();
+
+    expect((socket as unknown as TestWebSocket).closed?.code).toBe(1011);
+    await relay.destroy();
   });
 
   it("forwards validated frames across instances without self-echo or cross-room leakage", async () => {
