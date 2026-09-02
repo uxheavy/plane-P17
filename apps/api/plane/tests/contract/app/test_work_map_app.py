@@ -30,6 +30,7 @@ from plane.bgtasks.deletion_task import hard_delete
 from plane.bgtasks.page_version_task import track_page_version
 from plane.bgtasks.work_map_asset_task import cleanup_deleted_work_map_assets, cleanup_stale_work_map_asset_copies
 from plane.bgtasks.work_map_binding_task import expire_stale_work_map_binding_placements
+from plane.app.work_map_relay import WorkMapRelayCloseReason, force_close_work_map_relay_on_commit
 from plane.db.models import (
     Cycle,
     DeployBoard,
@@ -135,6 +136,60 @@ def _source_records(workspace, project, user):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestWorkMapApp:
+    def test_relay_force_close_publishes_only_after_commit(self, django_capture_on_commit_callbacks):
+        redis_client = Mock()
+        redis_factory = Mock(return_value=redis_client)
+        work_map_id = uuid.UUID("22222222-2222-4222-8222-222222222222")
+        with (
+            patch("plane.app.work_map_relay.redis_instance", redis_factory),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            force_close_work_map_relay_on_commit(
+                "workspace",
+                str(work_map_id),
+                WorkMapRelayCloseReason.GENERATION_CHANGED,
+            )
+            redis_client.publish.assert_not_called()
+
+        redis_factory.assert_called_once_with(socket_connect_timeout=1, socket_timeout=1)
+        redis_client.publish.assert_called_once_with(
+            "work-map:control",
+            f'{{"type":"FORCE_CLOSE","workspaceSlug":"workspace","workMapId":"{work_map_id}",'
+            '"reason":"generation_changed"}',
+        )
+
+    def test_lifecycle_mutations_schedule_relay_force_close(self, session_client, workspace, create_user):
+        project, _ = _project(workspace, create_user, "RST")
+        other_project, _ = _project(workspace, create_user, "ALT")
+        work_map = _create_work_map(session_client, workspace, project)
+        DocumentProject.objects.create(
+            document_id=work_map["id"],
+            project=other_project,
+            workspace=workspace,
+        )
+        work_map_url = _work_maps_url(workspace, project, work_map["id"])
+        lock_url = f"{work_map_url}lock/"
+        archive_url = f"{work_map_url}archive/"
+
+        with patch("plane.app.views.work_map.base.force_close_work_map_relay_on_commit") as force_close:
+            assert (
+                session_client.patch(work_map_url, {"access": Document.PRIVATE_ACCESS}, format="json").status_code
+                == 200
+            )
+            assert session_client.post(lock_url).status_code == status.HTTP_204_NO_CONTENT
+            assert session_client.delete(lock_url).status_code == status.HTTP_204_NO_CONTENT
+            assert session_client.post(archive_url).status_code == status.HTTP_200_OK
+            assert session_client.delete(archive_url).status_code == status.HTTP_204_NO_CONTENT
+            assert session_client.delete(work_map_url).status_code == status.HTTP_204_NO_CONTENT
+
+        assert force_close.call_count == 6
+        for invocation in force_close.call_args_list:
+            assert invocation.args == (
+                workspace.slug,
+                work_map["id"],
+                WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+            )
+
     def test_work_map_cleanup_task_is_registered(self):
         assert "plane.bgtasks.work_map_asset_task" in settings.CELERY_IMPORTS
         assert "plane.bgtasks.work_map_binding_task" in settings.CELERY_IMPORTS
@@ -557,7 +612,7 @@ class TestWorkMapApp:
         assert session_client.delete(second_url).status_code == status.HTTP_409_CONFLICT
         assert session_client.post(f"{second_url}archive/").status_code == status.HTTP_200_OK
         with (
-            patch("plane.app.views.work_map.base.transaction.on_commit", side_effect=lambda callback: callback()),
+            patch("plane.app.views.work_map.base.transaction.on_commit", side_effect=lambda callback, **_: callback()),
             patch("plane.bgtasks.work_map_asset_task.cleanup_deleted_work_map_assets.delay") as schedule_cleanup,
         ):
             assert session_client.delete(second_url).status_code == status.HTTP_204_NO_CONTENT
@@ -1517,7 +1572,13 @@ class TestWorkMapApp:
         assert bytes(WorkMap.objects.get(pk=work_map["id"]).scene_binary) == second_scene
         assert WorkMapBinding.objects.filter(work_map_id=work_map["id"]).count() == 2
 
-        restored = session_client.post(restore_url, {"generation": 2}, format="json")
+        with patch("plane.app.views.work_map.version.force_close_work_map_relay_on_commit") as force_close:
+            restored = session_client.post(restore_url, {"generation": 2}, format="json")
+        force_close.assert_called_once_with(
+            workspace.slug,
+            work_map["id"],
+            WorkMapRelayCloseReason.GENERATION_CHANGED,
+        )
         current = WorkMap.objects.get(pk=work_map["id"])
         current_binding = current.bindings.get()
         assert restored.status_code == status.HTTP_200_OK

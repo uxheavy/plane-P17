@@ -13,6 +13,7 @@ from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.document import visible_documents
+from plane.app.work_map_relay import WorkMapRelayCloseReason, force_close_work_map_relay_on_commit
 from plane.app.serializers import (
     WorkMapCreateSerializer,
     WorkMapUpdateSerializer,
@@ -176,10 +177,22 @@ class WorkMapViewSet(BaseViewSet):
                 return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
             if "access" in serializer.validated_data and document.owned_by_id != request.user.id:
                 return Response({"error": "Only the owner can change access"}, status=status.HTTP_403_FORBIDDEN)
+            access_changed = (
+                "access" in serializer.validated_data and serializer.validated_data["access"] != document.access
+            )
             for field, value in serializer.validated_data.items():
                 setattr(document, field, value)
             document.updated_by = request.user
             document.save(update_fields=[*serializer.validated_data.keys(), "updated_by", "updated_at"])
+            if access_changed:
+                work_map = WorkMap.objects.select_for_update().get(pk=document.id)
+                work_map.collaboration_epoch += 1
+                work_map.save(update_fields=["collaboration_epoch"])
+                force_close_work_map_relay_on_commit(
+                    slug,
+                    str(work_map.pk),
+                    WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+                )
         return Response(serialize_work_map(document), status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
@@ -209,6 +222,11 @@ class WorkMapViewSet(BaseViewSet):
             document.save(update_fields=["is_locked", "updated_by", "updated_at"])
             work_map.collaboration_epoch += 1
             work_map.save(update_fields=["collaboration_epoch"])
+            force_close_work_map_relay_on_commit(
+                slug,
+                str(work_map.pk),
+                WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
@@ -231,6 +249,11 @@ class WorkMapViewSet(BaseViewSet):
                 document.save(update_fields=["archived_at", "updated_by", "updated_at"])
                 work_map.collaboration_epoch += 1
                 work_map.save(update_fields=["collaboration_epoch"])
+                force_close_work_map_relay_on_commit(
+                    slug,
+                    str(work_map.pk),
+                    WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+                )
             UserFavorite.objects.filter(
                 entity_type="work_map",
                 entity_identifier=work_map_id,
@@ -257,6 +280,11 @@ class WorkMapViewSet(BaseViewSet):
             document.save(update_fields=["archived_at", "updated_by", "updated_at"])
             work_map.collaboration_epoch += 1
             work_map.save(update_fields=["collaboration_epoch"])
+            force_close_work_map_relay_on_commit(
+                slug,
+                str(work_map.pk),
+                WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
@@ -305,6 +333,11 @@ class WorkMapViewSet(BaseViewSet):
             link.delete()
             work_map.collaboration_epoch += 1
             work_map.save(update_fields=["collaboration_epoch"])
+            force_close_work_map_relay_on_commit(
+                slug,
+                str(work_map.pk),
+                WorkMapRelayCloseReason.AUTHORITY_CHANGED,
+            )
             if len(active_link_ids) == 1:
                 from plane.bgtasks.work_map_asset_task import cleanup_deleted_work_map_assets
 
