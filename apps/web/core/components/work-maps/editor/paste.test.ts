@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClipboardData } from "@excalidraw/excalidraw/clipboard";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { allowPaste } from "./paste";
+import { allowPaste, rebindProtectedPaste } from "./paste";
 
 const carrier = (nodeKey: string) =>
   ({
@@ -37,5 +37,20 @@ describe("Work Map protected paste", () => {
   it("fails closed when protected carriers need cross-map key replacement", () => {
     const data: ClipboardData = { elements: [carrier("d0f238c8-1c14-4f6c-a695-70d087bb8db0")] };
     expect(allowPaste(data, [])).toBe(false);
+  });
+
+  it("rebinds protected carriers and removes source-only embed state", async () => {
+    const sourceKey = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    const targetKey = "f0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    const element = {
+      ...carrier(sourceKey),
+      customData: { nodeKey: sourceKey, enabledOrigin: "https://source.example" },
+    } as ExcalidrawElement;
+    const result = await rebindProtectedPaste({ elements: [element] }, [], async (nodeKeys) => ({
+      [nodeKeys[0] as string]: targetKey,
+    }));
+    if (!result || result === false || !result.elements) throw new Error("Expected rebound paste data");
+    expect(result.elements[0]?.customData).toEqual({ nodeKey: targetKey });
+    expect(result.elements[0]?.link).toBe(`https://work-map.invalid/nodes/${targetKey}`);
   });
 });

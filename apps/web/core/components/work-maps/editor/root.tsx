@@ -12,11 +12,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { CaptureUpdateAction, Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
-import type { ExcalidrawEmbeddableElement, OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import type {
+  ExcalidrawElement,
+  ExcalidrawEmbeddableElement,
+  OrderedExcalidrawElement,
+} from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { PointerDownState } from "@excalidraw/excalidraw/types";
 // oxlint-disable-next-line import/no-unassigned-import -- Excalidraw owns its editor styles.
 import "@excalidraw/excalidraw/index.css";
-import type { TWorkMap, TWorkMapSource } from "@plane/types";
+import type { TWorkMap, TWorkMapSource, TWorkMapSourceKind } from "@plane/types";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { useWorkMap } from "@/hooks/store/use-work-map";
 import { useUser } from "@/hooks/store/user";
@@ -25,7 +30,7 @@ import { WorkMapSourceNode } from "../source-node";
 import { WorkMapSourcePicker } from "../source-picker";
 import { RecoveryPanel } from "./recovery-panel";
 import { PendingScenePanel } from "./pending-scene-panel";
-import { allowPaste } from "./paste";
+import { rebindProtectedPaste } from "./paste";
 import { createNodeCarrierLink, getNodeKey } from "./scene";
 import { getSourcePath } from "./source-navigation";
 import { getCurrentInvalidatedNodeKeys } from "./source-invalidation";
@@ -33,7 +38,9 @@ import { useCollaboration } from "./use-collaboration";
 import { isEmbeddableLinkAllowed } from "./embeddable-load";
 import { useEmbeddableLoading } from "./use-embeddable-loading";
 import { usePersistence } from "./use-persistence";
+import type { TRecoveryState } from "./use-persistence";
 import { useScene } from "./use-scene";
+import { WorkMapToolbar, useWorkMapToolShortcuts } from "./toolbar";
 
 const service = new WorkMapService();
 
@@ -44,16 +51,32 @@ type Props = {
 };
 
 export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
+  const { data: currentUser } = useUser();
+  return (
+    <WorkMapEditorContent
+      key={`${workspaceSlug}:${projectId}:${workMap.id}:${currentUser?.id ?? "anonymous"}`}
+      workspaceSlug={workspaceSlug}
+      projectId={projectId}
+      workMap={workMap}
+      userId={currentUser?.id ?? ""}
+    />
+  );
+}
+
+type EditorContentProps = Props & { userId: string };
+
+function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: EditorContentProps) {
   const router = useAppRouter();
   const store = useWorkMap();
-  const { data: currentUser } = useUser();
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSourceKind, setPickerSourceKind] = useState<TWorkMapSourceKind | null>(null);
+  const [pendingSource, setPendingSource] = useState<TWorkMapSource | null>(null);
   const [pendingScene, setPendingScene] = useState<{
     elements: readonly OrderedExcalidrawElement[];
     files: BinaryFiles;
   } | null>(null);
   const changeSequenceRef = useRef(0);
+  const placingSourceRef = useRef(false);
   const context = useMemo(
     () => ({ workspaceSlug, projectId, workMapId: workMap.id }),
     [projectId, workMap.id, workspaceSlug]
@@ -75,7 +98,9 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     applyStoredScene,
   } = scene;
   const nodeKeysRef = useRef(nodeKeys);
-  nodeKeysRef.current = nodeKeys;
+  useEffect(() => {
+    nodeKeysRef.current = nodeKeys;
+  }, [nodeKeys]);
   const persistenceSceneOwners = useMemo(
     () => ({
       generationRef,
@@ -86,7 +111,7 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     }),
     [api, applyAuthoritativeScene, applyStoredScene, durableSceneRef, generationRef]
   );
-  const persistence = usePersistence({ ...context, userId: currentUser?.id ?? "" }, persistenceSceneOwners);
+  const persistence = usePersistence({ ...context, userId }, persistenceSceneOwners);
   const { persistenceFailed, recoveryRecord, recoveryState, queue, evaluateRecovery, retryRecovery, discardRecovery } =
     persistence;
   const resynchronize = useCallback(async () => {
@@ -132,7 +157,7 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     [evaluateRecovery, workMap.archived_at, workMap.is_locked]
   );
   const collaboration = useCollaboration(
-    !!api && !!initialData && !!currentUser?.id,
+    !!api && !!initialData && !!userId,
     context,
     collaborationSceneOwners,
     onAuthorized,
@@ -154,15 +179,40 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
   const editable = authorizedEditable && !persistenceFailed && !pendingScene;
   const { shouldLoadEmbeddable, onEmbeddableLoadRequest } = useEmbeddableLoading(api, editable);
 
+  const selectSourceKind = useCallback(
+    (sourceKind: TWorkMapSourceKind) => {
+      api?.setActiveTool({ type: "selection" });
+      setPendingSource(null);
+      setPickerSourceKind(sourceKind);
+    },
+    [api]
+  );
+  const closeSourcePicker = useCallback(() => setPickerSourceKind(null), []);
+  const cancelSourceTool = useCallback(() => {
+    setPickerSourceKind(null);
+    setPendingSource(null);
+    api?.setActiveTool({ type: "selection" });
+  }, [api]);
+  useWorkMapToolShortcuts(api, editable, !!pickerSourceKind || !!pendingSource, selectSourceKind, cancelSourceTool);
+
   const onPaste = useCallback(
     async (data: Parameters<NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>>[0]) => {
       try {
-        return allowPaste(data, api?.getSceneElementsIncludingDeleted() ?? []);
+        return rebindProtectedPaste(data, api?.getSceneElementsIncludingDeleted() ?? [], async (sourceNodeKeys) => {
+          const result = await service.rebindPaste(
+            workspaceSlug,
+            projectId,
+            workMap.id,
+            generationRef.current,
+            sourceNodeKeys
+          );
+          return result.node_keys;
+        });
       } catch {
         return false;
       }
     },
-    [api]
+    [api, generationRef, projectId, workMap.id, workspaceSlug]
   );
 
   useEffect(() => {
@@ -252,13 +302,21 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     [openSource]
   );
 
-  const addSource = useCallback(
-    async (source: TWorkMapSource) => {
-      if (!api || !editable) return;
+  const placeSource = useCallback(
+    async (source: TWorkMapSource, origin: PointerDownState["origin"]) => {
+      if (!api || !editable || placingSourceRef.current) return;
+      placingSourceRef.current = true;
       try {
         const binding = await service.bindSource(workspaceSlug, projectId, workMap.id, source);
         const [base] = convertToExcalidrawElements([
-          { type: "rectangle", x: 120, y: 120, width: 288, height: 132, backgroundColor: "transparent" },
+          {
+            type: "rectangle",
+            x: origin.x - 144,
+            y: origin.y - 66,
+            width: 288,
+            height: 132,
+            backgroundColor: "transparent",
+          },
         ]);
         const carrier = {
           ...base,
@@ -270,13 +328,34 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
           elements: [...api.getSceneElements(), carrier],
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         });
-        setPickerOpen(false);
+        setPendingSource(null);
+        api.setActiveTool({ type: "selection" });
         await hydrate([binding.node_key]);
       } catch {
         // Binding creation is authoritative; a failed request must not insert an unbound carrier.
+      } finally {
+        placingSourceRef.current = false;
       }
     },
     [api, editable, hydrate, projectId, workMap.id, workspaceSlug]
+  );
+
+  const beginSourcePlacement = useCallback(
+    (source: TWorkMapSource) => {
+      if (!api || !editable) return;
+      setPickerSourceKind(null);
+      setPendingSource(source);
+      api.setActiveTool({ type: "custom", customType: "work-map-source" });
+    },
+    [api, editable]
+  );
+
+  const onPointerDown = useCallback(
+    (activeTool: AppState["activeTool"], pointerDownState: PointerDownState) => {
+      if (activeTool.type !== "custom" || activeTool.customType !== "work-map-source" || !pendingSource) return;
+      void placeSource(pendingSource, pointerDownState.origin);
+    },
+    [pendingSource, placeSource]
   );
 
   const initialScene = useMemo(() => (initialData ? Promise.resolve(initialData) : undefined), [initialData]);
@@ -291,13 +370,126 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
 
   if (initialLoadFailed)
     return (
-      <div className="grid size-full place-items-center text-13 text-danger-primary">
-        Work Map could not load. Check your connection and retry.
+      <div className="grid size-full place-items-center gap-2 text-13 text-danger-primary">
+        <p>Work Map could not load. Check your connection and retry.</p>
+        <button type="button" className="rounded border border-subtle px-3 py-1.5" onClick={scene.retryInitialLoad}>
+          Retry
+        </button>
       </div>
     );
   if (!initialScene)
     return <div className="grid size-full place-items-center text-13 text-secondary">Loading Work Map…</div>;
 
+  return (
+    <WorkMapEditorSurface
+      workspaceSlug={workspaceSlug}
+      projectId={projectId}
+      workMapId={workMap.id}
+      initialScene={initialScene}
+      editable={editable}
+      connectionState={connectionState}
+      connectionDataState={connectionDataState}
+      pickerSourceKind={pickerSourceKind}
+      activeSourceKind={pickerSourceKind ?? pendingSource?.source_kind ?? null}
+      recoveryRecord={recoveryRecord}
+      recoveryState={recoveryState}
+      pendingScene={!!pendingScene}
+      elementCount={elementCount}
+      liveNodeCount={liveNodeCount}
+      collaboratorCount={collaboratorCount}
+      collaboratorIds={collaboratorIds}
+      pointerSenderIds={pointerSenderIds}
+      selectionSenderIds={selectionSenderIds}
+      onSelectSourceKind={selectSourceKind}
+      onRetryRecovery={() => void retryRecovery(authorizedEditable)}
+      onDiscardRecovery={discardRecovery}
+      onRetryPending={() => void retryPendingScene()}
+      onDiscardPending={() => void discardPendingScene()}
+      onSelectSource={beginSourcePlacement}
+      onClosePicker={closeSourcePicker}
+      onExcalidrawAPI={setApi}
+      onChange={onChange}
+      onPointerUpdate={onPointerUpdate}
+      onPointerDown={onPointerDown}
+      onPaste={onPaste}
+      renderEmbeddable={renderEmbeddable}
+      shouldLoadEmbeddable={shouldLoadEmbeddable}
+      onEmbeddableLoadRequest={onEmbeddableLoadRequest}
+    />
+  );
+}
+
+type EditorSurfaceProps = {
+  workspaceSlug: string;
+  projectId: string;
+  workMapId: string;
+  initialScene: Promise<{ elements: readonly ExcalidrawElement[]; files: BinaryFiles }>;
+  editable: boolean;
+  connectionState: string;
+  connectionDataState: string;
+  pickerSourceKind: TWorkMapSourceKind | null;
+  activeSourceKind: TWorkMapSourceKind | null;
+  recoveryRecord: unknown;
+  recoveryState: TRecoveryState | null;
+  pendingScene: boolean;
+  elementCount: number;
+  liveNodeCount: number;
+  collaboratorCount: number;
+  collaboratorIds: string;
+  pointerSenderIds: string;
+  selectionSenderIds: string;
+  onSelectSourceKind: (sourceKind: TWorkMapSourceKind) => void;
+  onRetryRecovery: () => void;
+  onDiscardRecovery: () => void;
+  onRetryPending: () => void;
+  onDiscardPending: () => void;
+  onSelectSource: (source: TWorkMapSource) => void;
+  onClosePicker: () => void;
+  onExcalidrawAPI: (api: ExcalidrawImperativeAPI) => void;
+  onChange: NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
+  onPointerUpdate: NonNullable<ComponentProps<typeof Excalidraw>["onPointerUpdate"]>;
+  onPointerDown: NonNullable<ComponentProps<typeof Excalidraw>["onPointerDown"]>;
+  onPaste: NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>;
+  renderEmbeddable: NonNullable<ComponentProps<typeof Excalidraw>["renderEmbeddable"]>;
+  shouldLoadEmbeddable: NonNullable<ComponentProps<typeof Excalidraw>["shouldLoadEmbeddable"]>;
+  onEmbeddableLoadRequest: NonNullable<ComponentProps<typeof Excalidraw>["onEmbeddableLoadRequest"]>;
+};
+
+function WorkMapEditorSurface({
+  workspaceSlug,
+  projectId,
+  workMapId,
+  initialScene,
+  editable,
+  connectionState,
+  connectionDataState,
+  pickerSourceKind,
+  activeSourceKind,
+  recoveryRecord,
+  recoveryState,
+  pendingScene,
+  elementCount,
+  liveNodeCount,
+  collaboratorCount,
+  collaboratorIds,
+  pointerSenderIds,
+  selectionSenderIds,
+  onSelectSourceKind,
+  onRetryRecovery,
+  onDiscardRecovery,
+  onRetryPending,
+  onDiscardPending,
+  onSelectSource,
+  onClosePicker,
+  onExcalidrawAPI,
+  onChange,
+  onPointerUpdate,
+  onPointerDown,
+  onPaste,
+  renderEmbeddable,
+  shouldLoadEmbeddable,
+  onEmbeddableLoadRequest,
+}: EditorSurfaceProps) {
   return (
     <div
       data-testid="work-map-canvas"
@@ -305,41 +497,9 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
       data-live-node-count={liveNodeCount}
       className="relative size-full overflow-hidden bg-surface-1"
     >
-      <div className="absolute top-3 left-3 z-10 flex gap-2">
-        <button
-          type="button"
-          data-testid="work-map-add-source"
-          disabled={!editable}
-          className="rounded-md bg-accent-primary px-3 py-2 text-12 font-medium text-on-color disabled:opacity-50"
-          onClick={() => setPickerOpen((open) => !open)}
-        >
-          Add Plane source
-        </button>
-        <button
-          type="button"
-          data-testid="work-map-add-embed"
-          disabled={!editable}
-          className="rounded-md border border-subtle bg-surface-1 px-3 py-2 text-12 font-medium disabled:opacity-50"
-          onClick={() => api?.setActiveTool({ type: "embeddable" })}
-        >
-          Add URL embed
-        </button>
-        <span
-          data-testid="work-map-connection-state"
-          data-state={connectionDataState}
-          className="rounded-md bg-surface-1 px-3 py-2 text-12 text-secondary"
-        >
-          {connectionDataState.replace("-", " ")}
-        </span>
-        {connectionDataState === "read-only" && (
-          <span
-            data-testid="work-map-read-only"
-            className="rounded-md bg-warning-subtle px-3 py-2 text-12 text-warning-primary"
-          >
-            Read only
-          </span>
-        )}
-      </div>
+      <span data-testid="work-map-connection-state" data-state={connectionDataState} className="sr-only">
+        {connectionDataState.replace("-", " ")}
+      </span>
       <span
         data-testid="work-map-collaboration"
         data-state={collaboratorCount > 0 ? "active" : "empty"}
@@ -350,30 +510,27 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
         className="sr-only"
       />
       {recoveryRecord && recoveryState && (
-        <RecoveryPanel
-          state={recoveryState}
-          onRetry={() => void retryRecovery(authorizedEditable)}
-          onDiscard={discardRecovery}
-        />
+        <RecoveryPanel state={recoveryState} onRetry={onRetryRecovery} onDiscard={onDiscardRecovery} />
       )}
-      {pendingScene && (
-        <PendingScenePanel onRetry={() => void retryPendingScene()} onDiscard={() => void discardPendingScene()} />
-      )}
-      {pickerOpen && (
+      {pendingScene && <PendingScenePanel onRetry={onRetryPending} onDiscard={onDiscardPending} />}
+      {pickerSourceKind && (
         <WorkMapSourcePicker
+          key={pickerSourceKind}
           workspaceSlug={workspaceSlug}
           projectId={projectId}
-          workMapId={workMap.id}
-          onSelect={(source) => void addSource(source)}
-          onClose={() => setPickerOpen(false)}
+          workMapId={workMapId}
+          initialSourceKind={pickerSourceKind}
+          onSelect={onSelectSource}
+          onClose={onClosePicker}
         />
       )}
       <div data-testid="work-map-embed" className="size-full">
         <Excalidraw
-          onExcalidrawAPI={setApi}
+          onExcalidrawAPI={onExcalidrawAPI}
           initialData={initialScene}
           onChange={onChange}
           onPointerUpdate={onPointerUpdate}
+          onPointerDown={onPointerDown}
           onPaste={onPaste}
           isCollaborating={connectionState === "connected"}
           renderEmbeddable={renderEmbeddable}
@@ -381,6 +538,9 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
           onEmbeddableLoadRequest={onEmbeddableLoadRequest}
           validateEmbeddable={isEmbeddableLinkAllowed}
           viewModeEnabled={!editable}
+          renderToolbarUI={() => (
+            <WorkMapToolbar editable={editable} sourceKind={activeSourceKind} onSelectSourceKind={onSelectSourceKind} />
+          )}
           UIOptions={{ canvasActions: { export: false, loadScene: false, saveToActiveFile: false } }}
         />
       </div>

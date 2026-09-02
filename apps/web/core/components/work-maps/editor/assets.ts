@@ -68,7 +68,10 @@ export const uploadFile = async (
   file: BinaryFileData
 ): Promise<TWorkMapFile> => {
   if (!isWorkMapImageMimeType(file.mimeType)) throw new Error("Unsupported Work Map image type");
-  const blob = await fetch(file.dataURL).then((response) => response.blob());
+  const blob = await fetch(file.dataURL).then((response) => {
+    if (!response.ok) throw new Error("Unable to read Work Map image");
+    return response.blob();
+  });
   const upload = new File([blob], `${fileId}.${extensionByMimeType[file.mimeType]}`, {
     type: file.mimeType,
   });

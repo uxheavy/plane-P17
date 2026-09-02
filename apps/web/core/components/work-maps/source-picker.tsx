@@ -13,27 +13,40 @@ import { useEffect, useState } from "react";
 import type { TWorkMapSource, TWorkMapSourceKind } from "@plane/types";
 import { WorkMapService } from "@/services/work-map.service";
 
-const sourceKinds: TWorkMapSourceKind[] = ["work-item", "cycle", "module", "project-view", "page", "intake-item"];
+export const WORK_MAP_SOURCE_KINDS: TWorkMapSourceKind[] = [
+  "work-item",
+  "cycle",
+  "module",
+  "project-view",
+  "page",
+  "intake-item",
+];
+
 const service = new WorkMapService();
 
 type Props = {
   workspaceSlug: string;
   projectId: string;
   workMapId: string;
+  initialSourceKind: TWorkMapSourceKind;
   onSelect: (source: TWorkMapSource) => void;
   onClose: () => void;
 };
 
-export function WorkMapSourcePicker({ workspaceSlug, projectId, workMapId, onSelect, onClose }: Props) {
-  const [sourceKind, setSourceKind] = useState<TWorkMapSourceKind>("work-item");
+export function WorkMapSourcePicker({
+  workspaceSlug,
+  projectId,
+  workMapId,
+  initialSourceKind,
+  onSelect,
+  onClose,
+}: Props) {
+  const [sourceKind, setSourceKind] = useState<TWorkMapSourceKind>(initialSourceKind);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TWorkMapSource[]>([]);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!query.trim()) return;
     let cancelled = false;
     const timeout = window.setTimeout(() => {
       service
@@ -53,7 +66,7 @@ export function WorkMapSourcePicker({ workspaceSlug, projectId, workMapId, onSel
   }, [workspaceSlug, projectId, workMapId, sourceKind, query]);
 
   return (
-    <div className="absolute top-14 left-3 z-20 w-80 rounded-lg border border-subtle bg-surface-1 p-3 shadow-raised-200">
+    <div className="absolute top-16 left-1/2 z-20 w-80 -translate-x-1/2 rounded-lg border border-subtle bg-surface-1 p-3 shadow-raised-200">
       <div className="flex gap-2">
         <select
           aria-label="Source type"
@@ -61,18 +74,26 @@ export function WorkMapSourcePicker({ workspaceSlug, projectId, workMapId, onSel
           value={sourceKind}
           onChange={(event) => setSourceKind(event.target.value as TWorkMapSourceKind)}
         >
-          {sourceKinds.map((kind) => (
+          {WORK_MAP_SOURCE_KINDS.map((kind) => (
             <option key={kind} value={kind}>
               {kind.replace("-", " ")}
             </option>
           ))}
         </select>
+        <label htmlFor="work-map-source-search" className="sr-only">
+          Search accessible sources
+        </label>
         <input
+          id="work-map-source-search"
           data-testid="work-map-source-search"
           className="min-w-0 flex-1 rounded border border-subtle bg-surface-2 px-2 py-1.5 text-13"
           placeholder="Search accessible sources"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
+            if (!nextQuery.trim()) setResults([]);
+          }}
         />
         <button type="button" className="text-12 text-secondary" onClick={onClose}>
           Close
