@@ -40,3 +40,16 @@ class WorkMapBindingCreateSerializer(serializers.Serializer):
     node_key = serializers.UUIDField(required=False, default=uuid.uuid4)
     source_kind = serializers.ChoiceField(choices=WorkMapBinding.SourceKind.values)
     source_id = serializers.UUIDField()
+
+
+class WorkMapSourceDiscoverySerializer(serializers.Serializer):
+    source_kind = serializers.ChoiceField(choices=WorkMapBinding.SourceKind.values)
+    query = serializers.CharField(required=False, allow_blank=True, max_length=255, default="")
+
+
+class WorkMapBindingHydrationSerializer(serializers.Serializer):
+    node_keys = serializers.ListField(child=serializers.UUIDField(), allow_empty=True, max_length=100)
+
+
+class WorkMapBindingOpenSerializer(serializers.Serializer):
+    node_key = serializers.UUIDField()

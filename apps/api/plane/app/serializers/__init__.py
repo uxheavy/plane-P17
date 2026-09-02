@@ -106,8 +106,11 @@ from .page import (
 )
 from .work_map import (
     WorkMapBindingCreateSerializer,
+    WorkMapBindingHydrationSerializer,
+    WorkMapBindingOpenSerializer,
     WorkMapCreateSerializer,
     WorkMapSceneSerializer,
+    WorkMapSourceDiscoverySerializer,
     WorkMapUpdateSerializer,
 )
 
