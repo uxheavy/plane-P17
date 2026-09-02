@@ -6,9 +6,30 @@
 
 import { describe, expect, it } from "vitest";
 import type { SocketId } from "@excalidraw/excalidraw/types";
-import { expireCollaborators, parseAwarenessFrame, type TCollaboratorLease } from "./awareness";
+import {
+  createPointerUpdateFrame,
+  expireCollaborators,
+  parseAwarenessFrame,
+  type TCollaboratorLease,
+} from "./awareness";
 
 describe("Work Map awareness boundary", () => {
+  it("projects only relay-owned pointer fields from the native payload", () => {
+    const nativeUpdate = {
+      pointer: { x: 10, y: 20, tool: "pointer" as const },
+      button: "up" as const,
+      pointersMap: new Map(),
+    };
+    expect(createPointerUpdateFrame(nativeUpdate, { element: true })).toEqual({
+      type: "POINTER_UPDATE",
+      payload: {
+        pointer: nativeUpdate.pointer,
+        button: "up",
+        selectedElementIds: { element: true },
+      },
+    });
+  });
+
   it("accepts the closed native pointer projection", () => {
     const frame = parseAwarenessFrame({
       type: "POINTER_UPDATE",

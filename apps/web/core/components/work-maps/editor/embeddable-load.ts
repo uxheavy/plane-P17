@@ -5,6 +5,9 @@
  */
 
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
+import { getNodeKey, isAllowedEmbedUrl, isNodeCarrierLink } from "./scene";
+
+export const isEmbeddableLinkAllowed = (link: string): boolean => isNodeCarrierLink(link) || isAllowedEmbedUrl(link);
 
 export const getEmbeddableOrigin = (element: Pick<ExcalidrawEmbeddableElement, "link">): string | null => {
   if (!element.link) return null;
@@ -39,4 +42,14 @@ export const getViewerEmbeddableKey = (
   if (typeof element.customData?.nodeKey === "string") return null;
   const origin = getEmbeddableOrigin(element);
   return origin ? `${element.id}:${origin}` : null;
+};
+
+export const shouldLoadEmbeddableContent = (
+  element: ExcalidrawEmbeddableElement,
+  viewerEnablement: ReadonlySet<string>
+): boolean => {
+  if (getNodeKey(element)) return true;
+  if (isDocumentEmbeddableEnabled(element)) return true;
+  const viewerKey = getViewerEmbeddableKey(element);
+  return !!viewerKey && viewerEnablement.has(viewerKey);
 };

@@ -8,7 +8,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CaptureUpdateAction, UserIdleState } from "@excalidraw/excalidraw";
 import type { Collaborator, ExcalidrawImperativeAPI, SocketId } from "@excalidraw/excalidraw/types";
 import { throttle } from "lodash-es";
-import { expireCollaborators, type TAwarenessFrame, type TCollaboratorLease } from "./awareness";
+import {
+  createPointerUpdateFrame,
+  expireCollaborators,
+  type TAwarenessFrame,
+  type TCollaboratorLease,
+} from "./awareness";
 
 const POINTER_INTERVAL = 33;
 const PRESENCE_INTERVAL = 10_000;
@@ -108,7 +113,7 @@ export const useAwareness = (
           const selectedElementIds = Object.fromEntries(
             Object.entries(api?.getAppState().selectedElementIds ?? {}).filter(([, selected]) => selected)
           ) as Record<string, true>;
-          sendFrame({ type: "POINTER_UPDATE", payload: { ...payload, selectedElementIds } });
+          sendFrame(createPointerUpdateFrame(payload, selectedElementIds));
         },
         POINTER_INTERVAL,
         { leading: true, trailing: true }

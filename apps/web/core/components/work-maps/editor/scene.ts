@@ -13,6 +13,7 @@ export type TStoredScene = {
 };
 
 const NODE_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const NODE_CARRIER_URL_PREFIX = "https://work-map.invalid/nodes/";
 const ASSET_ID_PATTERN = NODE_KEY_PATTERN;
 const IMAGE_MIME_TYPES = new Set<TWorkMapFile["mimeType"]>([
   "image/svg+xml",
@@ -31,6 +32,16 @@ export const getNodeKey = (element: Pick<ExcalidrawElement, "type" | "customData
   return typeof nodeKey === "string" && NODE_KEY_PATTERN.test(nodeKey) ? nodeKey : undefined;
 };
 
+export const createNodeCarrierLink = (nodeKey: string): string => {
+  if (!NODE_KEY_PATTERN.test(nodeKey)) throw new Error("Invalid Work Map node key");
+  return `${NODE_CARRIER_URL_PREFIX}${nodeKey}`;
+};
+
+export const isNodeCarrierLink = (link: string): boolean => {
+  if (!link.startsWith(NODE_CARRIER_URL_PREFIX)) return false;
+  return NODE_KEY_PATTERN.test(link.slice(NODE_CARRIER_URL_PREFIX.length));
+};
+
 export const isAllowedEmbedUrl = (link: string): boolean => {
   try {
     const protocol = new URL(link).protocol;
@@ -43,9 +54,7 @@ export const isAllowedEmbedUrl = (link: string): boolean => {
 export const encodeScene = (scene: TStoredScene): string => {
   const elements = scene.elements.map((element) => {
     const nodeKey = getNodeKey(element);
-    return nodeKey
-      ? { ...element, link: `https://work-map.invalid/nodes/${nodeKey}`, customData: { nodeKey } }
-      : element;
+    return nodeKey ? { ...element, link: createNodeCarrierLink(nodeKey), customData: { nodeKey } } : element;
   });
   const files = Object.fromEntries(
     Object.entries(scene.files).map(([fileId, file]) => [

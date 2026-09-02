@@ -6,10 +6,21 @@
 
 import { describe, expect, it } from "vitest";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
-import { enableDocumentEmbeddable, getViewerEmbeddableKey, isDocumentEmbeddableEnabled } from "./embeddable-load";
+import {
+  enableDocumentEmbeddable,
+  getViewerEmbeddableKey,
+  isEmbeddableLinkAllowed,
+  isDocumentEmbeddableEnabled,
+  shouldLoadEmbeddableContent,
+} from "./embeddable-load";
 
 const embeddable = (id: string, link: string, enabledOrigin?: string) =>
-  ({ id, link, customData: enabledOrigin ? { enabledOrigin } : undefined }) as ExcalidrawEmbeddableElement;
+  ({
+    id,
+    type: "embeddable",
+    link,
+    customData: enabledOrigin ? { enabledOrigin } : undefined,
+  }) as ExcalidrawEmbeddableElement;
 
 describe("Work Map embeddable load ownership", () => {
   it("keeps same-origin path changes enabled and resets on origin changes", () => {
@@ -26,12 +37,15 @@ describe("Work Map embeddable load ownership", () => {
   });
 
   it("never treats a protected Plane carrier as a URL embed", () => {
+    const nodeKey = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
     const carrier = {
-      ...embeddable("node", "https://work-map.invalid/nodes/key"),
-      customData: { nodeKey: "key" },
+      ...embeddable("node", `https://work-map.invalid/nodes/${nodeKey}`),
+      customData: { nodeKey },
     };
     expect(isDocumentEmbeddableEnabled(carrier)).toBe(false);
+    expect(isEmbeddableLinkAllowed(carrier.link ?? "")).toBe(true);
     expect(enableDocumentEmbeddable(carrier)).toBe(carrier);
     expect(getViewerEmbeddableKey(carrier)).toBeNull();
+    expect(shouldLoadEmbeddableContent(carrier, new Set())).toBe(true);
   });
 });

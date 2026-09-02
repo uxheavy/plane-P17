@@ -8,6 +8,11 @@ import type { Collaborator, SocketId } from "@excalidraw/excalidraw/types";
 
 export type TCollaboratorLease = { collaborator: Collaborator; lastSeen: number };
 
+type TPointerUpdate = {
+  pointer: { x: number; y: number; tool: "pointer" | "laser" };
+  button: "down" | "up";
+};
+
 export type TAwarenessFrame =
   | {
       type: "POINTER_UPDATE";
@@ -28,6 +33,18 @@ export type TAwarenessFrame =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
+
+export const createPointerUpdateFrame = (
+  update: TPointerUpdate,
+  selectedElementIds: Record<string, true>
+): Pick<TAwarenessFrame, "type" | "payload"> => ({
+  type: "POINTER_UPDATE",
+  payload: {
+    pointer: update.pointer,
+    button: update.button,
+    selectedElementIds,
+  },
+});
 
 export const expireCollaborators = (
   collaborators: Map<SocketId, TCollaboratorLease>,

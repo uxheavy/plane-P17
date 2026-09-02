@@ -8,7 +8,12 @@ import { useCallback, useEffect, useRef } from "react";
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import type { ExcalidrawEmbeddableElement } from "@excalidraw/excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { enableDocumentEmbeddable, getViewerEmbeddableKey, isDocumentEmbeddableEnabled } from "./embeddable-load";
+import {
+  enableDocumentEmbeddable,
+  getViewerEmbeddableKey,
+  isDocumentEmbeddableEnabled,
+  shouldLoadEmbeddableContent,
+} from "./embeddable-load";
 
 export const useEmbeddableLoading = (api: ExcalidrawImperativeAPI | null, editable: boolean) => {
   const viewerEnablementRef = useRef(new Set<string>());
@@ -17,11 +22,10 @@ export const useEmbeddableLoading = (api: ExcalidrawImperativeAPI | null, editab
     if (editable) viewerEnablementRef.current.clear();
   }, [editable]);
 
-  const shouldLoadEmbeddable = useCallback((element: ExcalidrawEmbeddableElement) => {
-    if (isDocumentEmbeddableEnabled(element)) return true;
-    const viewerKey = getViewerEmbeddableKey(element);
-    return !!viewerKey && viewerEnablementRef.current.has(viewerKey);
-  }, []);
+  const shouldLoadEmbeddable = useCallback(
+    (element: ExcalidrawEmbeddableElement) => shouldLoadEmbeddableContent(element, viewerEnablementRef.current),
+    []
+  );
 
   const onEmbeddableLoadRequest = useCallback(
     (element: ExcalidrawEmbeddableElement) => {

@@ -6,13 +6,11 @@
 
 import type { ClipboardData } from "@excalidraw/excalidraw/clipboard";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { getNodeKey } from "./scene";
-
-const INTERNAL_NODE_URL_PREFIX = "https://work-map.invalid/nodes/";
+import { getNodeKey, isNodeCarrierLink } from "./scene";
 
 const isProtectedCarrier = (element: ExcalidrawElement) =>
   element.type === "embeddable" &&
-  (typeof element.customData?.nodeKey === "string" || element.link?.startsWith(INTERNAL_NODE_URL_PREFIX));
+  (typeof element.customData?.nodeKey === "string" || (!!element.link && isNodeCarrierLink(element.link)));
 
 export const allowPaste = (
   data: ClipboardData,

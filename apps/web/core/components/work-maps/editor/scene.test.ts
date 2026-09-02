@@ -7,7 +7,15 @@
 import { describe, expect, it } from "vitest";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { TWorkMapFiles } from "@plane/types";
-import { decodeScene, encodeScene, getNodeKey, isAllowedEmbedUrl, isGenerationConflict } from "./scene";
+import {
+  createNodeCarrierLink,
+  decodeScene,
+  encodeScene,
+  getNodeKey,
+  isAllowedEmbedUrl,
+  isGenerationConflict,
+  isNodeCarrierLink,
+} from "./scene";
 
 describe("Work Map scene boundary", () => {
   it("accepts only web embed URLs", () => {
@@ -15,6 +23,14 @@ describe("Work Map scene boundary", () => {
     expect(isAllowedEmbedUrl("http://127.0.0.1:8080/frame")).toBe(true);
     expect(isAllowedEmbedUrl("javascript:alert(1)")).toBe(false);
     expect(isAllowedEmbedUrl("not a URL")).toBe(false);
+  });
+
+  it("creates and recognizes only closed native carrier links", () => {
+    const nodeKey = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    const link = createNodeCarrierLink(nodeKey);
+    expect(link).toBe(`https://work-map.invalid/nodes/${nodeKey}`);
+    expect(isNodeCarrierLink(link)).toBe(true);
+    expect(isNodeCarrierLink("https://work-map.invalid/nodes/not-a-node-key")).toBe(false);
   });
 
   it("round-trips native scene bytes with only the opaque node key", () => {

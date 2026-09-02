@@ -16,15 +16,16 @@ import { useAppRouter } from "@/hooks/use-app-router";
 import { useWorkMap } from "@/hooks/store/use-work-map";
 import { useUser } from "@/hooks/store/user";
 import { WorkMapService } from "@/services/work-map.service";
-import { WorkMapSourceCard } from "../source-card";
+import { WorkMapSourceNode } from "../source-node";
 import { WorkMapSourcePicker } from "../source-picker";
 import { RecoveryPanel } from "./recovery-panel";
 import { PendingScenePanel } from "./pending-scene-panel";
 import { allowPaste } from "./paste";
-import { getNodeKey, isAllowedEmbedUrl } from "./scene";
+import { createNodeCarrierLink, getNodeKey } from "./scene";
 import { getSourcePath } from "./source-navigation";
 import { getCurrentInvalidatedNodeKeys } from "./source-invalidation";
 import { useCollaboration } from "./use-collaboration";
+import { isEmbeddableLinkAllowed } from "./embeddable-load";
 import { useEmbeddableLoading } from "./use-embeddable-loading";
 import { usePersistence } from "./use-persistence";
 import { useScene } from "./use-scene";
@@ -68,6 +69,8 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     applyRemoteScene,
     applyStoredScene,
   } = scene;
+  const nodeKeysRef = useRef(nodeKeys);
+  nodeKeysRef.current = nodeKeys;
   const persistenceSceneOwners = useMemo(
     () => ({
       generationRef,
@@ -85,10 +88,10 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     const authoritative = await service.fetchScene(workspaceSlug, projectId, workMap.id);
     await applyAuthoritativeScene(authoritative);
   }, [applyAuthoritativeScene, projectId, workMap.id, workspaceSlug]);
-  const failCloseSources = useCallback(() => store.invalidate(nodeKeys), [nodeKeys, store]);
+  const failCloseSources = useCallback(() => store.invalidate(nodeKeysRef.current), [store]);
 
   const hydrate = useCallback(
-    async (keys = nodeKeys) => {
+    async (keys = nodeKeysRef.current) => {
       if (keys.length === 0) return;
       try {
         await store.hydrate(workspaceSlug, projectId, workMap.id, keys.slice(0, 100));
@@ -96,17 +99,17 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
         // Keep skeletons during a transport failure; authorization results still evict immediately.
       }
     },
-    [nodeKeys, projectId, store, workMap.id, workspaceSlug]
+    [projectId, store, workMap.id, workspaceSlug]
   );
 
   const invalidateSources = useCallback(
     async (keys: string[]) => {
-      const affected = getCurrentInvalidatedNodeKeys(nodeKeys, keys);
+      const affected = getCurrentInvalidatedNodeKeys(nodeKeysRef.current, keys);
       if (affected.length === 0) return;
       store.invalidate(affected);
       await hydrate(affected);
     },
-    [hydrate, nodeKeys, store]
+    [hydrate, store]
   );
 
   const collaborationSceneOwners = useMemo(
@@ -239,20 +242,9 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
     (element: ExcalidrawEmbeddableElement) => {
       const nodeKey = getNodeKey(element);
       if (!nodeKey) return null;
-      const projection = store.projections[nodeKey];
-      return (
-        <div
-          data-testid="work-map-node"
-          data-source-kind={
-            projection ? (projection.available ? projection.source.source_kind : "unavailable") : "loading"
-          }
-          className="size-full overflow-hidden rounded-lg"
-        >
-          <WorkMapSourceCard projection={projection} onOpen={() => void openSource(nodeKey)} />
-        </div>
-      );
+      return <WorkMapSourceNode nodeKey={nodeKey} onOpen={() => void openSource(nodeKey)} />;
     },
-    [openSource, store.projections]
+    [openSource]
   );
 
   const addSource = useCallback(
@@ -266,7 +258,7 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
         const carrier = {
           ...base,
           type: "embeddable",
-          link: `https://work-map.invalid/nodes/${binding.node_key}`,
+          link: createNodeCarrierLink(binding.node_key),
           customData: { nodeKey: binding.node_key },
         } as ExcalidrawEmbeddableElement;
         api.updateScene({
@@ -382,7 +374,7 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
           renderEmbeddable={renderEmbeddable}
           shouldLoadEmbeddable={shouldLoadEmbeddable}
           onEmbeddableLoadRequest={onEmbeddableLoadRequest}
-          validateEmbeddable={(link) => link.startsWith("https://work-map.invalid/nodes/") || isAllowedEmbedUrl(link)}
+          validateEmbeddable={isEmbeddableLinkAllowed}
           viewModeEnabled={!editable}
           UIOptions={{ canvasActions: { export: false, loadScene: false, saveToActiveFile: false } }}
         />
