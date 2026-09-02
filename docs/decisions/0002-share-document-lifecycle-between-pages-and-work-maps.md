@@ -94,13 +94,15 @@ are removed and invariants prove one owner.
 The approved final cutover is destructive only after that caller proof and
 rollback window. It removes shared lifecycle columns from `Page`, retires
 `ProjectPage` as the association owner, and removes shared version identity,
-lifecycle, and asset ownership from `PageVersion`. It also removes the legacy
-`FileAsset.page` relationship; retaining its cascading delete would leave Page
-as a second asset-lifecycle owner after the cutover. `Page` and `PageVersion`
-remain as rich-text subtype owners on the same preserved IDs; `Document`,
-Document project associations, Document versions, and `DocumentVersionAsset`
-are their sole shared owners. The contraction is not optional compatibility
-debt and does not create ID translation or a replacement Page route.
+lifecycle, and asset ownership from `PageVersion`. It also removes legacy
+`FileAsset.page` lifecycle ownership: a temporarily retained Page API pointer
+must use `SET_NULL` and is non-authoritative, never cascading. Retaining its
+cascading delete would leave Page as a second asset-lifecycle owner after the
+cutover. `Page` and `PageVersion` remain as rich-text subtype owners on the same
+preserved IDs; `Document`, Document project associations, Document versions, and
+`DocumentVersionAsset` are their sole shared owners. The contraction is not
+optional compatibility debt and does not create ID translation or a replacement
+Page route.
 
 ### Shared lifecycle semantics
 
