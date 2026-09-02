@@ -154,13 +154,20 @@ resets advance the epoch, publish immediate force-close, and periodic
 epoch/authorization checks close a client when that Redis control message is
 deliberately dropped.
 
+Retain a failed snapshot at the current generation, then advance only
+`collaboration_epoch` through lock/unlock or another lifecycle reset. Prove the
+old recovery record is non-replayable even though its generation still matches.
+
 Drop a successful scene PATCH response, then retry its byte-identical body with
 the stale generation and prove the endpoint returns the current generation as
 durable acknowledgement. Prove a genuinely different stale scene still
 conflicts. Drop a deletion frame and prove the periodic full-scene repair still
 carries the deleted element tombstone and removes it from the stale client;
 inspect relay, persistence, and recovery payloads to prove none filters deleted
-elements.
+elements. After durable deletion acknowledgement, remove file metadata reached
+only by deleted image elements and prove the storage object is reclaimable while
+the deletion tombstone remains. Then compact through an epoch-changing,
+force-closing boundary and prove no stale client can resurrect the element.
 
 #### Document-owned asset journey
 
@@ -208,6 +215,11 @@ leases resume idempotently, committed results become visible once, and cleanup
 removes only operation-owned bindings, uploaded assets, replacement keys, staged
 objects, and incomplete aggregates.
 
+Leave successful and cleaned-failed operations plus acknowledged placements
+beyond the configured idempotency/recovery window. Prove bounded maintenance
+removes terminal receipts while retaining every pending cleanup receipt and its
+external object keys until cleanup succeeds.
+
 #### Experienced desktop and tablet behavior
 
 Through the real project Work Map routes and real sign-in, prove create/list/
@@ -216,16 +228,21 @@ tombstones, disconnected/read-only state, recovery retry, URL-embed behavior,
 duplicate, versions, lock/archive, search/favorite/recent, and project-scoped
 denial. URL-embed proof includes rejection of Plane application/API origins and
 hosts covered by the configured session-cookie domain, while an unrelated
-HTTP(S) origin remains eligible for explicit enablement. Tablet proof uses touch
-and no-hover affordances rather than a resized desktop assertion.
+HTTP(S) origin remains eligible for explicit enablement. Redirect an allowed
+origin through a Plane credential-scoped host and an unrelated controlled host;
+prove no Plane credential is attached anywhere in either redirect chain and
+that browsers without the redirect-safe credential boundary keep the embed
+inert. Tablet proof uses touch and no-hover affordances rather than a resized
+desktop assertion.
 
 Recovery proof covers HTTP durable-acknowledgement cleanup, byte-identical
 stale-generation acknowledgement, explicit discard, tab close, rejection of a
 different stale-generation body, and authority-revocation rejection, without
 silent replay or document mutation. It proves there is at most one
-`sessionStorage` record scoped by user, Work Map, and generation and no durable
-awareness record. Awareness proof uses a 10-second heartbeat and 30-second lease
-expiry keyed by connection ID, including two tabs for the same user.
+`sessionStorage` record scoped by user, Work Map, collaboration epoch, and
+generation and no durable awareness record. Awareness proof uses a 10-second
+heartbeat and 30-second lease expiry keyed by connection ID, including two tabs
+for the same user.
 
 #### Supported performance envelope
 

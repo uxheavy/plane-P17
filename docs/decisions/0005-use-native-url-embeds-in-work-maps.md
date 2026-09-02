@@ -83,7 +83,11 @@ origin to `enabledOrigin` through the normal scene mutation and durability path.
 A read-only viewer adds only the viewer-session tuple. If edit authority is lost
 before persistence, document enablement fails closed and the viewer may still
 choose the ephemeral session load. Changing origin makes both old forms
-inapplicable without requiring iframe cooperation.
+inapplicable without requiring iframe cooperation. On every cross-origin URL
+edit, Plane removes `enabledOrigin` from the element and clears every
+viewer-session grant for that Document/element before accepting the new URL.
+Returning later to a previously enabled origin therefore requires a new native
+load gesture; stale grants never reactivate.
 
 The protected-carrier exception requires the internal carrier link and opaque
 `nodeKey` already validated by the Work Map scene API. It never authorizes an
@@ -92,10 +96,20 @@ the uniform unavailable tombstone.
 
 Every arbitrary URL starts as an inert domain-labelled shell. Only a user with
 current Work Map edit permission may persist enablement. The enabled iframe uses
-the existing Excalidraw sandbox and referrer policy; Plane must not add
-permissions or weaken either to make a destination work. Plane never forwards
+the existing Excalidraw sandbox and referrer policy plus a browser-enforced
+credentialless navigation boundary that suppresses credentials across the full
+redirect chain. Plane must not add permissions or weaken either to make a
+destination work. If the current browser cannot provide that redirect-safe
+credential boundary, arbitrary URL content remains inert with an open-link
+fallback; initial-origin validation alone is insufficient. Plane never forwards
 Plane authentication headers, cookies, tokens, or credentials to the embed
 origin and never server-fetches or proxies arbitrary embed URLs.
+
+The selected primitive follows the
+[iframe credentialless specification](https://wicg.github.io/anonymous-iframe/):
+the iframe subtree receives a fresh ephemeral network and storage context rather
+than the user's existing origin credentials. The fallback above remains
+mandatory because this primitive is not a universal browser baseline.
 
 ### Interaction and map state
 
@@ -148,7 +162,7 @@ and a separate decision because it changes document and browser behavior.
   must produce distinct honest visible outcomes; a controlled slow destination
   must prove the canvas remains interactive.
 - Browser request inspection must prove no Plane credential reaches the embed
-  origin and no Plane server proxies the request.
+  origin or any redirected destination and no Plane server proxies the request.
 - The ADR-0006 performance envelope must run five embeds before any optimization
   is proposed.
 

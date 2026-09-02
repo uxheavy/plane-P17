@@ -151,6 +151,13 @@ Document modification metadata. File bytes remain in the permission-checked
 Plane asset owner; protected source bindings remain outside collaborative scene
 content.
 
+An editor who can mutate the Work Map but cannot currently read one already
+bound source may preserve that existing opaque carrier while saving unrelated
+scene changes. Source authorization is required when a binding is introduced or
+transferred, not merely because its existing carrier remains in the full-scene
+snapshot. Hydration still returns the uniform unavailable tombstone to that
+viewer.
+
 Normal durable acknowledgement is silent in the editor. V0 shows no routine
 Saving/Saved status, but it must show actionable disconnected, read-only, and
 persistence-failed states.
@@ -164,9 +171,10 @@ On realtime loss:
   mutation. Socket reopen alone is insufficient.
 
 Only one unacknowledged full-scene update may enter a `sessionStorage` recovery
-record scoped to user, Work Map, generation, and a request-specific snapshot
-identity. Durable acknowledgement removes the record only when that exact
-snapshot identity is still current. If a newer edit replaced the record while
+record scoped to user, Work Map, `collaboration_epoch`, generation, and a
+request-specific snapshot identity. Durable acknowledgement removes the record
+only when that exact snapshot identity is still current. If a newer edit replaced
+the record while
 an older request was in flight, the acknowledgement advances the newer snapshot
 to the returned generation and persistence continues; it never clears the newer
 bytes. For an ambiguous retry, the scene endpoint checks byte identity before
@@ -179,13 +187,23 @@ session: it is not an offline document, does not outlive the tab, does not permi
 continued editing, and does not accumulate a multi-update queue.
 
 After persistence failure, freeze mutation and retain the pending update. A
-reload, reconnect, permission/lock/archive change, or generation change requires
-fresh authorization and authoritative resynchronization. The user may then
-explicitly retry if still authorized and the generation is current. Never
+reload, reconnect, permission/lock/archive change, generation change, or
+collaboration-epoch change requires fresh authorization and authoritative
+resynchronization. The user may then explicitly retry only if still authorized
+and both the generation and originating collaboration epoch are current. Never
 replay, merge, discard, or mark recovered state durable silently. Failed retry
 remains visible and read-only. A generation mismatch whose submitted bytes are
-not already authoritative, or revoked authority, makes the record
-non-replayable. Closing the tab ends its lifetime.
+not already authoritative, an epoch mismatch, or revoked authority makes the
+record non-replayable. Closing the tab ends its lifetime.
+
+Element deletion tombstones remain in relay, persistence, repair, and recovery
+payloads until a controlled compaction advances `collaboration_epoch` and
+force-closes the old collaboration session. Image bytes do not wait for that
+compaction: after a deletion tombstone is durably acknowledged, a follow-up
+scene save may remove file metadata referenced only by deleted elements. The
+asset endpoint may then reclaim the object when no current scene or retained
+version reaches it. This two-step boundary preserves anti-resurrection data
+while preventing deleted image metadata and bytes from becoming permanent.
 
 ### Versions and generation
 
@@ -228,11 +246,14 @@ its assets are:
   integrity
   `sha512-+9N6GGjFL/xduwZIGG6UnFikliL45synxxVSzCruEA8VA8RM2rCut9MNPJV2NEzSgsc2ItkBcJKzJc7v+8ekYw==`.
 
-Plane pins the immutable release URLs and those exact integrity values in its
-package-manager lockfile. The acceptance receipt records and rechecks the same
-manifest and resolved lockfile entries. The earlier `924b02ea` artifact plan was
-never released, is absent from the selected dependency graph, and is superseded;
-it is not a historical release or an acceptable fallback.
+The Work Map implementation PR must pin the immutable release URLs and those
+exact integrity values in Plane's package-manager lockfile before V0 release.
+This ADR selects the release input but does not claim that its documentation-only
+revision already contains those entries. The acceptance receipt records and
+rechecks the manifest and resolved lockfile entries from the final Plane
+candidate. The earlier `924b02ea` artifact plan was never released, is absent
+from the selected dependency graph, and is superseded; it is not a historical
+release or an acceptable fallback.
 
 The release is not accepted if package sources differ from the recorded fork
 commit, a clean consumer cannot build, or the Plane lockfile resolves another
@@ -249,13 +270,16 @@ resolution. An artifact produced from another commit is not substitutable.
   correct behavior through reconnect and service restart.
 - Persistence tests prove generation-conflict retry, unchanged durable state
   after failed persistence, mutation freeze, explicit retry/discard, tab-session
-  cleanup, permission rejection, and generation rejection.
+  cleanup, permission rejection, generation rejection, and epoch rejection.
 - Awareness tests prove the 10-second heartbeat, 30-second lease expiry,
   connection-scoped multi-tab identity, disconnect cleanup, and no durable
   awareness record.
 - Raw API, socket, scene, storage, and log inspection proves that protected
   source metadata, asset bytes, signed URLs, credentials, and scene payloads do
   not leak outside their owners.
+- Asset tests prove durable tombstone acknowledgement permits removal of file
+  metadata used only by deleted elements, retained versions still protect their
+  assets, and controlled epoch-changing compaction cannot resurrect elements.
 - Release evidence records the exact Plane revision, fork source and base
   commits, immutable artifact manifest, artifact digests, resolved lockfile
   entries, deterministic inputs, final scenes, Undo result, and restart readback.

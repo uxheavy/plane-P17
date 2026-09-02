@@ -165,7 +165,10 @@ registry:
 - `WorkMapBindingPlacement` owns one newly created binding until its native
   carrier is durably inserted or the placement is cancelled;
 - `WorkMapSceneAssetPlacement` owns one newly uploaded Work Map asset until a
-  durable scene generation references it or the placement is cancelled;
+  durable scene generation references it or the placement is cancelled. The
+  same placement owner protects every target-owned asset copied by a cross-map
+  paste after the copy transaction commits and before the pasted scene is
+  durably acknowledged;
 - `WorkMapPasteRebinding` owns the complete source-to-target key replacement for
   one cross-map paste before any pasted element enters the target scene; and
 - `WorkMapDuplicateOperation` owns one whole-map duplicate, including its target
@@ -181,6 +184,15 @@ object copies, and incomplete duplicate aggregates without touching
 pre-existing resources. These records are not a second scene, binding, asset,
 or workflow authority and are retained only for the bounded recovery window
 required to prove cleanup.
+
+A paste operation may become terminal after its source-to-target replacement is
+committed because each copied asset then has its own
+`WorkMapSceneAssetPlacement` receipt. Scene acknowledgement removes those
+placements; lease-expiry cleanup reclaims copied assets that never enter a
+durable scene. Terminal operation and acknowledged placement receipts remain
+queryable only for the configured idempotency/recovery window and are then
+deleted by bounded maintenance. Pending cleanup receipts and asset object names
+are never age-deleted before their owned external cleanup succeeds.
 
 Work Map V0 adds no activity/compliance subsystem. Creator, last editor,
 timestamps, and versions provide document-state attribution. Presence, cursors,
