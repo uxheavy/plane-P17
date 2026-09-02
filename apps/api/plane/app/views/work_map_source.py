@@ -23,6 +23,7 @@ def _source_projection(source_kind, source, project):
         "source_kind": source_kind,
         "source_id": source.id,
         "project_id": project.id,
+        "project_name": project.name,
         "name": source.issue.name if source_kind == "intake-item" else source.name,
     }
     if source_kind == "work-item":
@@ -102,6 +103,7 @@ class WorkMapSourceDiscoveryEndpoint(BaseAPIView):
             workspace_id=document.workspace_id,
             source_kind=data["source_kind"],
             query=data["query"],
+            project_id=data.get("project_id"),
             limit=20,
         )
         return Response(

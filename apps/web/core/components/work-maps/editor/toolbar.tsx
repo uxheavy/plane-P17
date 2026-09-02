@@ -3,21 +3,30 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { useEffect, useState } from "react";
-import { ToolbarButton, ToolbarMenu } from "@excalidraw/excalidraw";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { useMemo } from "react";
+import { useTranslation } from "@plane/i18n";
+import type {
+  EditorShortcut,
+  HostToolbarItem,
+  ToolShortcutOverrides,
+} from "@excalidraw/excalidraw/types";
 import type { TWorkMapSourceKind } from "@plane/types";
 import { Boxes, ListTodo } from "lucide-react";
-import { isTypingInInput } from "@/components/power-k/core/shortcut-handler";
-import { WORK_MAP_SOURCE_KINDS } from "../source-picker";
 
-const SOURCE_KIND_LABELS: Record<TWorkMapSourceKind, string> = {
-  "work-item": "Work item",
-  cycle: "Cycle",
-  module: "Module",
-  "project-view": "Project view",
-  page: "Page",
-  "intake-item": "Intake item",
+const SOURCE_KIND_KEYS: Record<TWorkMapSourceKind, string> = {
+  "work-item": "common.work_items",
+  cycle: "common.cycles",
+  module: "common.modules",
+  "project-view": "common.view",
+  page: "common.pages",
+  "intake-item": "common.intake",
+};
+
+export const WORK_MAP_TOOL_SHORTCUTS: ToolShortcutOverrides = {
+  diamond: [{ key: "3" }],
+  freedraw: ["D", "B", "X", "P"].map((key): EditorShortcut => ({ key })),
+  autoshape: [{ key: "X", shiftKey: true }],
+  bucketfill: [],
 };
 
 type ToolbarProps = {
@@ -26,80 +35,39 @@ type ToolbarProps = {
   onSelectSourceKind: (sourceKind: TWorkMapSourceKind) => void;
 };
 
-export function WorkMapToolbar({ editable, sourceKind, onSelectSourceKind }: ToolbarProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
+export function useWorkMapToolbarItems({
+  editable,
+  sourceKind,
+  onSelectSourceKind,
+}: ToolbarProps): readonly HostToolbarItem[] {
+  const { t } = useTranslation();
 
-  return (
-    <>
-      <ToolbarButton
-        type="toggle"
-        checked={sourceKind === "work-item"}
-        icon={<ListTodo />}
-        keyBindingLabel="W"
-        aria-label="Add work item"
-        aria-keyshortcuts="W"
-        title="Add work item — W"
-        disabled={!editable}
-        data-testid="work-map-add-work-item"
-        onSelect={() => onSelectSourceKind("work-item")}
-      />
-      <ToolbarMenu open={menuOpen}>
-        <ToolbarMenu.Trigger
-          aria-label="Add another Plane node"
-          title="Add another Plane node"
-          disabled={!editable}
-          onToggle={() => setMenuOpen((open) => !open)}
-        >
-          <Boxes />
-        </ToolbarMenu.Trigger>
-        <ToolbarMenu.Content onClickOutside={() => setMenuOpen(false)} onSelect={() => setMenuOpen(false)}>
-          {WORK_MAP_SOURCE_KINDS.slice(1).map((kind) => (
-            <ToolbarMenu.Item key={kind} selected={sourceKind === kind} onSelect={() => onSelectSourceKind(kind)}>
-              {SOURCE_KIND_LABELS[kind]}
-            </ToolbarMenu.Item>
-          ))}
-        </ToolbarMenu.Content>
-      </ToolbarMenu>
-    </>
+  return useMemo(
+    () => [
+      {
+        id: "work-item",
+        label: t("common.add_work_item"),
+        icon: <ListTodo />,
+        shortcuts: [{ key: "W" }],
+        disabled: !editable,
+        checked: sourceKind === "work-item",
+        onSelect: () => onSelectSourceKind("work-item"),
+      },
+      {
+        id: "source-menu",
+        type: "menu" as const,
+        label: t("common.add"),
+        icon: <Boxes />,
+        disabled: !editable,
+        items: (Object.keys(SOURCE_KIND_KEYS) as TWorkMapSourceKind[])
+          .filter((kind) => kind !== "work-item")
+          .map((kind) => ({
+            id: kind,
+            label: t(SOURCE_KIND_KEYS[kind]),
+            onSelect: () => onSelectSourceKind(kind),
+          })),
+      },
+    ],
+    [editable, onSelectSourceKind, sourceKind, t],
   );
-}
-
-export function useWorkMapToolShortcuts(
-  api: ExcalidrawImperativeAPI | null,
-  editable: boolean,
-  sourceToolActive: boolean,
-  onSelectSourceKind: (sourceKind: TWorkMapSourceKind) => void,
-  onCancelSourceTool: () => void
-) {
-  useEffect(() => {
-    if (!api || !editable) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        event.shiftKey ||
-        isTypingInInput(event.target) ||
-        event.target instanceof HTMLSelectElement
-      )
-        return;
-
-      const key = event.key.toLowerCase();
-      if (key === "escape" && sourceToolActive) {
-        onCancelSourceTool();
-      } else if (key === "w") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        api.setActiveTool({ type: "selection" });
-        onSelectSourceKind("work-item");
-      } else if (key === "d" || key === "b" || key === "x") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        onCancelSourceTool();
-        api.setActiveTool({ type: "freedraw" });
-      }
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [api, editable, onCancelSourceTool, onSelectSourceKind, sourceToolActive]);
 }

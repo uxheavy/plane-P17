@@ -101,15 +101,18 @@ has no persistent right-side inspector in V0.
 One placement controller owns tool activation, fixed-size ghost, click-to-place,
 create-or-select, cancellation, and Excalidraw keep-tool-active behavior. `W`
 activates Work Item; the other kinds occupy one feature/permission-filtered
-dropdown beside it in the native Excalidraw toolbar.
+menu inside the native Excalidraw toolbar. The host contract and ownership
+boundary are recorded in ADR-0007.
 
 Work Map owns these route-scoped shortcut overrides: `W` activates Work Item,
-and `D`, `B`, or `X` activates native free drawing to preserve tldraw drawing
-muscle memory. The overrides do not run while the user is typing or outside a
-Work Map; normal Plane shortcuts remain unchanged. Native Excalidraw tools keep
-their other shortcuts. Diamond remains available through its native toolbar
-control and numeric shortcut, while Web Embed remains in the native More tools
-menu as specified by ADR-0005.
+and `D`, `B`, `X`, or `P` activates native free drawing to preserve tldraw
+muscle memory; `3` activates Diamond and `Shift+X` activates Autoshape. The
+overrides do not run while the user is typing or outside a Work Map; normal
+Plane shortcuts remain unchanged. Native Excalidraw tools keep their other
+shortcuts, with Bucket Fill remaining in the native More tools menu. ADR-0007
+makes Excalidraw the owner of merged shortcut resolution and toolbar
+accessibility semantics, while Plane supplies only these descriptors. Web
+Embed remains in the native More tools menu as specified by ADR-0005.
 
 At workspace scope, availability is the union of kinds enabled across projects
 the viewer may access. Each chooser groups or filters results by source project

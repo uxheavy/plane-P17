@@ -271,6 +271,14 @@ class TestWorkMapApp:
             )
             assert discovered.status_code == status.HTTP_200_OK
             assert [result["source_id"] for result in discovered.json()["results"]] == [str(source.id)]
+            assert discovered.json()["results"][0]["project_id"] == str(source_project.id)
+            assert discovered.json()["results"][0]["project_name"] == source_project.name
+            filtered = session_client.get(
+                f"{base}sources/",
+                {"source_kind": source_kind, "query": "", "project_id": str(source_project.id)},
+            )
+            assert filtered.status_code == status.HTTP_200_OK
+            assert all(result["project_id"] == str(source_project.id) for result in filtered.json()["results"])
             bound = session_client.post(
                 f"{base}bindings/",
                 {"source_kind": source_kind, "source_id": source.id},

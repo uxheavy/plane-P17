@@ -34,6 +34,9 @@ Work Map V0 requires layered proof:
 4. real desktop and tablet outside-in journeys through signed-in Plane; and
 5. a bounded human review of the exact automated state.
 
+The package-level integration and shortcut contract required by this proof is
+the host-owned Excalidraw boundary in ADR-0007.
+
 Passing a lower layer never substitutes for a higher layer whose risk it cannot
 observe. Evidence proves only the exercised scenarios and supported envelope.
 

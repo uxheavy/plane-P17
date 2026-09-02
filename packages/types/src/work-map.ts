@@ -68,6 +68,7 @@ type TWorkMapSourceBase = {
   source_kind: TWorkMapSourceKind;
   source_id: string;
   project_id: string;
+  project_name: string;
   name: string;
 };
 

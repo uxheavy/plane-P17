@@ -45,6 +45,7 @@ class WorkMapBindingCreateSerializer(serializers.Serializer):
 class WorkMapSourceDiscoverySerializer(serializers.Serializer):
     source_kind = serializers.ChoiceField(choices=WorkMapBinding.SourceKind.values)
     query = serializers.CharField(required=False, allow_blank=True, max_length=255, default="")
+    project_id = serializers.UUIDField(required=False)
 
 
 class WorkMapBindingHydrationSerializer(serializers.Serializer):

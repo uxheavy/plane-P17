@@ -22,7 +22,8 @@ system remains authoritative for referenced work.
 
 ADR-0002 defines shared Document lifecycle, ADR-0003 defines protected Plane
 nodes, ADR-0004 defines realtime authority, ADR-0005 defines URL-embed trust and
-interaction, and ADR-0006 defines the proof required to ship.
+interaction, ADR-0006 defines the proof required to ship, and ADR-0007 defines
+the host-owned Excalidraw integration boundary.
 
 ## Decision
 

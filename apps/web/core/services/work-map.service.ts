@@ -109,10 +109,11 @@ export class WorkMapService extends APIService {
     projectId: string,
     workMapId: string,
     sourceKind: TWorkMapSourceKind,
-    query: string
+    query: string,
+    sourceProjectId?: string,
   ): Promise<TWorkMapSource[]> {
     return this.get(this.path(workspaceSlug, projectId, `${workMapId}/sources/`), {
-      params: { source_kind: sourceKind, query },
+      params: { source_kind: sourceKind, query, ...(sourceProjectId ? { project_id: sourceProjectId } : {}) },
     }).then(({ data }) => data.results);
   }
 }

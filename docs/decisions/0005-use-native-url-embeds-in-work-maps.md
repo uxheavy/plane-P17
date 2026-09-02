@@ -27,8 +27,9 @@ Work Map preserves Excalidraw's native Web Embed tool, click-drag link editor,
 URL parsing, intrinsic sizing, paste/drop, sandbox, and click-to-interact
 behavior. Plane does not implement a parallel URL insertion or gesture path.
 Because Work Map reserves `W` for Work Item placement, Web Embed remains
-discoverable through Excalidraw's native More tools menu. Plane does not add an
-`Add URL embed` button or a second embed workflow.
+discoverable through Excalidraw's native More tools menu. The host toolbar
+extension used for Plane node placement is defined by ADR-0007; it does not add
+an `Add URL embed` button or a second embed workflow.
 
 Override provider eligibility so every syntactically valid `http` or `https`
 URL may use Excalidraw's native generic iframe fallback. Non-web schemes are
