@@ -170,7 +170,9 @@ Any unavailable live source or required asset cancels the entire mixed
 native/live selection with one non-disclosing error. Failure leaves target scene,
 protected bindings, and target asset state unchanged. Success preserves arrows,
 frames, groups, files, ordering, selection, and one native undo step. Native-only
-paste bypasses rebinding.
+paste bypasses rebinding, but every cross-document paste and whole-document
+duplicate still removes URL-embed `enabledOrigin` before insertion as required by
+ADR-0005.
 
 The exact shipped package must prove that Copy/Cut preserve `nodeKey` and the
 awaited host callback can replace keys before native insertion. If not, only the

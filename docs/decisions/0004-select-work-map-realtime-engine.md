@@ -116,20 +116,28 @@ Every transmitted update is a full serialized Work Map scene. On receipt, the
 client decodes it, calls `restoreElements(remote.elements, null)`, reconciles it
 against `getSceneElementsIncludingDeleted()` with
 `reconcileElements(local, restoredRemote, appState)`, and applies the result with
-`updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })`. Remote
-changes therefore use stock Excalidraw semantics without entering local Undo.
-Every editable client also broadcasts its full current scene every 20 seconds;
-this repairs a missed transient relay frame through the same reconciliation path
-and is neither a durability timer nor an offline queue.
+`updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })`. The same
+frame carries the closed opaque `files` metadata from the durable scene. Before
+rendering referenced images, the receiver reauthorizes and materializes their
+bytes through the Plane asset endpoint and supplies them through Excalidraw's
+native file API; relay frames never contain bytes, signed URLs, storage keys, or
+credentials. Remote changes therefore use stock Excalidraw semantics without
+entering local Undo. Every editable client also broadcasts its full current
+scene, including that closed file metadata, every 20 seconds; this repairs a
+missed transient relay frame through the same reconciliation path and is neither
+a durability timer nor an offline queue.
 
 The client persists through the generation-CAS scene API. It fetches the current
 authoritative scene and generation, reconciles its pending scene with that state,
 PATCHes the result with the fetched generation, and on a generation conflict
-refetches and retries once. Only a successful HTTP compare-and-swap is durable
-acknowledgement. Socket receipt, Redis publication, or another client's
-observation is not durability. Scene PATCH also advances Document modification
-metadata. File bytes remain in the permission-checked Plane asset owner;
-protected source bindings remain outside collaborative scene content.
+refetches, reconciles, and retries with bounded jitter. The supported ten-editor
+envelope permits at most ten total attempts for one pending snapshot; exhausting
+that bound enters the visible persistence-failed state. Only a successful HTTP
+compare-and-swap is durable acknowledgement. Socket receipt, Redis publication,
+or another client's observation is not durability. Scene PATCH also advances
+Document modification metadata. File bytes remain in the permission-checked
+Plane asset owner; protected source bindings remain outside collaborative scene
+content.
 
 Normal durable acknowledgement is silent in the editor. V0 shows no routine
 Saving/Saved status, but it must show actionable disconnected, read-only, and
@@ -144,10 +152,14 @@ On realtime loss:
   mutation. Socket reopen alone is insufficient.
 
 Only one unacknowledged full-scene update may enter a `sessionStorage` recovery
-record scoped to user, Work Map, and generation. Durable acknowledgement or
-explicit discard removes it. The record is bounded by the browser tab session:
-it is not an offline document, does not outlive the tab, does not permit
-continued editing, and does not accumulate a multi-update queue.
+record scoped to user, Work Map, generation, and a content-derived snapshot
+identity. Durable acknowledgement removes the record only when that exact
+snapshot identity is still current. If a newer edit replaced the record while
+an older request was in flight, the acknowledgement advances the newer snapshot
+to the returned generation and persistence continues; it never clears the newer
+bytes. Explicit discard removes the current record. The record is bounded by the
+browser tab session: it is not an offline document, does not outlive the tab,
+does not permit continued editing, and does not accumulate a multi-update queue.
 
 After persistence failure, freeze mutation and retain the pending update. A
 reload, reconnect, permission/lock/archive change, or generation change requires

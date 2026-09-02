@@ -135,14 +135,20 @@ key.
 Under deterministic delivery, prove the selected ADR-0004 path: full scenes are
 restored, reconciled, and applied with `CaptureUpdateAction.NEVER`; independent
 and conflicting edits converge with valid arrows, groups, and ordering; remote
-changes remain absent from local Undo; and the 20-second full-scene broadcast
-repairs a dropped transient frame. Prove the API compare-and-swap, not relay
-receipt, is the durability acknowledgement and survives API, Live, Redis, and
-browser restart. Prove atomic version restore with matching protected bindings
-and retained asset reachability. Prove normal CAS changes generation without
-changing `collaboration_epoch`; restore and lifecycle resets advance the epoch,
-publish immediate force-close, and periodic epoch/authorization checks close a
-client when that Redis control message is deliberately dropped.
+changes remain absent from local Undo; newly referenced images arrive with only
+closed file metadata and are reauthorized through Plane before native file
+materialization; and the 20-second full-scene broadcast repairs a dropped
+transient frame. With ten concurrent editors, prove bounded CAS retries converge
+without treating ordinary conflicts as infrastructure failure. Replace a
+recovery record with a newer edit while an older PATCH is in flight and prove the
+older acknowledgement cannot clear the newer snapshot. Prove the API
+compare-and-swap, not relay receipt, is the durability acknowledgement and
+survives API, Live, Redis, and browser restart. Prove atomic version restore with
+matching protected bindings and retained asset reachability. Prove normal CAS
+changes generation without changing `collaboration_epoch`; restore and lifecycle
+resets advance the epoch, publish immediate force-close, and periodic
+epoch/authorization checks close a client when that Redis control message is
+deliberately dropped.
 
 #### Document-owned asset journey
 

@@ -58,6 +58,9 @@ being represented as successful content.
 - Changing URL origin resets document enablement to inert. A same-origin path or
   query change does not reset solely because the full URL changed.
 - Excalidraw native duplication copies the node-owned enablement with the node.
+- Any cross-document paste or whole-document duplicate removes
+  `customData.enabledOrigin` before insertion. Same-document duplication may
+  retain it; a new target document always requires its own explicit enablement.
 
 Plane stores document enablement as `customData.enabledOrigin` on the native
 embeddable element. It is enabled only when that exact normalized HTTP(S) origin
