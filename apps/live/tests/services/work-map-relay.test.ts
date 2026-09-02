@@ -241,6 +241,21 @@ describe("WorkMapRelay", () => {
     await relay.destroy();
   });
 
+  it("leaves the room when post-join authorization fails", async () => {
+    const bus = new TestRedisBus();
+    const authorize = vi.fn().mockResolvedValueOnce(authorization()).mockRejectedValueOnce(new Error("Unavailable"));
+    const relay = await initializeRelay(bus, authorize);
+    const socket = websocket();
+
+    await relay.handleConnection(socket, request());
+
+    expect((socket as unknown as TestWebSocket).closed?.code).toBe(4403);
+    expect(
+      [...bus.connections].some((connection) => connection.channels.has(`work-map:workspace:${WORK_MAP_ID}`))
+    ).toBe(false);
+    await relay.destroy();
+  });
+
   it("force closes one Work Map across instances without closing another map", async () => {
     const bus = new TestRedisBus();
     const authorize = vi.fn(async (_workspace: string, _project: string, workMapId: string) =>

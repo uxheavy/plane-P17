@@ -170,12 +170,22 @@ export class WorkMapRelay {
       const room = workMapRoomName(authorization);
       const connectionId = randomUUID();
       await this.join(room, ws, connectionId);
-      const joinedAuthorization = await this.authorizer(
-        connection.workspaceSlug,
-        connection.projectId,
-        connection.workMapId,
-        cookie
-      );
+      let joinedAuthorization: WorkMapAuthorization;
+      try {
+        joinedAuthorization = await this.authorizer(
+          connection.workspaceSlug,
+          connection.projectId,
+          connection.workMapId,
+          cookie
+        );
+      } catch (error) {
+        await this.leave(room, ws);
+        throw error;
+      }
+      if (closed) {
+        await this.leave(room, ws);
+        return;
+      }
       if (
         joinedAuthorization.workspace_slug !== authorization.workspace_slug ||
         joinedAuthorization.project_id !== authorization.project_id ||
