@@ -87,9 +87,12 @@ transaction instead appends a `WorkMapProjectionInvalidation` outbox record for
 each affected Work Map and its opaque binding keys. A dispatcher claims pending
 records, publishes chunks of at most 100 opaque keys to the authorized room, and
 marks a record delivered only after publication succeeds. Failure retains it as
-pending for idempotent retry; an expired dispatcher lease may be reclaimed. The outbox
-contains no source kind, source ID, project, title, or cause and is not a second
-source-event history.
+pending for at-least-once retry; an expired dispatcher lease may be reclaimed.
+An ambiguous publish may therefore deliver the same opaque-key chunk again.
+Client invalidation and authoritative hydration are idempotent, so the relay
+does not add an exact-once receipt or deduplication store. The outbox contains no
+source kind, source ID, project, title, or cause and is not a second source-event
+history.
 
 Normal cleanup may hard-delete only a delivered record whose publication receipt
 has been stored. An undelivered or ambiguously delivered record remains pending;
