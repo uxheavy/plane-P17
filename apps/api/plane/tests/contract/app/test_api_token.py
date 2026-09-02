@@ -150,6 +150,10 @@ class TestApiTokenEndpoint:
             format="json",
         )
         assert runtime.status_code == status.HTTP_400_BAD_REQUEST
+
+        for malformed_purpose in ([], {}):
+            malformed = session_client.post(url, {"purpose": malformed_purpose}, format="json")
+            assert malformed.status_code == status.HTTP_400_BAD_REQUEST
         assert APIToken.objects.count() == before
 
     # GET /user/api-tokens/ tests

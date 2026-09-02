@@ -25,7 +25,10 @@ class ApiTokenEndpoint(BaseAPIView):
         purpose = request.data.get("purpose", APIToken.Purpose.FULL)
         workspace_slug = request.data.get("workspace_slug")
 
-        if purpose not in {APIToken.Purpose.FULL, APIToken.Purpose.AGENT_LIFECYCLE}:
+        if not isinstance(purpose, str) or purpose not in {
+            APIToken.Purpose.FULL,
+            APIToken.Purpose.AGENT_LIFECYCLE,
+        }:
             return Response({"error": "Token purpose is not available"}, status=status.HTTP_400_BAD_REQUEST)
 
         workspace = None

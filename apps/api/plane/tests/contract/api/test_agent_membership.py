@@ -238,7 +238,7 @@ class TestWorkspaceAgentMemberships:
             "rotate-historian",
         )
         assert rotation_replay.data["replayed"] is True
-        assert rotation_replay.data["credential"] == new_token
+        assert rotation_replay.data["credential"] is None
         assert APIToken.objects.filter(user_id=user_id).count() == token_count
 
         disabled = self.put_agent(

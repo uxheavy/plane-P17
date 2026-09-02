@@ -159,23 +159,9 @@ class WorkspaceAgentMemberships:
         credential = None
         if state == "disabled":
             active_tokens.update(is_active=False)
-        elif replayed:
-            token = active_tokens.first()
-            credential = token.token if action == "rotate" and token else None
-        elif action == "rotate":
-            active_tokens.update(is_active=False)
-            token = APIToken.objects.create(
-                user=user,
-                workspace=workspace,
-                label=token_label,
-                user_type=1,
-                is_service=True,
-                purpose=APIToken.Purpose.AGENT_RUNTIME,
-            )
-            credential = token.token
-        else:
-            token = active_tokens.first()
-            if token is None:
+        elif not replayed:
+            if action == "rotate":
+                active_tokens.update(is_active=False)
                 token = APIToken.objects.create(
                     user=user,
                     workspace=workspace,
@@ -185,7 +171,19 @@ class WorkspaceAgentMemberships:
                     purpose=APIToken.Purpose.AGENT_RUNTIME,
                 )
                 credential = token.token
-            active_tokens.exclude(id=token.id).update(is_active=False)
+            else:
+                token = active_tokens.first()
+                if token is None:
+                    token = APIToken.objects.create(
+                        user=user,
+                        workspace=workspace,
+                        label=token_label,
+                        user_type=1,
+                        is_service=True,
+                        purpose=APIToken.Purpose.AGENT_RUNTIME,
+                    )
+                    credential = token.token
+                active_tokens.exclude(id=token.id).update(is_active=False)
 
         response = (
             receipt.response
