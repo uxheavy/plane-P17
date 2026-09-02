@@ -67,6 +67,9 @@ associations, and updated time. V0 stores no scene thumbnail. A new Work Map
 persists an empty Excalidraw scene; any empty-state guidance remains local UI
 and contains no persisted template or case data.
 
+Document lifecycle actions remain on the Work Map list item, following the
+Pages surface. In particular, duplication is not repeated in the editor header.
+
 Global search indexes Work Map document metadata, including title, but not
 arbitrary scene text. Favorites and recents may discover a Work Map. Opening a
 workspace-level result resolves through an active associated project the viewer
@@ -82,6 +85,9 @@ undo/redo. Excalidraw remains the owner of those semantics.
 
 Plane adds document identity, permissions, persistence, collaboration, and the
 closed live-node behavior in ADR-0003. It does not recreate a drawing engine.
+Plane live-node entry points render through one generic host extension in the
+native Excalidraw toolbar. Work Map must not mount a parallel canvas toolbar or
+duplicate an applicable native Excalidraw tool.
 
 Desktop web and tablet web are supported. They use Excalidraw's native pointer,
 keyboard, trackpad, and touch interaction rather than separate Plane gesture
