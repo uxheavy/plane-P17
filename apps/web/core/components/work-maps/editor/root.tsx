@@ -395,7 +395,14 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       if (!api || !editable || placingSourceRef.current) return;
       placingSourceRef.current = true;
       try {
-        const binding = await service.bindSource(workspaceSlug, projectId, workMap.id, source);
+        const binding = await service.bindSource(
+          workspaceSlug,
+          projectId,
+          workMap.id,
+          generationRef.current,
+          crypto.randomUUID(),
+          source
+        );
         const [base] = convertToExcalidrawElements([
           {
             type: "rectangle",

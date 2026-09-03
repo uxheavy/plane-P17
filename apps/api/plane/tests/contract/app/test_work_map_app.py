@@ -649,8 +649,7 @@ class TestWorkMapApp:
         ).json()
         carrier = {
             "id": "protected",
-            "type": "embeddable",
-            "link": f"https://work-map.invalid/nodes/{binding['node_key']}",
+            "type": "rectangle",
             "customData": {"nodeKey": binding["node_key"]},
         }
         scene_url = _work_maps_url(workspace, map_project, work_map["id"], "scene/")
@@ -864,8 +863,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": element_id,
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{node_key}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": node_key},
                     }
                     for element_id in ("first", "second")
@@ -1002,8 +1000,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "kept",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{kept['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": kept["node_key"]},
                     }
                 ],
@@ -1087,8 +1084,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "source-node",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{source_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": source_binding["node_key"]},
                     },
                     {"id": "source-image", "type": "image", "fileId": "source-file"},
@@ -1135,7 +1131,6 @@ class TestWorkMapApp:
         ).exists()
 
         target_scene = json.loads(source_scene)
-        target_scene["elements"][0]["link"] = f"https://work-map.invalid/nodes/{target_key}"
         target_scene["elements"][0]["customData"]["nodeKey"] = target_key
         target_scene["files"]["source-file"]["assetId"] = target_asset_id
         inserted = session_client.patch(
@@ -1297,8 +1292,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "plane-node",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{source_key}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": source_key},
                     },
                     {
@@ -1347,7 +1341,7 @@ class TestWorkMapApp:
         assert duplicate.generation == 0
         assert duplicate_binding.node_key == uuid.UUID(target_key)
         assert target_key != source_key
-        assert duplicate_scene["elements"][0]["link"] == f"https://work-map.invalid/nodes/{target_key}"
+        assert duplicate_scene["elements"][0].get("link") is None
         assert "enabledOrigin" not in duplicate_scene["elements"][1]["customData"]
         assert duplicate_binding.source_kind == "work-item"
         assert duplicate_binding.source_id == issue.id
@@ -1456,8 +1450,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "first",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{first_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": first_binding["node_key"]},
                     }
                 ],
@@ -1507,14 +1500,12 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "first",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{first_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": first_binding["node_key"]},
                     },
                     {
                         "id": "second",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{second_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": second_binding["node_key"]},
                     },
                 ],

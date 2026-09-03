@@ -32,7 +32,7 @@ from plane.utils.path_validator import sanitize_filename
 
 from ..base import BaseAPIView
 from .base import serialize_work_map, visible_work_maps
-from .binding import WORK_MAP_NODE_LINK_PREFIX, validate_protected_binding_carriers
+from .binding import validate_protected_binding_carriers
 from .scene import (
     LEGACY_SCENE_UPGRADE_ERROR,
     WorkMapSceneUpgradeRequired,
@@ -135,7 +135,6 @@ def duplicate_scene(scene_binary, bindings, key_map=None):
         source_key = uuid.UUID(str(node_key_value))
         target_key = uuid.UUID(str(key_map.setdefault(str(source_key), str(uuid.uuid4()))))
         custom_data["nodeKey"] = str(target_key)
-        element["link"] = f"{WORK_MAP_NODE_LINK_PREFIX}{target_key}"
 
     return scene, key_map
 

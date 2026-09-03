@@ -62,9 +62,15 @@ export class WorkMapService extends APIService {
     workspaceSlug: string,
     projectId: string,
     workMapId: string,
+    generation: number,
+    placementId: string,
     source: Pick<TWorkMapSource, "source_kind" | "source_id">
-  ): Promise<{ node_key: string; revision: number }> {
-    return this.post(this.path(workspaceSlug, projectId, `${workMapId}/bindings/`), source).then(({ data }) => data);
+  ): Promise<{ placement_id: string; node_key: string; revision: number; generation: number }> {
+    return this.post(this.path(workspaceSlug, projectId, `${workMapId}/bindings/`), {
+      generation,
+      placement_id: placementId,
+      ...source,
+    }).then(({ data }) => data);
   }
 
   async hydrate(
