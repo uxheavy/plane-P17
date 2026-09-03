@@ -168,7 +168,7 @@ class Migration(migrations.Migration):
                     -- An update can remove an agent by changing member_id, so
                     -- validate both the row being replaced and its replacement.
                     FOR membership_row IN
-                        SELECT (OLD).*
+                        SELECT (OLD).* WHERE NEW.deleted_at IS NULL
                         UNION ALL
                         SELECT (NEW).*
                     LOOP
