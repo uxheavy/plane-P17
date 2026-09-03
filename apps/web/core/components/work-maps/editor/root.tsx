@@ -35,7 +35,7 @@ import { RecoveryPanel } from "./recovery-panel";
 import type { TRecoveryRecord } from "./recovery";
 import { PendingScenePanel } from "./pending-scene-panel";
 import { rebindProtectedPaste } from "./paste";
-import { getNodeKey, normalizeNodeCarrier } from "./scene";
+import { getNodeKey, isGenerationConflict, normalizeNodeCarrier } from "./scene";
 import { getSourcePath } from "./source-navigation";
 import { getCurrentInvalidatedNodeKeys } from "./source-invalidation";
 import { useCollaboration } from "./use-collaboration";
@@ -395,14 +395,30 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       if (!api || !editable || placingSourceRef.current) return;
       placingSourceRef.current = true;
       try {
-        const binding = await service.bindSource(
-          workspaceSlug,
-          projectId,
-          workMap.id,
-          generationRef.current,
-          crypto.randomUUID(),
-          source
-        );
+        const placementId = crypto.randomUUID();
+        let binding: Awaited<ReturnType<typeof service.bindSource>> | undefined;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            binding = await service.bindSource(
+              workspaceSlug,
+              projectId,
+              workMap.id,
+              generationRef.current,
+              placementId,
+              source
+            );
+            break;
+          } catch (error) {
+            if (!isGenerationConflict(error) || attempt === 2) throw error;
+            const responseGeneration =
+              error && typeof error === "object" && "response" in error
+                ? (error.response as { data?: { generation?: unknown } } | undefined)?.data?.generation
+                : undefined;
+            if (typeof responseGeneration !== "number" || !Number.isInteger(responseGeneration)) throw error;
+            generationRef.current = responseGeneration;
+          }
+        }
+        if (!binding) return;
         const [base] = convertToExcalidrawElements([
           {
             type: "rectangle",
