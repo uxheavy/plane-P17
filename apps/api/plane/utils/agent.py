@@ -50,5 +50,6 @@ def agent_lifecycle() -> Iterator[None]:
             # would mask the original database error with InFailedSqlTransaction.
             raise
         else:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT set_config('plane.agent_lifecycle', %s, true)", [previous])
+            if not transaction.get_rollback():
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT set_config('plane.agent_lifecycle', %s, true)", [previous])
