@@ -33,7 +33,11 @@ describe("Work Map scene boundary", () => {
     const encoded = encodeScene({ elements: [element], files: {} });
     const decoded = decodeScene(encoded);
     expect(getNodeKey(decoded.elements[0])).toBe(nodeKey);
-    expect(decoded.elements[0]).toMatchObject({ type: "rectangle", customData: { nodeKey } });
+    expect(decoded.elements[0]).toMatchObject({
+      type: "rectangle",
+      backgroundColor: "rgba(0, 0, 0, 0.001)",
+      customData: { nodeKey },
+    });
     expect(decoded.elements[0]).not.toHaveProperty("link");
     expect(atob(encoded)).not.toContain("source_id");
     expect(atob(encoded)).not.toContain("source_kind");

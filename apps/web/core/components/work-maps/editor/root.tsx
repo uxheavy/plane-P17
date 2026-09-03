@@ -35,7 +35,7 @@ import { RecoveryPanel } from "./recovery-panel";
 import type { TRecoveryRecord } from "./recovery";
 import { PendingScenePanel } from "./pending-scene-panel";
 import { rebindProtectedPaste } from "./paste";
-import { getNodeKey } from "./scene";
+import { getNodeKey, normalizeNodeCarrier } from "./scene";
 import { getSourcePath } from "./source-navigation";
 import { getCurrentInvalidatedNodeKeys } from "./source-invalidation";
 import { useCollaboration } from "./use-collaboration";
@@ -406,7 +406,10 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
             backgroundColor: "transparent",
           },
         ]);
-        const carrier = { ...base, customData: { nodeKey: binding.node_key } };
+        const carrier = normalizeNodeCarrier({
+          ...base,
+          customData: { nodeKey: binding.node_key },
+        });
         api.updateScene({
           elements: [...api.getSceneElements(), carrier],
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,

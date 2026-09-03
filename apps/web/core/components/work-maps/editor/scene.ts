@@ -40,12 +40,21 @@ export const getNodeKey = (element: Pick<ExcalidrawElement, "type" | "customData
   return element.type === "rectangle" ? getCustomDataNodeKey(element) : undefined;
 };
 
-const normalizeNodeCarrier = (element: ExcalidrawElement): ExcalidrawElement => {
+const NODE_CARRIER_HIT_AREA = "rgba(0, 0, 0, 0.001)";
+
+export const normalizeNodeCarrier = (element: ExcalidrawElement): ExcalidrawElement => {
   if (element.type !== "rectangle" && element.type !== "embeddable") return element;
   const nodeKey = getCustomDataNodeKey(element);
   if (!nodeKey) return element;
   const { link: _link, ...withoutLink } = element;
-  return { ...withoutLink, type: "rectangle", customData: { nodeKey } } as unknown as ExcalidrawElement;
+  return {
+    ...withoutLink,
+    type: "rectangle",
+    // Excalidraw only hit-tests the interior of a filled shape. The host card
+    // covers this imperceptible fill while preserving native whole-card selection.
+    backgroundColor: NODE_CARRIER_HIT_AREA,
+    customData: { nodeKey },
+  } as unknown as ExcalidrawElement;
 };
 
 export const isAllowedEmbedUrl = (link: string): boolean => {
