@@ -284,7 +284,7 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
   );
 
   useEffect(() => {
-    if (initialData) void hydrate();
+    void hydrate();
     const onFocus = () => void hydrate();
     const onOnline = () => void hydrate();
     window.addEventListener("focus", onFocus);
@@ -293,7 +293,7 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
     };
-  }, [connectionState, hydrate, initialData]);
+  }, [connectionState, hydrate]);
 
   const onChange = useCallback(
     (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
