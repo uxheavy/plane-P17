@@ -129,8 +129,10 @@ def hard_delete():
         UserFavorite,
         ModuleIssue,
         CycleIssue,
+        Document,
         Estimate,
         EstimatePoint,
+        FileAsset,
     )
 
     days = settings.HARD_DELETE_AFTER_DAYS
@@ -188,6 +190,25 @@ def hard_delete():
         # Check if the model has a 'deleted_at' field
         if hasattr(model, "deleted_at"):
             # Get all instances where 'deleted_at' is greater than 30 days ago
-            _ = model.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+            expired = model.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days))
+            if model is Document:
+                pending_asset_documents = (
+                    FileAsset.all_objects.filter(
+                        entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+                    )
+                    .exclude(asset="")
+                    .values_list("document_id", flat=True)
+                )
+                expired = expired.exclude(id__in=pending_asset_documents)
+            if model is FileAsset:
+                expired = expired.filter(document_version_links__isnull=True)
+                expired = expired.exclude(
+                    models.Q(
+                        entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+                        document__deleted_at__isnull=False,
+                    )
+                    & ~models.Q(asset="")
+                )
+            _ = expired.delete()
 
     return

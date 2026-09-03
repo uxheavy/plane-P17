@@ -103,6 +103,7 @@ from .cycle.issue import CycleIssueViewSet
 from .cycle.archive import CycleArchiveUnarchiveEndpoint
 
 from .asset.base import FileAssetEndpoint, UserAssetsEndpoint, FileAssetViewSet
+from .asset.work_map import WorkMapSceneAssetEndpoint
 from .asset.v2 import (
     WorkspaceFileAssetEndpoint,
     UserAssetsV2Endpoint,
@@ -174,7 +175,17 @@ from .page.base import (
     PageDuplicateEndpoint,
 )
 from .page.version import PageVersionEndpoint
-from .work_map import WorkMapBindingEndpoint, WorkMapRealtimeEndpoint, WorkMapSceneEndpoint, WorkMapViewSet
+from .work_map import (
+    WorkMapBindingEndpoint,
+    WorkMapDuplicateEndpoint,
+    WorkMapFavoriteViewSet,
+    WorkMapPasteRebindingEndpoint,
+    WorkMapRealtimeEndpoint,
+    WorkMapSceneEndpoint,
+    WorkMapVersionEndpoint,
+    WorkMapVersionRestoreEndpoint,
+    WorkMapViewSet,
+)
 from .work_map_source import (
     WorkMapBindingHydrationEndpoint,
     WorkMapBindingOpenEndpoint,
