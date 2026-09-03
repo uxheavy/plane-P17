@@ -45,6 +45,10 @@ def agent_lifecycle() -> Iterator[None]:
             cursor.execute("SELECT set_config('plane.agent_lifecycle', 'on', true)")
         try:
             yield
-        finally:
+        except BaseException:
+            # The atomic block is already marked for rollback; any SQL here
+            # would mask the original database error with InFailedSqlTransaction.
+            raise
+        else:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT set_config('plane.agent_lifecycle', %s, true)", [previous])

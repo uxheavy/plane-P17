@@ -163,8 +163,39 @@ class Migration(migrations.Migration):
                 membership_row record;
                 lifecycle_on boolean;
             BEGIN
-                membership_row := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
                 lifecycle_on := current_setting('plane.agent_lifecycle', true) = 'on';
+                IF TG_OP = 'UPDATE' THEN
+                    -- An update can remove an agent by changing member_id, so
+                    -- validate both the row being replaced and its replacement.
+                    FOR membership_row IN
+                        SELECT (OLD).*
+                        UNION ALL
+                        SELECT (NEW).*
+                    LOOP
+                        SELECT is_bot, bot_type INTO agent_is_bot, agent_kind
+                        FROM users WHERE id = membership_row.member_id;
+                        IF agent_is_bot AND agent_kind = 'AGENT' THEN
+                            IF NOT lifecycle_on THEN
+                                RAISE EXCEPTION 'Agent membership is lifecycle-managed';
+                            END IF;
+                            IF membership_row.deleted_at IS NOT NULL THEN
+                                CONTINUE;
+                            END IF;
+                            SELECT workspace_id INTO owner_workspace
+                            FROM workspace_agent_memberships
+                            WHERE user_id = membership_row.member_id AND deleted_at IS NULL;
+                            IF owner_workspace IS NULL
+                                OR owner_workspace <> membership_row.workspace_id
+                                OR membership_row.role <> 15
+                            THEN
+                                RAISE EXCEPTION 'Agent membership violates lifecycle ownership';
+                            END IF;
+                        END IF;
+                    END LOOP;
+                    RETURN NEW;
+                END IF;
+
+                membership_row := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
                 SELECT is_bot, bot_type INTO agent_is_bot, agent_kind
                 FROM users WHERE id = membership_row.member_id;
                 IF agent_is_bot AND agent_kind = 'AGENT' THEN

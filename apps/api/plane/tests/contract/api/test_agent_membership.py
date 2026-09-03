@@ -47,6 +47,7 @@ from plane.tests.factories import (
     WorkspaceFactory,
     WorkspaceMemberFactory,
 )
+from plane.utils.agent import agent_lifecycle
 
 
 def install_agent_membership_guards():
@@ -647,6 +648,31 @@ class TestWorkspaceAgentMemberships:
                 with transaction.atomic():
                     model.objects.filter(**filters).delete()
             assert model.objects.filter(**filters).exists()
+
+    def test_database_guard_rejects_ordinary_agent_membership_reassignments(self):
+        install_agent_membership_guards()
+        created = self.apply(key="reassignment-guard")
+        replacement = UserFactory(username="membership-replacement")
+
+        for model, filters in (
+            (WorkspaceMember, {"workspace": self.workspace, "member_id": created["user_id"]}),
+            (ProjectMember, {"project": self.project, "member_id": created["user_id"]}),
+        ):
+            with pytest.raises(DatabaseError, match="lifecycle-managed"):
+                with transaction.atomic():
+                    model.objects.filter(**filters).update(member_id=replacement.id)
+            assert model.objects.filter(**filters).exists()
+
+    def test_agent_lifecycle_preserves_database_error_from_guard(self):
+        install_agent_membership_guards()
+        created = self.apply(key="database-error-guard")
+        project_member = ProjectMember.objects.get(project=self.project, member_id=created["user_id"])
+
+        with pytest.raises(DatabaseError, match="violates lifecycle ownership"):
+            with agent_lifecycle():
+                ProjectMember.objects.filter(id=project_member.id).update(role=14)
+
+        assert ProjectMember.objects.get(id=project_member.id).role == 15
 
     def test_database_guard_allows_lifecycle_and_parent_cascade_deletes(self):
         install_agent_membership_guards()
