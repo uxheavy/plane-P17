@@ -21,6 +21,7 @@
     "doctor": "npx react-doctor@latest"
   },
   "devDependencies": {
+    "@oxlint/plugins": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",
     "oxfmt": "catalog:",

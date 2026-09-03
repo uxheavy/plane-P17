@@ -12,15 +12,16 @@ import { Disclosure } from "@headlessui/react";
 // plane imports
 import { ROLE, EUserPermissions } from "@plane/constants";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { EUserProjectRoles, IUser, IWorkspaceMember, TProjectMembership } from "@plane/types";
+import type { EUserProjectRoles, IUser, IUserLite, TProjectMembership } from "@plane/types";
 import { CustomMenu, CustomSelect } from "@plane/ui";
 import { getFileURL } from "@plane/utils";
+
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
-
+import { isNativeAgent } from "@/store/member/utils";
 export interface RowData extends Pick<TProjectMembership, "original_role"> {
-  member: IWorkspaceMember;
+  member: IUserLite;
 }
 
 type NameProps = {
@@ -42,10 +43,11 @@ export function NameColumn(props: NameProps) {
   const { rowData, workspaceSlug, isAdmin, currentUser, setRemoveMemberModal } = props;
   // derived values
   const { avatar_url, display_name, email, first_name, id, last_name } = rowData.member;
+  const isAgent = isNativeAgent(rowData.member);
 
   return (
     <Disclosure>
-      {({}) => (
+      {() => (
         <div className="group relative">
           <div className="flex w-72 items-center gap-2">
             <div className="flex flex-1 items-center gap-x-2 gap-y-2">
@@ -66,9 +68,9 @@ export function NameColumn(props: NameProps) {
                   </span>
                 </Link>
               )}
-              {first_name} {last_name}
+              {isAgent ? display_name : `${first_name} ${last_name}`}
             </div>
-            {(isAdmin || id === currentUser?.id) && (
+            {!isAgent && (isAdmin || id === currentUser?.id) && (
               <CustomMenu
                 ellipsis
                 buttonClassName="p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -76,13 +78,14 @@ export function NameColumn(props: NameProps) {
                 placement="bottom-end"
               >
                 <CustomMenu.MenuItem>
-                  <div
+                  <button
+                    type="button"
                     className="flex cursor-pointer items-center gap-x-1 font-medium text-danger-primary"
                     onClick={() => setRemoveMemberModal(rowData)}
                   >
                     <CircleMinus className="size-3.5 flex-shrink-0" />
                     {rowData.member?.id === currentUser?.id ? "Leave " : "Remove "}
-                  </div>
+                  </button>
                 </CustomMenu.MenuItem>
               </CustomMenu>
             )}
@@ -93,7 +96,7 @@ export function NameColumn(props: NameProps) {
   );
 }
 
-export const AccountTypeColumn = observer(function AccountTypeColumn(props: AccountTypeProps) {
+const AccountTypeColumnView = observer(function AccountTypeColumnView(props: AccountTypeProps) {
   const { rowData, projectId, workspaceSlug } = props;
   // store hooks
   const {
@@ -109,27 +112,29 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
   } = useForm();
   // derived values
   const roleLabel = ROLE[rowData.original_role ?? EUserPermissions.GUEST];
+  const isAgent = isNativeAgent(rowData.member);
   const isCurrentUser = currentUser?.id === rowData.member.id;
   const isRowDataWorkspaceAdmin = [EUserPermissions.ADMIN].includes(
-    Number(getWorkspaceMemberDetails(rowData.member.id)?.role) ?? EUserPermissions.GUEST
+    Number(getWorkspaceMemberDetails(rowData.member.id)?.role ?? EUserPermissions.GUEST)
   );
   const isCurrentUserWorkspaceAdmin = currentUser
     ? [EUserPermissions.ADMIN].includes(
-        Number(getWorkspaceMemberDetails(currentUser.id)?.role) ?? EUserPermissions.GUEST
+        Number(getWorkspaceMemberDetails(currentUser.id)?.role ?? EUserPermissions.GUEST)
       )
     : false;
   const currentProjectRole = getProjectRoleByWorkspaceSlugAndProjectId(workspaceSlug, projectId);
 
   const isCurrentUserProjectAdmin = currentProjectRole
-    ? ![EUserPermissions.MEMBER, EUserPermissions.GUEST].includes(Number(currentProjectRole) ?? EUserPermissions.GUEST)
+    ? ![EUserPermissions.MEMBER, EUserPermissions.GUEST].includes(Number(currentProjectRole))
     : false;
 
   // logic
   // Workspace admin can change his own role
   // Project admin can change any role except his own and workspace admin's role
   const isRoleEditable =
-    (isCurrentUserWorkspaceAdmin && isCurrentUser) ||
-    (isCurrentUserProjectAdmin && !isRowDataWorkspaceAdmin && !isCurrentUser);
+    !isAgent &&
+    ((isCurrentUserWorkspaceAdmin && isCurrentUser) ||
+      (isCurrentUserProjectAdmin && !isRowDataWorkspaceAdmin && !isCurrentUser));
   const checkCurrentOptionWorkspaceRole = (value: string) => {
     const currentMemberWorkspaceRole = getWorkspaceMemberDetails(value)?.role as EUserPermissions | undefined;
     if (!value || !currentMemberWorkspaceRole) return ROLE;
@@ -143,7 +148,11 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
 
   return (
     <>
-      {isRoleEditable ? (
+      {isAgent ? (
+        <div className="flex w-32">
+          <span>Agent</span>
+        </div>
+      ) : isRoleEditable ? (
         <Controller
           name="role"
           control={control}
@@ -192,3 +201,7 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
     </>
   );
 });
+
+export function AccountTypeColumn(props: AccountTypeProps) {
+  return <AccountTypeColumnView {...props} />;
+}

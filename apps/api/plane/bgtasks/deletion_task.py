@@ -13,9 +13,20 @@ from django.db.models.fields.related import OneToOneRel
 # Third party imports
 from celery import shared_task
 
+# Module imports
+from plane.utils.agent import agent_lifecycle
+
 
 @shared_task
 def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
+    model_class = apps.get_model(app_label, model_name)
+    if model_class._meta.label_lower in {"db.workspace", "db.project"}:
+        with agent_lifecycle():
+            return _soft_delete_related_objects(app_label, model_name, instance_pk, using)
+    return _soft_delete_related_objects(app_label, model_name, instance_pk, using)
+
+
+def _soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
     """
     Soft delete related objects for a given model instance
     """
@@ -80,7 +91,7 @@ def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
                                 )
                 else:
                     # Handle other relationships
-                    related_queryset = getattr(instance, related_name)(manager="objects").all()
+                    related_queryset = getattr(instance, related_name).all()
 
                     for related_obj in related_queryset:
                         if hasattr(related_obj, "deleted_at"):
@@ -131,14 +142,33 @@ def hard_delete():
         CycleIssue,
         Estimate,
         EstimatePoint,
+        User,
+        WorkspaceAgentMembership,
+        BotTypeEnum,
     )
 
     days = settings.HARD_DELETE_AFTER_DAYS
-    # check delete workspace
-    _ = Workspace.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+    expired_workspaces = Workspace.all_objects.filter(
+        deleted_at__lt=timezone.now() - timezone.timedelta(days=days)
+    )
+    agent_user_ids = list(
+        WorkspaceAgentMembership.all_objects.filter(
+            workspace__in=expired_workspaces
+        ).values_list("user_id", flat=True)
+    )
+
+    # check delete workspace and its lifecycle-owned agent users
+    with agent_lifecycle():
+        _ = expired_workspaces.delete()
+        _ = User.objects.filter(
+            id__in=agent_user_ids,
+            is_bot=True,
+            bot_type=BotTypeEnum.AGENT,
+        ).delete()
 
     # check delete project
-    _ = Project.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+    with agent_lifecycle():
+        _ = Project.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
 
     # check delete cycle
     _ = Cycle.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()

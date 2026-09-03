@@ -21,6 +21,11 @@ def generate_token():
 
 
 class APIToken(BaseModel):
+    class Purpose(models.TextChoices):
+        FULL = "FULL", "Full"
+        AGENT_LIFECYCLE = "AGENT_LIFECYCLE", "Agent lifecycle"
+        AGENT_RUNTIME = "AGENT_RUNTIME", "Agent runtime"
+
     # Meta information
     label = models.CharField(max_length=255, default=generate_label_token)
     description = models.TextField(blank=True)
@@ -37,6 +42,7 @@ class APIToken(BaseModel):
     expired_at = models.DateTimeField(blank=True, null=True)
     is_service = models.BooleanField(default=False)
     allowed_rate_limit = models.CharField(max_length=255, default="60/min")
+    purpose = models.CharField(max_length=32, choices=Purpose.choices, default=Purpose.FULL)
 
     class Meta:
         verbose_name = "API Token"

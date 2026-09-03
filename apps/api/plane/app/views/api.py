@@ -13,7 +13,7 @@ from rest_framework import status
 
 # Module import
 from .base import BaseAPIView
-from plane.db.models import APIToken
+from plane.db.models import APIToken, WorkspaceMember
 from plane.app.serializers import APITokenSerializer, APITokenReadSerializer
 
 
@@ -22,6 +22,40 @@ class ApiTokenEndpoint(BaseAPIView):
         label = request.data.get("label", str(uuid4().hex))
         description = request.data.get("description", "")
         expired_at = request.data.get("expired_at", None)
+        purpose = request.data.get("purpose", APIToken.Purpose.FULL)
+        workspace_slug = request.data.get("workspace_slug")
+
+        if not isinstance(purpose, str) or purpose not in {
+            APIToken.Purpose.FULL,
+            APIToken.Purpose.AGENT_LIFECYCLE,
+        }:
+            return Response({"error": "Token purpose is not available"}, status=status.HTTP_400_BAD_REQUEST)
+
+        workspace = None
+        if purpose == APIToken.Purpose.AGENT_LIFECYCLE:
+            if not isinstance(workspace_slug, str) or not workspace_slug:
+                return Response({"error": "Workspace is required"}, status=status.HTTP_400_BAD_REQUEST)
+            membership = (
+                WorkspaceMember.objects.select_related("workspace")
+                .filter(
+                    workspace__slug=workspace_slug,
+                    member=request.user,
+                    role=20,
+                    is_active=True,
+                )
+                .first()
+            )
+            if membership is None:
+                return Response(
+                    {"error": "Workspace admin role 20 is required"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            workspace = membership.workspace
+        elif workspace_slug is not None:
+            return Response(
+                {"error": "Full tokens cannot be workspace-scoped"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Check the user type
         user_type = 1 if request.user.is_bot else 0
@@ -32,6 +66,8 @@ class ApiTokenEndpoint(BaseAPIView):
             user=request.user,
             user_type=user_type,
             expired_at=expired_at,
+            workspace=workspace,
+            purpose=purpose,
         )
 
         serializer = APITokenSerializer(api_token)

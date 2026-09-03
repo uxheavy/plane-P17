@@ -20,7 +20,7 @@ import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { ModuleDropdown } from "@/components/dropdowns/module/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { ParentIssuesListModal } from "@/components/issues/parent-issues-list-modal";
-import { IssueLabelSelect } from "@/components/issues/select";
+import { LabelDropdown } from "@/components/dropdowns/label";
 // helpers
 // hooks
 import { useProjectEstimates } from "@/hooks/store/estimates";
@@ -32,6 +32,170 @@ type TInboxIssueProperties = {
   handleData: (issueKey: keyof Partial<TIssue>, issueValue: Partial<TIssue>[keyof Partial<TIssue>]) => void;
   isVisible?: boolean;
 };
+
+type TInboxAdditionalProperties = {
+  areEstimatesEnabled: boolean;
+  data: Partial<TIssue>;
+  getIndex: (key: string) => number | undefined;
+  handleData: TInboxIssueProperties["handleData"];
+  isVisible: boolean;
+  minDate: Date | undefined;
+  projectId: string;
+  parentIssueModalOpen: boolean;
+  selectedParentIssue: ISearchIssueResponse | undefined;
+  setParentIssueModalOpen: (open: boolean) => void;
+  setSelectedParentIssue: (issue: ISearchIssueResponse | undefined) => void;
+};
+
+function InboxAdditionalProperties(props: TInboxAdditionalProperties) {
+  const {
+    areEstimatesEnabled,
+    data,
+    getIndex,
+    handleData,
+    isVisible,
+    minDate,
+    projectId,
+    parentIssueModalOpen,
+    selectedParentIssue,
+    setParentIssueModalOpen,
+    setSelectedParentIssue,
+  } = props;
+
+  return (
+    <>
+      {/* start date */}
+      {isVisible && (
+        <div className="h-7">
+          <DateDropdown
+            value={data?.start_date || null}
+            onChange={(date) => handleData("start_date", date ? renderFormattedPayloadDate(date) : "")}
+            buttonVariant="border-with-text"
+            minDate={minDate}
+            placeholder="Start date"
+            tabIndex={getIndex("start_date")}
+          />
+        </div>
+      )}
+
+      {/* due date */}
+      <div className="h-7">
+        <DateDropdown
+          value={data?.target_date || null}
+          onChange={(date) => handleData("target_date", date ? renderFormattedPayloadDate(date) : "")}
+          buttonVariant="border-with-text"
+          minDate={minDate}
+          placeholder="Due date"
+          tabIndex={getIndex("target_date")}
+        />
+      </div>
+
+      {/* cycle */}
+      {isVisible && (
+        <div className="h-7">
+          <CycleDropdown
+            value={data?.cycle_id || ""}
+            onChange={(cycleId) => handleData("cycle_id", cycleId)}
+            projectId={projectId}
+            placeholder="Cycle"
+            buttonVariant="border-with-text"
+            tabIndex={getIndex("cycle_id")}
+          />
+        </div>
+      )}
+
+      {/* module */}
+      {isVisible && (
+        <div className="h-7">
+          <ModuleDropdown
+            value={data?.module_ids || []}
+            onChange={(moduleIds) => handleData("module_ids", moduleIds)}
+            projectId={projectId}
+            placeholder="Modules"
+            buttonVariant="border-with-text"
+            multiple
+            showCount
+            tabIndex={getIndex("module_ids")}
+          />
+        </div>
+      )}
+
+      {/* estimate */}
+      {isVisible && areEstimatesEnabled && (
+        <div className="h-7">
+          <EstimateDropdown
+            value={data?.estimate_point || undefined}
+            onChange={(estimatePoint) => handleData("estimate_point", estimatePoint)}
+            projectId={projectId}
+            buttonVariant="border-with-text"
+            placeholder="Estimate"
+            tabIndex={getIndex("estimate_point")}
+          />
+        </div>
+      )}
+
+      {/* add parent */}
+      {isVisible && (
+        <div className="h-7">
+          {selectedParentIssue ? (
+            <CustomMenu
+              customButton={
+                <button
+                  type="button"
+                  className="flex h-full cursor-pointer items-center justify-between gap-1 rounded-sm border-[0.5px] border-strong px-2 py-0.5 text-11 hover:bg-layer-1"
+                >
+                  <ParentPropertyIcon className="h-3 w-3 flex-shrink-0" />
+                  <span className="whitespace-nowrap">
+                    {`${selectedParentIssue.project__identifier}-${selectedParentIssue.sequence_id}`}
+                  </span>
+                </button>
+              }
+              placement="bottom-start"
+              className="h-full w-full"
+              customButtonClassName="h-full"
+              tabIndex={getIndex("parent_id")}
+            >
+              <>
+                <CustomMenu.MenuItem className="!p-1" onClick={() => setParentIssueModalOpen(true)}>
+                  Change parent work item
+                </CustomMenu.MenuItem>
+                <CustomMenu.MenuItem
+                  className="!p-1"
+                  onClick={() => {
+                    handleData("parent_id", "");
+                    setSelectedParentIssue(undefined);
+                  }}
+                >
+                  Remove parent work item
+                </CustomMenu.MenuItem>
+              </>
+            </CustomMenu>
+          ) : (
+            <button
+              type="button"
+              className="flex h-full cursor-pointer items-center justify-between gap-1 rounded-sm border-[0.5px] border-strong px-2 py-0.5 text-11 hover:bg-layer-1"
+              onClick={() => setParentIssueModalOpen(true)}
+            >
+              <ParentPropertyIcon className="h-3 w-3 flex-shrink-0" />
+              <span className="whitespace-nowrap">Add parent</span>
+            </button>
+          )}
+
+          <ParentIssuesListModal
+            isOpen={parentIssueModalOpen}
+            handleClose={() => setParentIssueModalOpen(false)}
+            onChange={(issue) => {
+              handleData("parent_id", issue?.id);
+              setSelectedParentIssue(issue);
+            }}
+            projectId={projectId}
+            issueId={undefined}
+          />
+        </div>
+      )}
+    </>
+  );
+}
 
 export const InboxIssueProperties = observer(function InboxIssueProperties(props: TInboxIssueProperties) {
   const { projectId, data, handleData, isVisible = false } = props;
@@ -93,7 +257,7 @@ export const InboxIssueProperties = observer(function InboxIssueProperties(props
 
       {/* labels */}
       <div className="h-7">
-        <IssueLabelSelect
+        <LabelDropdown
           value={data?.label_ids || []}
           onChange={(labelIds) => handleData("label_ids", labelIds)}
           projectId={projectId}
@@ -101,137 +265,19 @@ export const InboxIssueProperties = observer(function InboxIssueProperties(props
         />
       </div>
 
-      {/* start date */}
-      {isVisible && (
-        <div className="h-7">
-          <DateDropdown
-            value={data?.start_date || null}
-            onChange={(date) => handleData("start_date", date ? renderFormattedPayloadDate(date) : "")}
-            buttonVariant="border-with-text"
-            minDate={minDate ?? undefined}
-            placeholder="Start date"
-            tabIndex={getIndex("start_date")}
-          />
-        </div>
-      )}
-
-      {/* due date */}
-      <div className="h-7">
-        <DateDropdown
-          value={data?.target_date || null}
-          onChange={(date) => handleData("target_date", date ? renderFormattedPayloadDate(date) : "")}
-          buttonVariant="border-with-text"
-          minDate={minDate ?? undefined}
-          placeholder="Due date"
-          tabIndex={getIndex("target_date")}
-        />
-      </div>
-
-      {/* cycle */}
-      {isVisible && (
-        <div className="h-7">
-          <CycleDropdown
-            value={data?.cycle_id || ""}
-            onChange={(cycleId) => handleData("cycle_id", cycleId)}
-            projectId={projectId}
-            placeholder="Cycle"
-            buttonVariant="border-with-text"
-            tabIndex={getIndex("cycle_id")}
-          />
-        </div>
-      )}
-
-      {/* module */}
-      {isVisible && (
-        <div className="h-7">
-          <ModuleDropdown
-            value={data?.module_ids || []}
-            onChange={(moduleIds) => handleData("module_ids", moduleIds)}
-            projectId={projectId}
-            placeholder="Modules"
-            buttonVariant="border-with-text"
-            multiple
-            showCount
-            tabIndex={getIndex("module_ids")}
-          />
-        </div>
-      )}
-
-      {/* estimate */}
-      {isVisible && projectId && areEstimateEnabledByProjectId(projectId) && (
-        <div className="h-7">
-          <EstimateDropdown
-            value={data?.estimate_point || undefined}
-            onChange={(estimatePoint) => handleData("estimate_point", estimatePoint)}
-            projectId={projectId}
-            buttonVariant="border-with-text"
-            placeholder="Estimate"
-            tabIndex={getIndex("estimate_point")}
-          />
-        </div>
-      )}
-
-      {/* add parent */}
-      {isVisible && (
-        <div className="h-7">
-          {selectedParentIssue ? (
-            <CustomMenu
-              customButton={
-                <button
-                  type="button"
-                  className="flex h-full cursor-pointer items-center justify-between gap-1 rounded-sm border-[0.5px] border-strong px-2 py-0.5 text-11 hover:bg-layer-1"
-                >
-                  <ParentPropertyIcon className="h-3 w-3 flex-shrink-0" />
-                  <span className="whitespace-nowrap">
-                    {selectedParentIssue
-                      ? `${selectedParentIssue.project__identifier}-${selectedParentIssue.sequence_id}`
-                      : `Add parent`}
-                  </span>
-                </button>
-              }
-              placement="bottom-start"
-              className="h-full w-full"
-              customButtonClassName="h-full"
-              tabIndex={getIndex("parent_id")}
-            >
-              <>
-                <CustomMenu.MenuItem className="!p-1" onClick={() => setParentIssueModalOpen(true)}>
-                  Change parent work item
-                </CustomMenu.MenuItem>
-                <CustomMenu.MenuItem
-                  className="!p-1"
-                  onClick={() => {
-                    handleData("parent_id", "");
-                    setSelectedParentIssue(undefined);
-                  }}
-                >
-                  Remove parent work item
-                </CustomMenu.MenuItem>
-              </>
-            </CustomMenu>
-          ) : (
-            <button
-              type="button"
-              className="flex h-full cursor-pointer items-center justify-between gap-1 rounded-sm border-[0.5px] border-strong px-2 py-0.5 text-11 hover:bg-layer-1"
-              onClick={() => setParentIssueModalOpen(true)}
-            >
-              <ParentPropertyIcon className="h-3 w-3 flex-shrink-0" />
-              <span className="whitespace-nowrap">Add parent</span>
-            </button>
-          )}
-
-          <ParentIssuesListModal
-            isOpen={parentIssueModalOpen}
-            handleClose={() => setParentIssueModalOpen(false)}
-            onChange={(issue) => {
-              handleData("parent_id", issue?.id);
-              setSelectedParentIssue(issue);
-            }}
-            projectId={projectId}
-            issueId={undefined}
-          />
-        </div>
-      )}
+      <InboxAdditionalProperties
+        areEstimatesEnabled={areEstimateEnabledByProjectId(projectId)}
+        data={data}
+        getIndex={getIndex}
+        handleData={handleData}
+        isVisible={isVisible}
+        minDate={minDate ?? undefined}
+        projectId={projectId}
+        parentIssueModalOpen={parentIssueModalOpen}
+        selectedParentIssue={selectedParentIssue}
+        setParentIssueModalOpen={setParentIssueModalOpen}
+        setSelectedParentIssue={setSelectedParentIssue}
+      />
     </div>
   );
 });

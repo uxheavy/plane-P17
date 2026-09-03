@@ -14,14 +14,14 @@ import { EUserPermissions } from "@plane/types";
 import { useLabel } from "@/hooks/store/use-label";
 import { useUserPermissions } from "@/hooks/store/user";
 // local imports
-import type { TWorkItemLabelSelectBaseProps } from "./base";
-import { WorkItemLabelSelectBase } from "./base";
+import type { TLabelDropdownBaseProps } from "./base";
+import { LabelDropdownBase } from "./base";
 
-type TWorkItemLabelSelectProps = Omit<TWorkItemLabelSelectBaseProps, "labelIds" | "getLabelById" | "onDropdownOpen"> & {
+type TLabelDropdownProps = Omit<TLabelDropdownBaseProps, "labelIds" | "getLabelById" | "onDropdownOpen"> & {
   projectId: string | undefined;
 };
 
-export const IssueLabelSelect = observer(function IssueLabelSelect(props: TWorkItemLabelSelectProps) {
+export const LabelDropdown = observer(function LabelDropdown(props: TLabelDropdownProps) {
   const { projectId } = props;
   // router
   const { workspaceSlug } = useParams();
@@ -48,7 +48,7 @@ export const IssueLabelSelect = observer(function IssueLabelSelect(props: TWorkI
   };
 
   return (
-    <WorkItemLabelSelectBase
+    <LabelDropdownBase
       {...props}
       getLabelById={getLabelById}
       labelIds={projectLabelIds ?? []}

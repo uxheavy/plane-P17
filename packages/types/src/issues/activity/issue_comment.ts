@@ -79,6 +79,7 @@ export interface ActorDetail {
   display_name?: string;
   first_name?: string;
   is_bot?: boolean;
+  bot_type?: "AGENT" | "WORKSPACE_SEED" | null;
   id?: string;
   last_name?: string;
 }
