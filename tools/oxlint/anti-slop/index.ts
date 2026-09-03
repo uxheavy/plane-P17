@@ -1,3 +1,6 @@
+// Copyright (c) 2026-present Ngo Quoc Huy
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { eslintCompatPlugin } from "@oxlint/plugins";
 
 import { noChainedTypeAssertionsRule } from "./rules/no-chained-type-assertions.ts";

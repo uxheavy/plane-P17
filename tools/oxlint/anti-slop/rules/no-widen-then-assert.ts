@@ -1,3 +1,6 @@
+// Copyright (c) 2026-present Ngo Quoc Huy
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree, Variable } from "@oxlint/plugins";
 
