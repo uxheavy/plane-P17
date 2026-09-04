@@ -97,29 +97,20 @@ Normal durable acknowledgement is silent in the editor. V0 shows no routine
 Saving/Saved status, but it must show actionable disconnected, read-only, and
 persistence-failed states.
 
-On realtime loss:
+ADR-0008 is the canonical owner of local authoring and recovery policy. During
+transient relay or save failures, the editor may continue native geometry and
+authored-text editing and retain exact scene bytes in the existing pending
+queue and bounded recovery journal for silent autosync. The relay remains
+transport-only: it never authorizes source records, protected bindings, or
+assets, and it must not replace a newer local gesture with fetched state on
+reconnect.
 
-- keep the last synchronized scene visible;
-- disable every Work Map mutation;
-- queue no offline edits; and
-- after reconnect, fetch and apply fresh authoritative state before re-enabling
-  mutation. Socket reopen alone is insufficient.
-
-Only unacknowledged updates may enter a bounded, expiring recovery journal
-scoped to user, Work Map, and generation. Durable acknowledgement or explicit
-discard removes them. The journal is not an offline document and does not
-permit continued editing or accumulate a multi-update queue.
-
-After persistence failure, freeze mutation and retain the pending update. A
-reload, reconnect, permission/lock/archive change, or generation change requires
-fresh authorization and authoritative resynchronization. The user may then
-explicitly retry if still authorized and the generation is current. Never
-replay, merge, discard, or mark recovered state durable silently. Failed retry
-remains visible and read-only. Expiry, generation mismatch, revoked authority,
-or incompatible authoritative state makes the journal entry non-replayable.
-Explicit discard removes it earlier; expiry triggers eventual
-device-local deletion without replay. No arbitrary lifetime is selected before
-the storage and review contract is proved.
+Generation/CAS and `collaboration_epoch` guards, fresh permission, and the
+existing journal lifecycle decide whether a draft may autosync. Permission
+revocation, lock/archive or association loss, version restore/epoch change, and
+local-storage failure remain hard boundaries. No stale draft may silently
+replay, merge, discard, or claim durable authority across a boundary. No
+offline asset guarantee is made; raw image bytes are not journaled.
 
 ### Versions and generation
 
@@ -193,10 +184,11 @@ Work Map acceptance suite rather than copied into production code.
   metadata and scene payloads from logs.
 - Exact scene binary must survive persistence and restart without Yjs or
   rich-text conversion.
-- Disconnect, persistence failure, journal retry, acknowledgement cleanup,
-  explicit discard, expiry cleanup, permission revocation, generation mismatch,
-  and version restoration must prove no silent edit, replay, loss, or stale
-  write.
+- Relay or save failure, native authoring continuation, silent autosync,
+  acknowledgement cleanup, explicit discard, expiry cleanup, permission
+  revocation, generation mismatch, and version restoration must prove that
+  local drafts are preserved without unauthorized source, binding, or asset
+  writes, stale replay, silent loss, or stale writes.
 - The bounded gate report must record package revision, wire representation,
   deterministic inputs/delivery, serialized results, undo result, and selected
   path. ADR-0006 makes it a release gate.
@@ -221,8 +213,10 @@ or permanent operational cost.
 
 ### Offline Yjs persistence
 
-Rejected because V0 is online-only and silent reconnect merge conflicts with
-current authorization and version generations.
+Rejected as a second realtime or persistence owner. The existing bounded local
+scene journal and pending queue support transient geometry/text authoring, while
+source actions, protected bindings, and assets remain server-authorized; no
+cross-epoch recovery merge is introduced.
 
 ## Consequences
 
@@ -230,6 +224,8 @@ current authorization and version generations.
   authorization plus bounded periodic reauthorization.
 - Work Map gains cross-instance transport without a second persistence owner or
   a second standalone realtime service.
-- Editing availability depends on Plane Live and authoritative resync.
+- Native geometry/text authoring can continue through transient relay or save
+  failures under ADR-0008; server-authorized source, binding, and asset
+  mutations still depend on Plane Live and current authorization.
 - Encoding uncertainty is paid once in a bounded gate rather than embedded as
   rescue complexity in production.
