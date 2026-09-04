@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.work_map import can_read_work_map_source
 from plane.app.serializers import WorkMapVersionRestoreSerializer, WorkMapVersionSerializer
+from plane.app.work_map_relay import WorkMapRelayCloseReason, force_close_work_map_relay_on_commit
 from plane.db.models import (
     Document,
     DocumentVersion,
@@ -244,6 +245,11 @@ class WorkMapVersionRestoreEndpoint(BaseAPIView):
             work_map.save(update_fields=["scene_binary", "generation", "collaboration_epoch"])
             document.updated_by = request.user
             document.save(update_fields=["updated_by", "updated_at"])
+            force_close_work_map_relay_on_commit(
+                slug,
+                str(work_map.pk),
+                WorkMapRelayCloseReason.GENERATION_CHANGED,
+            )
 
         return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
 
