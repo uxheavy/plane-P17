@@ -435,7 +435,9 @@ class GenericAssetEndpoint(BaseAPIView):
             workspace = Workspace.objects.get(slug=slug)
 
             # Get the asset
-            asset = FileAsset.objects.get(id=asset_id, workspace_id=workspace.id, is_deleted=False)
+            asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+                id=asset_id, workspace_id=workspace.id, is_deleted=False
+            )
 
             # Check if the asset exists and is uploaded
             if not asset.is_uploaded:
@@ -450,9 +452,7 @@ class GenericAssetEndpoint(BaseAPIView):
             # (default MinIO self-hosted setup).
             storage = S3Storage(request=request, is_server=True)
             asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
-            disposition = (
-                "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
-            )
+            disposition = "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
             presigned_url = storage.generate_presigned_url(
                 object_name=asset.asset.name,
                 filename=asset.attributes.get("name"),
@@ -618,7 +618,9 @@ class GenericAssetEndpoint(BaseAPIView):
         and trigger metadata extraction.
         """
         try:
-            asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug, is_deleted=False)
+            asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+                id=asset_id, workspace__slug=slug, is_deleted=False
+            )
 
             # Update is_uploaded status
             asset.is_uploaded = request.data.get("is_uploaded", asset.is_uploaded)
