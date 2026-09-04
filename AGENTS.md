@@ -92,15 +92,15 @@ tests; this map is advisory guidance.
 - **Realtime relay:** [`work-map-relay.ts`](apps/live/src/services/work-map-relay.ts),
   its Work Map service, and [`server.ts`](apps/live/src/server.ts) own the
   authenticated transport/session relay, not durable Plane source data.
-- **Acceptance bootstrap, repair, receipts, and cleanup:** the external Plane
-  Runner `bootstrap_repair` owner. Keep that lifecycle out of product repos.
+- **Acceptance provisioning, receipts, and cleanup:** the external Plane
+  Runner's `tests/acceptance/runner/` lifecycle. Keep that lifecycle out of
+  product repos.
 
 Current source carriers are ordinary Excalidraw rectangles with an opaque
 `customData.nodeKey`. Plane renders their cards through `renderHostElement`,
-whose host containers currently have `pointer-events: none`. If click, peek,
-selection, or placement behavior changes, review the shared host/editor
-interaction seam first. Do not add per-source event or geometry workarounds;
-the click/peek design remains under discussion.
+whose host containers currently have `pointer-events: none`. Keep interaction
+at this shared host/editor seam and reuse its existing selection and hit
+testing behavior before introducing per-source event or geometry code.
 
 ## Work Map verification map
 
@@ -111,8 +111,3 @@ Use the existing package commands for focused proof:
 - API: `docker compose -f docker-compose-test.yml run --rm api-tests pytest <focused Work Map test path>`.
 - Excalidraw sibling: `yarn test:app --run <focused test paths>`.
 - Documentation-only edits: `git diff --check`.
-
-The review handoff recorded 20 targeted web tests and 2 API contract tests as
-passing. Its separate Excalidraw run collected 119 tests, with 118 passed and
-1 snapshot mismatch, so that receipt is partial evidence rather than a green
-UX claim. Recheck the current candidate before making a passing claim.
