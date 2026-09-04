@@ -51,3 +51,68 @@ Prereq (once): `./setup.sh` — generates `apps/api/.env` from `.env.example`.
 - Teardown: `docker compose -f docker-compose-test.yml down -v`
 
 See `apps/api/tests/RUNNING_TESTS.md` for the full walkthrough and troubleshooting; see `apps/api/tests/TESTING_GUIDE.md` for test conventions and fixtures.
+
+## Work Map ownership map
+
+Keep this boundary DRY: each concern has one canonical owner, and this file
+only routes readers. The [Work Map decision records](docs/decisions/) are
+revisable rationale; they are not UX or release proof. If current source or
+evidence disproves a decision, revisit the decision and owner before adding a
+second seam. Executable invariants belong in the listed owners and their
+tests; this map is advisory guidance.
+
+- **Plane source records, authorization, and source actions:** native Plane
+  models plus the per-source [issue views](apps/api/plane/app/views/issue/)
+  and [page views](apps/api/plane/app/views/page/), with the Work Map read gate
+  in [`work_map.py`](apps/api/plane/app/permissions/work_map.py). Source
+  discovery and readback live in
+  [`work_map_source.py`](apps/api/plane/app/views/work_map_source.py). Work
+  Map bindings keep opaque references and do not copy source state or own
+  source mutations.
+- **Document lifecycle:** [`document.py`](apps/api/plane/db/models/document.py),
+  [`document.py`](apps/api/plane/app/permissions/document.py), and Work Map
+  lifecycle views in [`work_map/base.py`](apps/api/plane/app/views/work_map/base.py),
+  with the web list/detail state and API adapter in
+  [`work-map.store.ts`](apps/web/core/store/work-map.store.ts) and
+  [`work-map.service.ts`](apps/web/core/services/work-map.service.ts).
+- **Work Map scene and protected bindings:** the backend model in
+  [`work_map.py`](apps/api/plane/db/models/work_map.py), the scene/binding
+  endpoints in [`apps/api/plane/app/views/work_map/`](apps/api/plane/app/views/work_map/),
+  and the web editor in
+  [`apps/web/core/components/work-maps/editor/`](apps/web/core/components/work-maps/editor/).
+- **Read-only source hydration:** the API read projection and authorization
+  above, [`work-map.store.ts`](apps/web/core/store/work-map.store.ts), and
+  [`source-node.tsx`](apps/web/core/components/work-maps/source-node.tsx).
+  Hydration is a viewer projection; it is not a second source record or a
+  source mutation path.
+- **Excalidraw scene arrangement and history:** the sibling
+  `excalidraw-work-map` checkout's public host contract in
+  `packages/excalidraw/{types.ts,index.tsx,components/App.tsx}`. Plane owns
+  domain projections and policy, while the editor owns native scene behavior.
+- **Realtime relay:** [`work-map-relay.ts`](apps/live/src/services/work-map-relay.ts),
+  its Work Map service, and [`server.ts`](apps/live/src/server.ts) own the
+  authenticated transport/session relay, not durable Plane source data.
+- **Acceptance bootstrap, repair, receipts, and cleanup:** the external Plane
+  Runner `bootstrap_repair` owner. Keep that lifecycle out of product repos.
+
+Current source carriers are ordinary Excalidraw rectangles with an opaque
+`customData.nodeKey`. Plane renders their cards through `renderHostElement`,
+whose host containers currently have `pointer-events: none`. If click, peek,
+selection, or placement behavior changes, review the shared host/editor
+interaction seam first. Do not add per-source event or geometry workarounds;
+the click/peek design remains under discussion.
+
+## Work Map verification map
+
+Use the existing package commands for focused proof:
+
+- Web: `pnpm --filter web test -- <focused Work Map test paths>` (the web
+  package's canonical script is `vitest run`).
+- API: `docker compose -f docker-compose-test.yml run --rm api-tests pytest <focused Work Map test path>`.
+- Excalidraw sibling: `yarn test:app --run <focused test paths>`.
+- Documentation-only edits: `git diff --check`.
+
+The review handoff recorded 20 targeted web tests and 2 API contract tests as
+passing. Its separate Excalidraw run collected 119 tests, with 118 passed and
+1 snapshot mismatch, so that receipt is partial evidence rather than a green
+UX claim. Recheck the current candidate before making a passing claim.
