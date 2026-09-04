@@ -10,6 +10,7 @@
     "preview": "react-router build && serve -s build/client -l 3000",
     "start": "serve -s build/client -l 3000",
     "test": "vitest run",
+    "test:reference": "bash tests/reference/work-item-create-form/run.sh",
     "clean": "rm -rf .turbo && rm -rf .next && rm -rf .react-router && rm -rf node_modules && rm -rf dist && rm -rf build",
     "check:lint": "oxlint --max-warnings=11957 .",
     "check:types": "react-router typegen && tsc --noEmit",
@@ -79,6 +80,7 @@
   "devDependencies": {
     "@plane/tailwind-config": "workspace:*",
     "@plane/typescript-config": "workspace:*",
+    "@playwright/test": "catalog:",
     "@react-router/dev": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@tailwindcss/typography": "catalog:",

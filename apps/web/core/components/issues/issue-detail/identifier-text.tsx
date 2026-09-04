@@ -54,6 +54,7 @@ export function IdentifierText(props: TIdentifierTextProps) {
         type="button"
         className={cn("text-12 font-medium whitespace-nowrap text-tertiary", textSizeClassName, variantClassName, {
           "cursor-pointer": enableClickToCopyIdentifier,
+          "pointer-events-none": !enableClickToCopyIdentifier,
         })}
         onClick={handleCopyIssueIdentifier}
         disabled={!enableClickToCopyIdentifier}

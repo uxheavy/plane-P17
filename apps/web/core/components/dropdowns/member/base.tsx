@@ -4,8 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "@plane/i18n";
 import { ChevronDownIcon } from "@plane/propel/icons";
@@ -13,9 +14,11 @@ import { ChevronDownIcon } from "@plane/propel/icons";
 import type { IUserLite } from "@plane/types";
 import { ComboDropDown } from "@plane/ui";
 // helpers
-import { cn } from "@plane/utils";
+import { cn, sortByCurrentUserThenSelected } from "@plane/utils";
 // hooks
 import { useDropdown } from "@/hooks/use-dropdown";
+import { useMember } from "@/hooks/store/use-member";
+import { useUser } from "@/hooks/store/user";
 // local imports
 import { DropdownButton } from "../buttons";
 import { BUTTON_VARIANTS_WITH_TEXT } from "../constants";
@@ -64,10 +67,15 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
   } = props;
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-  // popper-js refs
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
   // states
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const { workspaceSlug } = useParams();
+  const { data: currentUser } = useUser();
+  const {
+    workspace: { isUserSuspended },
+  } = useMember();
 
   const comboboxProps = {
     value,
@@ -75,6 +83,16 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
     disabled,
     multiple,
   };
+
+  const normalizedQuery = query.toLowerCase();
+  const memberOptions = (memberIds ?? []).reduce<{ value: string }[]>((options, memberId) => {
+    const member = getUserDetails(memberId);
+    if (`${member?.display_name} ${member?.first_name} ${member?.last_name}`.toLowerCase().includes(normalizedQuery))
+      options.push({ value: memberId });
+    return options;
+  }, []);
+  const virtualOptions =
+    sortByCurrentUserThenSelected(memberOptions, value, currentUser?.id)?.map((option) => option.value) ?? [];
 
   const { handleClose, handleKeyDown, handleOnClick } = useDropdown({
     dropdownRef,
@@ -88,22 +106,30 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
     if (!multiple) handleClose();
   };
 
-  const getDisplayName = (value: string | string[] | null, showUserDetails: boolean, placeholder: string = "") => {
-    if (Array.isArray(value)) {
-      if (value.length > 0) {
-        if (value.length === 1) {
-          return getUserDetails(value[0])?.display_name || placeholder;
+  useEffect(() => {
+    if (!isOpen) setQuery("");
+  }, [isOpen]);
+
+  const getDisplayName = (
+    displayValue: string | string[] | null,
+    includeUserDetails: boolean,
+    emptyPlaceholder: string = ""
+  ) => {
+    if (Array.isArray(displayValue)) {
+      if (displayValue.length > 0) {
+        if (displayValue.length === 1) {
+          return getUserDetails(displayValue[0])?.display_name || emptyPlaceholder;
         } else {
-          return showUserDetails ? `${value.length} ${t("members").toLocaleLowerCase()}` : "";
+          return includeUserDetails ? `${displayValue.length} ${t("members").toLocaleLowerCase()}` : "";
         }
       } else {
-        return placeholder;
+        return emptyPlaceholder;
       }
     } else {
-      if (showUserDetails && value) {
-        return getUserDetails(value)?.display_name || placeholder;
+      if (includeUserDetails && displayValue) {
+        return getUserDetails(displayValue)?.display_name || emptyPlaceholder;
       } else {
-        return placeholder;
+        return emptyPlaceholder;
       }
     }
   };
@@ -162,24 +188,31 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
   return (
     <ComboDropDown
       as="div"
+      role="group"
       ref={dropdownRef}
       {...comboboxProps}
       className={cn("h-full", className)}
       onChange={dropdownOnChange}
       onKeyDown={handleKeyDown}
+      onClose={handleClose}
       button={comboButton}
       renderByDefault={renderByDefault}
+      virtual={{
+        options: virtualOptions,
+        disabled: (memberId) => !!memberId && isUserSuspended(memberId, workspaceSlug?.toString()),
+      }}
     >
       {isOpen && (
         <MemberOptions
           getUserDetails={getUserDetails}
           isOpen={isOpen}
-          memberIds={memberIds}
           onDropdownOpen={onDropdownOpen}
+          options={virtualOptions}
           optionsClassName={optionsClassName}
           placement={placement}
           referenceElement={referenceElement}
-          value={value}
+          query={query}
+          setQuery={setQuery}
         />
       )}
     </ComboDropDown>

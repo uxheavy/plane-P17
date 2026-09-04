@@ -48,6 +48,7 @@ export type TIssueActivityUserDetail = {
   last_name: string;
   avatar_url: string;
   is_bot: boolean;
+  bot_type?: "AGENT" | "WORKSPACE_SEED" | null;
   display_name: string;
 };
 

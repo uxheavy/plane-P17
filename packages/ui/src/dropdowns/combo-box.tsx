@@ -5,7 +5,7 @@
  */
 
 import { Combobox } from "@headlessui/react";
-import type { ElementType, KeyboardEventHandler, ReactNode, Ref } from "react";
+import type { AriaRole, ElementType, KeyboardEventHandler, ReactNode, Ref } from "react";
 import React, { Fragment, forwardRef, useEffect, useRef, useState } from "react";
 
 type Props = {
@@ -13,11 +13,17 @@ type Props = {
   ref?: Ref<HTMLElement> | undefined;
   tabIndex?: number | undefined;
   className?: string | undefined;
+  role?: AriaRole;
   value?: string | string[] | null;
   onChange?: (value: any) => void;
+  onClose?: () => void;
   disabled?: boolean | undefined;
   onKeyDown?: KeyboardEventHandler<HTMLDivElement> | undefined;
   multiple?: boolean;
+  virtual?: {
+    options: (string | null)[];
+    disabled?: (value: string | null) => boolean;
+  } | null;
   renderByDefault?: boolean;
   button: ReactNode;
   children: ReactNode;

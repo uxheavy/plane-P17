@@ -729,6 +729,16 @@ class IssueCommentSerializer(BaseSerializer):
     """
 
     is_member = serializers.BooleanField(read_only=True)
+    mentioned_user_ids = serializers.SerializerMethodField()
+
+    def get_mentioned_user_ids(self, obj) -> list[str]:
+        try:
+            document = html.fragment_fromstring(obj.comment_html or "", create_parent=True)
+            return list(
+                dict.fromkeys(document.xpath('//mention-component[@entity_name="user_mention"]/@entity_identifier'))
+            )
+        except (TypeError, ValueError):
+            return []
 
     class Meta:
         model = IssueComment

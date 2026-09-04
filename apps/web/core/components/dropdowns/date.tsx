@@ -4,10 +4,9 @@
  * See the LICENSE file for details.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { createPopper } from "@popperjs/core";
 import { observer } from "mobx-react";
-import { createPortal } from "react-dom";
-import { usePopper } from "react-popper";
 import { CalendarDays } from "lucide-react";
 import { Combobox } from "@headlessui/react";
 // ui
@@ -75,29 +74,31 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const popperRef = useRef<HTMLDivElement | null>(null);
   // hooks
   const { data } = useUserProfile();
   const startOfWeek = data?.start_of_the_week;
-  // popper-js refs
-  const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
-  // popper-js init
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
-    placement: placement ?? "bottom-start",
-    modifiers: [
-      {
-        name: "preventOverflow",
-        options: {
-          padding: 12,
-        },
-      },
-    ],
-  });
+
+  useLayoutEffect(() => {
+    if (!isOpen || !popperRef.current) return;
+    const referenceElement = dropdownRef.current?.querySelector("button");
+    if (!referenceElement) return;
+    const popper = createPopper(referenceElement, popperRef.current, {
+      placement: placement ?? "bottom-start",
+      strategy: "fixed",
+      modifiers: [
+        { name: "offset", options: { offset: [0, 4] } },
+        { name: "preventOverflow", options: { padding: 12 } },
+      ],
+    });
+    popper.forceUpdate();
+    return () => popper.destroy();
+  }, [isOpen, placement]);
 
   const isDateSelected = value && value.toString().trim() !== "";
 
   const onOpen = () => {
-    if (referenceElement) referenceElement.focus();
+    dropdownRef.current?.querySelector("button")?.focus();
   };
 
   const { handleClose, handleKeyDown, handleOnClick } = useDropdown({
@@ -112,7 +113,7 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
     onChange(val);
     if (closeOnSelect) {
       handleClose();
-      referenceElement?.blur();
+      dropdownRef.current?.querySelector("button")?.blur();
     }
   };
 
@@ -131,7 +132,6 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
         },
         buttonContainerClassName
       )}
-      ref={setReferenceElement}
       onClick={handleOnClick}
       disabled={disabled}
     >
@@ -167,6 +167,7 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
   return (
     <ComboDropDown
       as="div"
+      role="group"
       ref={dropdownRef}
       tabIndex={tabIndex}
       className={cn("h-full", className)}
@@ -179,37 +180,36 @@ export const DateDropdown = observer(function DateDropdown(props: Props) {
       disabled={disabled}
       renderByDefault={renderByDefault}
     >
-      {isOpen &&
-        createPortal(
-          <Combobox.Options as="ul" data-prevent-outside-click static>
-            <div
-              className={cn(
-                "z-30 my-1 overflow-hidden rounded-md border-[0.5px] border-strong bg-surface-1 shadow-raised-200",
-                optionsClassName
-              )}
-              ref={setPopperElement}
-              style={styles.popper}
-              {...attributes.popper}
-            >
-              <Calendar
-                className="rounded-md border border-subtle p-3"
-                captionLayout="dropdown"
-                selected={getDate(value)}
-                defaultMonth={getDate(value)}
-                onSelect={(date: Date | undefined) => {
-                  dropdownOnChange(date ?? null);
-                }}
-                showOutsideDays
-                initialFocus
-                disabled={disabledDays}
-                mode="single"
-                fixedWeeks
-                weekStartsOn={startOfWeek}
-              />
-            </div>
-          </Combobox.Options>,
-          document.body
-        )}
+      {isOpen && (
+        <Combobox.Options
+          as="div"
+          className={cn(
+            "z-30 overflow-hidden rounded-md border-[0.5px] border-strong bg-surface-1 shadow-raised-200",
+            optionsClassName
+          )}
+          data-prevent-outside-click
+          modal={false}
+          portal
+          ref={popperRef}
+          static
+        >
+          <Calendar
+            className="rounded-md border border-subtle p-3"
+            captionLayout="dropdown"
+            selected={getDate(value)}
+            defaultMonth={getDate(value)}
+            onSelect={(date: Date | undefined) => {
+              dropdownOnChange(date ?? null);
+            }}
+            showOutsideDays
+            initialFocus
+            disabled={disabledDays}
+            mode="single"
+            fixedWeeks
+            weekStartsOn={startOfWeek}
+          />
+        </Combobox.Options>
+      )}
     </ComboDropDown>
   );
 });

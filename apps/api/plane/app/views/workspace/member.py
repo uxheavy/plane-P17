@@ -4,6 +4,7 @@
 
 # Django imports
 from django.db.models import Count, Q, OuterRef, Subquery, IntegerField
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models.functions import Coalesce
 
@@ -23,6 +24,7 @@ from plane.app.serializers import (
 from plane.app.views.base import BaseAPIView
 from plane.db.models import Project, ProjectMember, WorkspaceMember, DraftIssue
 from plane.utils.cache import invalidate_cache
+from plane.utils.agent import agent_user_q, is_agent_user
 
 from .. import BaseViewSet
 
@@ -39,6 +41,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             super()
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(Q(member__is_bot=False) | (agent_user_q("member__") & Q(is_active=True, member__is_active=True)))
             .select_related("member", "member__avatar_asset")
         )
 
@@ -75,9 +78,12 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
-        workspace_member = WorkspaceMember.objects.get(
-            pk=pk, workspace__slug=slug, member__is_bot=False, is_active=True
-        )
+        workspace_member = get_object_or_404(self.get_queryset(), pk=pk, is_active=True)
+        if is_agent_user(workspace_member.member):
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
         if request.user.id == workspace_member.member_id:
             return Response(
                 {"error": "You cannot update your own role"},
@@ -98,9 +104,12 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, slug, pk):
         # Check the user role who is deleting the user
-        workspace_member = WorkspaceMember.objects.get(
-            workspace__slug=slug, pk=pk, member__is_bot=False, is_active=True
-        )
+        workspace_member = get_object_or_404(self.get_queryset(), pk=pk, is_active=True)
+        if is_agent_user(workspace_member.member):
+            return Response(
+                {"error": "Agent membership is lifecycle-managed"},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # check requesting user role
         requesting_workspace_member = WorkspaceMember.objects.get(

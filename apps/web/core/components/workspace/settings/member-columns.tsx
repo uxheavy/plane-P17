@@ -19,14 +19,14 @@ import type { IUser, IWorkspaceMember } from "@plane/types";
 import { CustomSelect, PopoverMenu } from "@plane/ui";
 // helpers
 import { getFileURL } from "@plane/utils";
+
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
-
-export interface RowData {
-  member: IWorkspaceMember;
+import { isNativeAgent } from "@/store/member/utils";
+export interface RowData extends Omit<IWorkspaceMember, "member" | "role"> {
+  member: IWorkspaceMember["member"] & Pick<IWorkspaceMember, "last_login_medium">;
   role: EUserPermissions;
-  is_active: boolean;
 }
 
 type NameProps = {
@@ -47,6 +47,7 @@ export function NameColumn(props: NameProps) {
   // derived values
   const { avatar_url, display_name, email, first_name, id, last_name } = rowData.member;
   const isSuspended = rowData.is_active === false;
+  const isAgent = isNativeAgent(rowData.member);
 
   return (
     <Disclosure>
@@ -76,31 +77,24 @@ export function NameColumn(props: NameProps) {
                 </Link>
               )}
               <span className={isSuspended ? "text-placeholder" : ""}>
-                {first_name} {last_name}
+                {isAgent ? display_name : `${first_name} ${last_name}`}
               </span>
             </div>
 
-            {!isSuspended && (isAdmin || id === currentUser?.id) && (
+            {!isSuspended && !isAgent && (isAdmin || id === currentUser?.id) && (
               <PopoverMenu
                 data={[""]}
                 keyExtractor={(item) => item}
                 popoverClassName="justify-end"
                 buttonClassName="outline-none	origin-center rotate-90 size-8 aspect-square flex-shrink-0 grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity"
                 render={() => (
-                  <div
-                    role="button"
-                    tabIndex={0}
+                  <button
+                    type="button"
                     className="flex cursor-pointer items-center gap-x-3"
                     onClick={() => setRemoveMemberModal(rowData)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setRemoveMemberModal(rowData);
-                      }
-                    }}
                   >
                     <TrashIcon className="size-3.5 align-middle" /> {id === currentUser?.id ? "Leave " : "Remove "}
-                  </div>
+                  </button>
                 )}
               />
             )}
@@ -111,7 +105,7 @@ export function NameColumn(props: NameProps) {
   );
 }
 
-export const AccountTypeColumn = observer(function AccountTypeColumn(props: AccountTypeProps) {
+const AccountTypeColumnView = observer(function AccountTypeColumnView(props: AccountTypeProps) {
   const { rowData, workspaceSlug } = props;
   // form info
   const {
@@ -128,13 +122,20 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
 
   // derived values
   const isCurrentUser = currentUser?.id === rowData.member.id;
+  const isAgent = isNativeAgent(rowData.member);
   const isAdminRole = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const isRoleNonEditable = isCurrentUser || !isAdminRole;
+  const isRoleNonEditable = isAgent || isCurrentUser || !isAdminRole;
   const isSuspended = rowData.is_active === false;
 
   return (
     <>
-      {isSuspended ? (
+      {isAgent ? (
+        <div className="flex w-32">
+          <Pill variant={EPillVariant.DEFAULT} size={EPillSize.SM} className="border-none">
+            Agent
+          </Pill>
+        </div>
+      ) : isSuspended ? (
         <div className="flex w-32">
           <Pill variant={EPillVariant.DEFAULT} size={EPillSize.SM} className="border-none">
             Suspended
@@ -152,11 +153,11 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
           render={({ field: { value } }) => (
             <CustomSelect
               value={value as EUserPermissions}
-              onChange={async (value: EUserPermissions) => {
+              onChange={async (nextRole: EUserPermissions) => {
                 if (!workspaceSlug) return;
                 try {
                   await updateMember(workspaceSlug.toString(), rowData.member.id, {
-                    role: value as unknown as EUserPermissions,
+                    role: nextRole,
                   });
                 } catch (err: unknown) {
                   const error = err as { error?: string | string[] };
@@ -190,3 +191,7 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
     </>
   );
 });
+
+export function AccountTypeColumn(props: AccountTypeProps) {
+  return <AccountTypeColumnView {...props} />;
+}

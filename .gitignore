@@ -108,6 +108,9 @@ build/
 
 build/
 .react-router/
+test-results/
+playwright-report/
+output/playwright/
 temp/
 scripts/
 !packages/i18n/scripts/

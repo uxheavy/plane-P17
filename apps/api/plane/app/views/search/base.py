@@ -42,6 +42,7 @@ from plane.db.models import (
     WorkspaceMember,
     Document,
 )
+from plane.utils.agent import human_or_agent_user_q
 
 
 class GlobalSearchEndpoint(BaseAPIView):
@@ -391,9 +392,9 @@ class SearchEndpoint(BaseAPIView):
                     users = (
                         ProjectMember.objects.filter(
                             q,
+                            human_or_agent_user_q("member__"),
                             is_active=True,
                             workspace__slug=slug,
-                            member__is_bot=False,
                             project_id=project_id,
                         )
                         .annotate(
@@ -603,9 +604,9 @@ class SearchEndpoint(BaseAPIView):
                     users = (
                         WorkspaceMember.objects.filter(
                             q,
+                            human_or_agent_user_q("member__"),
                             is_active=True,
                             workspace__slug=slug,
-                            member__is_bot=False,
                         )
                         .annotate(
                             member__avatar_url=Case(

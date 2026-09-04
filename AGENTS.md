@@ -23,6 +23,16 @@
 - **Testing**: All features require unit tests, use existing test framework per package
 - **Components**: Build in `@plane/ui` with Storybook for isolated development
 
+## Web tests
+
+Frontend tests for `apps/web` live under `apps/web/tests` and mirror the source path beneath `apps/web`. Keep production helpers beside their owning source when they are not reusable application primitives.
+
+Reference-consumer scenarios live under `apps/web/tests/reference` and exercise production entry points through deterministic representative stores or services.
+
+- Run all web tests: `pnpm --filter=web test`
+- Run web reference tests: `pnpm --filter=web test:reference`
+- Run one web test: `pnpm --filter=web test -- <path-under-apps/web>`
+
 ## Feature shape acceptance
 
 - Green behavior, tests, and builds are necessary but not sufficient for a new

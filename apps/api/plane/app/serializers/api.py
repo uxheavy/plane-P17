@@ -18,6 +18,7 @@ class APITokenSerializer(BaseSerializer):
             "created_at",
             "updated_at",
             "workspace",
+            "purpose",
             "user",
             "is_active",
             "last_used",

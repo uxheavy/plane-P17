@@ -20,6 +20,7 @@ import type { IMemberRootStore } from "../index.ts";
 import type { IWorkspaceMemberFiltersStore } from "./workspace-member-filters.store";
 import { WorkspaceMemberFiltersStore } from "./workspace-member-filters.store";
 import type { RootStore } from "@/store/root.store";
+import { isNativeAgent } from "../utils";
 
 export interface IWorkspaceMembership {
   id: string;
@@ -77,6 +78,15 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
   // services
   workspaceService;
 
+  private isVisibleMember = (membership: IWorkspaceMembership) => {
+    const user = this.memberRoot?.memberMap?.[membership.member];
+    return !user?.is_bot || isNativeAgent(user);
+  };
+
+  private isActiveMember = (membership: IWorkspaceMembership) => {
+    return membership.is_active && this.isVisibleMember(membership);
+  };
+
   constructor(_memberRoot: IMemberRootStore, _rootStore: RootStore) {
     makeObservable(this, {
       // observables
@@ -132,8 +142,10 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
       (m) => m.member !== this.userStore?.data?.id,
       (m) => this.memberRoot?.memberMap?.[m.member]?.display_name?.toLowerCase(),
     ]);
-    //filter out bots
-    const memberIds = members.filter((m) => !this.memberRoot?.memberMap?.[m.member]?.is_bot).map((m) => m.member);
+    const memberIds = members.reduce<string[]>((ids, member) => {
+      if (this.isActiveMember(member)) ids.push(member.member);
+      return ids;
+    }, []);
     return memberIds;
   });
 
@@ -143,8 +155,7 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
    */
   getFilteredWorkspaceMemberIds = computedFn((workspaceSlug: string) => {
     let members = Object.values(this.workspaceMemberMap?.[workspaceSlug] ?? {});
-    //filter out bots and inactive members
-    members = members.filter((m) => !this.memberRoot?.memberMap?.[m.member]?.is_bot);
+    members = members.filter(this.isVisibleMember);
 
     // Use filters store to get filtered member ids
     const memberIds = this.filtersStore.getFilteredMemberIds(
@@ -235,15 +246,17 @@ export class WorkspaceMemberStore implements IWorkspaceMemberStore {
   fetchWorkspaceMembers = async (workspaceSlug: string) =>
     await this.workspaceService.fetchWorkspaceMembers(workspaceSlug).then((response) => {
       runInAction(() => {
+        const memberships: Record<string, IWorkspaceMembership> = {};
         response.forEach((member) => {
           set(this.memberRoot?.memberMap, member.member.id, { ...member.member, joining_date: member.created_at });
-          set(this.workspaceMemberMap, [workspaceSlug, member.member.id], {
+          memberships[member.member.id] = {
             id: member.id,
             member: member.member.id,
-            role: member.role,
+            role: member.role as EUserPermissions,
             is_active: member.is_active,
-          });
+          };
         });
+        set(this.workspaceMemberMap, workspaceSlug, memberships);
       });
       return response;
     });

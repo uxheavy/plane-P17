@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from .asset import urlpatterns as asset_patterns
+from .agent_membership import urlpatterns as agent_membership_patterns
 from .cycle import urlpatterns as cycle_patterns
 from .intake import urlpatterns as intake_patterns
 from .label import urlpatterns as label_patterns
@@ -16,6 +17,7 @@ from .invite import urlpatterns as invite_patterns
 from .sticky import urlpatterns as sticky_patterns
 
 urlpatterns = [
+    *agent_membership_patterns,
     *asset_patterns,
     *cycle_patterns,
     *intake_patterns,

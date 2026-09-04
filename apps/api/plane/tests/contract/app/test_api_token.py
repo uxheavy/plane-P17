@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from plane.db.models import APIToken, User
+from plane.db.models import APIToken, User, WorkspaceMember
 
 
 @pytest.mark.contract
@@ -99,6 +99,62 @@ class TestApiTokenEndpoint:
 
         # Assert
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    @pytest.mark.django_db
+    def test_role_20_can_create_workspace_scoped_lifecycle_token_once(self, session_client, create_user, workspace):
+        session_client.force_authenticate(user=create_user)
+
+        response = session_client.post(
+            reverse("api-tokens"),
+            {
+                "label": "Agent lifecycle",
+                "purpose": APIToken.Purpose.AGENT_LIFECYCLE,
+                "workspace_slug": workspace.slug,
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["token"].startswith("plane_api_")
+        token = APIToken.objects.get(id=response.data["id"])
+        assert token.workspace == workspace
+        assert token.purpose == APIToken.Purpose.AGENT_LIFECYCLE
+        read = session_client.get(reverse("api-tokens-details", kwargs={"pk": token.id}))
+        assert read.status_code == status.HTTP_200_OK
+        assert "token" not in read.data
+        assert read.data["purpose"] == APIToken.Purpose.AGENT_LIFECYCLE
+        assert str(read.data["workspace"]) == str(workspace.id)
+
+    @pytest.mark.django_db
+    def test_lifecycle_token_creation_rejects_unprivileged_and_runtime_callers(
+        self, session_client, create_user, workspace
+    ):
+        url = reverse("api-tokens")
+        before = APIToken.objects.count()
+
+        for role, active in ((15, True), (20, False)):
+            WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=role, is_active=active)
+            denied = session_client.post(
+                url,
+                {
+                    "purpose": APIToken.Purpose.AGENT_LIFECYCLE,
+                    "workspace_slug": workspace.slug,
+                },
+                format="json",
+            )
+            assert denied.status_code == status.HTTP_403_FORBIDDEN
+
+        runtime = session_client.post(
+            url,
+            {"purpose": APIToken.Purpose.AGENT_RUNTIME, "workspace_slug": workspace.slug},
+            format="json",
+        )
+        assert runtime.status_code == status.HTTP_400_BAD_REQUEST
+
+        for malformed_purpose in ([], {}):
+            malformed = session_client.post(url, {"purpose": malformed_purpose}, format="json")
+            assert malformed.status_code == status.HTTP_400_BAD_REQUEST
+        assert APIToken.objects.count() == before
 
     # GET /user/api-tokens/ tests
     @pytest.mark.django_db
@@ -382,6 +438,28 @@ class TestApiTokenEndpoint:
         assert response.status_code == status.HTTP_200_OK
         create_api_token_for_user.refresh_from_db()
         assert create_api_token_for_user.allowed_rate_limit == original_rate_limit
+
+    @pytest.mark.django_db
+    def test_patch_cannot_modify_lifecycle_token_purpose_or_workspace(self, session_client, create_user, workspace):
+        token = APIToken.objects.create(
+            user=create_user,
+            label="Lifecycle token",
+            purpose=APIToken.Purpose.AGENT_LIFECYCLE,
+            workspace=workspace,
+        )
+        session_client.force_authenticate(user=create_user)
+
+        response = session_client.patch(
+            reverse("api-tokens-details", kwargs={"pk": token.id}),
+            {"purpose": APIToken.Purpose.FULL, "workspace": None, "label": "Renamed"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        token.refresh_from_db()
+        assert token.label == "Renamed"
+        assert token.purpose == APIToken.Purpose.AGENT_LIFECYCLE
+        assert token.workspace == workspace
 
     @pytest.mark.django_db
     def test_patch_cannot_modify_service_token(self, session_client, create_user):

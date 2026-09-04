@@ -17,7 +17,7 @@ import { CheckIcon, SearchIcon, SuspendedUserIcon } from "@plane/propel/icons";
 import { EPillSize, EPillVariant, Pill } from "@plane/propel/pill";
 import type { IUserLite } from "@plane/types";
 import { Avatar } from "@plane/ui";
-import { cn, getFileURL, sortByCurrentUserThenSelected } from "@plane/utils";
+import { cn, getFileURL } from "@plane/utils";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser } from "@/hooks/store/user";
@@ -27,31 +27,33 @@ interface Props {
   className?: string;
   getUserDetails: (userId: string) => IUserLite | undefined;
   isOpen: boolean;
-  memberIds?: string[];
   onDropdownOpen?: () => void;
+  options: string[];
   optionsClassName?: string;
   placement: Placement | undefined;
   referenceElement: HTMLButtonElement | null;
-  value?: string[] | string | null;
+  query: string;
+  setQuery: (query: string) => void;
 }
 
 export const MemberOptions = observer(function MemberOptions(props: Props) {
   const {
     getUserDetails,
     isOpen,
-    memberIds,
     onDropdownOpen,
+    options,
     optionsClassName = "",
     placement,
     referenceElement,
-    value,
+    query,
+    setQuery,
   } = props;
   // router
   const { workspaceSlug } = useParams();
   // refs
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const wasOpenRef = useRef(false);
   // states
-  const [query, setQuery] = useState("");
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
   // plane hooks
   const { t } = useTranslation();
@@ -75,13 +77,20 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    if (!wasOpenRef.current) {
       onDropdownOpen?.();
       if (!isMobile) {
-        inputRef.current && inputRef.current.focus();
+        inputRef.current?.focus();
       }
     }
-  }, [isOpen, isMobile]);
+
+    wasOpenRef.current = true;
+  }, [isOpen, isMobile, onDropdownOpen]);
 
   const searchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (query !== "" && e.key === "Escape") {
@@ -90,112 +99,90 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
     }
   };
 
-  const options = memberIds
-    ?.map((userId) => {
-      const userDetails = getUserDetails(userId);
-      return {
-        value: userId,
-        query: `${userDetails?.display_name} ${userDetails?.first_name} ${userDetails?.last_name}`,
-        content: (
-          <div className="flex items-center gap-2">
-            <div className="w-4">
-              {isUserSuspended(userId, workspaceSlug?.toString()) ? (
-                <SuspendedUserIcon className="h-3.5 w-3.5 text-placeholder" />
-              ) : (
-                <Avatar name={userDetails?.display_name} src={getFileURL(userDetails?.avatar_url ?? "")} />
-              )}
-            </div>
-            <span
-              className={cn(
-                "flex-grow truncate",
-                isUserSuspended(userId, workspaceSlug?.toString()) ? "text-placeholder" : ""
-              )}
-            >
-              {currentUser?.id === userId ? t("you") : userDetails?.display_name}
-            </span>
-          </div>
-        ),
-      };
-    })
-    .filter((o) => !!o);
-
-  const filteredOptions = sortByCurrentUserThenSelected(
-    query === "" ? options : options?.filter((o) => o?.query.toLowerCase().includes(query.toLowerCase())),
-    value,
-    currentUser?.id
-  );
+  if (typeof document === "undefined") return null;
 
   return createPortal(
-    <Combobox.Options as="ul" data-prevent-outside-click static>
-      <div
-        className={cn(
-          "z-30 my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none",
-          optionsClassName
-        )}
-        ref={setPopperElement}
-        style={{
-          ...styles.popper,
-        }}
-        {...attributes.popper}
-      >
-        <div className="flex items-center gap-1.5 rounded-sm border border-subtle bg-surface-2 px-2">
-          <SearchIcon className="h-3.5 w-3.5 text-placeholder" strokeWidth={1.5} />
-          <Combobox.Input
-            as="input"
-            ref={inputRef}
-            className="w-full bg-transparent py-1 text-11 text-secondary placeholder:text-placeholder focus:outline-none"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("search")}
-            displayValue={(assigned: any) => assigned?.name}
-            onKeyDown={searchInputKeyDown}
-          />
-        </div>
-        <div className="mt-2 max-h-48 space-y-1 overflow-y-scroll">
-          {filteredOptions ? (
-            filteredOptions.length > 0 ? (
-              filteredOptions.map(
-                (option) =>
-                  option && (
-                    <Combobox.Option
-                      as="li"
-                      key={option.value}
-                      value={option.value}
-                      className={({ active, selected }) =>
-                        cn(
-                          "flex w-full items-center justify-between gap-2 truncate rounded-sm px-1 py-1.5 select-none",
-                          active && "bg-layer-transparent-hover",
-                          selected ? "text-primary" : "text-secondary",
-                          isUserSuspended(option.value, workspaceSlug?.toString())
-                            ? "cursor-not-allowed"
-                            : "cursor-pointer"
-                        )
-                      }
-                      disabled={isUserSuspended(option.value, workspaceSlug?.toString())}
-                    >
-                      {({ selected }) => (
-                        <>
-                          <span className="flex-grow truncate">{option.content}</span>
-                          {selected && <CheckIcon className="h-3.5 w-3.5 flex-shrink-0" />}
-                          {isUserSuspended(option.value, workspaceSlug?.toString()) && (
-                            <Pill variant={EPillVariant.DEFAULT} size={EPillSize.XS} className="border-none">
-                              Suspended
-                            </Pill>
-                          )}
-                        </>
-                      )}
-                    </Combobox.Option>
-                  )
-              )
-            ) : (
-              <p className="px-1.5 py-1 text-placeholder italic">{t("no_matching_results")}</p>
-            )
-          ) : (
-            <p className="px-1.5 py-1 text-placeholder italic">{t("loading")}</p>
-          )}
-        </div>
+    <div
+      className={cn(
+        "z-30 my-1 w-48 rounded-sm border-[0.5px] border-strong bg-surface-1 px-2 py-2.5 text-11 shadow-raised-200 focus:outline-none",
+        optionsClassName
+      )}
+      ref={setPopperElement}
+      style={{
+        ...styles.popper,
+      }}
+      {...attributes.popper}
+      data-prevent-outside-click
+    >
+      <div className="flex items-center gap-1.5 rounded-sm border border-subtle bg-surface-2 px-2">
+        <SearchIcon className="h-3.5 w-3.5 text-placeholder" strokeWidth={1.5} />
+        <Combobox.Input
+          as="input"
+          ref={inputRef}
+          className="w-full bg-transparent py-1 text-11 text-secondary placeholder:text-placeholder focus:outline-none"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("search")}
+          displayValue={(assigned: any) => assigned?.name}
+          onKeyDown={searchInputKeyDown}
+        />
       </div>
-    </Combobox.Options>,
+      {options.length > 0 ? (
+        <Combobox.Options
+          as="ul"
+          className="mt-2 h-48 space-y-1 overflow-y-scroll"
+          data-prevent-outside-click
+          modal={false}
+          static
+        >
+          {({ option }: { option: string }) => {
+            const userDetails = getUserDetails(option);
+            const suspended = isUserSuspended(option, workspaceSlug?.toString());
+            return (
+              <Combobox.Option
+                as="li"
+                key={option}
+                value={option}
+                className={({ active, selected }) =>
+                  cn(
+                    "flex w-full items-center justify-between gap-2 truncate rounded-sm px-1 py-1.5 select-none",
+                    active && "bg-layer-transparent-hover",
+                    selected ? "text-primary" : "text-secondary",
+                    suspended ? "cursor-not-allowed" : "cursor-pointer"
+                  )
+                }
+                disabled={suspended}
+              >
+                {({ selected }) => (
+                  <>
+                    <span className="flex flex-grow items-center gap-2 truncate">
+                      <span className="w-4">
+                        {suspended ? (
+                          <SuspendedUserIcon className="h-3.5 w-3.5 text-placeholder" />
+                        ) : (
+                          <Avatar name={userDetails?.display_name} src={getFileURL(userDetails?.avatar_url ?? "")} />
+                        )}
+                      </span>
+                      <span className={cn("flex-grow truncate", suspended && "text-placeholder")}>
+                        {currentUser?.id === option ? t("you") : userDetails?.display_name}
+                      </span>
+                    </span>
+                    {selected && <CheckIcon className="h-3.5 w-3.5 flex-shrink-0" />}
+                    {suspended && (
+                      <Pill variant={EPillVariant.DEFAULT} size={EPillSize.XS} className="border-none">
+                        Suspended
+                      </Pill>
+                    )}
+                  </>
+                )}
+              </Combobox.Option>
+            );
+          }}
+        </Combobox.Options>
+      ) : (
+        <p className="mt-2 px-1.5 py-1 text-placeholder italic">{t("no_matching_results")}</p>
+      )}
+    </div>,
     document.body
   );
 });
