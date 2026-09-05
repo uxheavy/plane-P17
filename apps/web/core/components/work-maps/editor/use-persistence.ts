@@ -567,7 +567,9 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
     [projectId, recoveryRecords, refreshRecovery, save, scene, userId, workMapId, workspaceSlug]
   );
 
-  recoveryRetryRef.current = retryRecovery;
+  useEffect(() => {
+    recoveryRetryRef.current = retryRecovery;
+  }, [retryRecovery]);
 
   useEffect(() => {
     if (!recoveryEditableRef.current) return;

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "@plane/i18n";
 import { useOutsideClickDetector } from "@plane/hooks";
 import { IconButton } from "@plane/propel/icon-button";
 import { CloseIcon, SearchIcon } from "@plane/propel/icons";
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function ListSearchInput({ placeholder, searchQuery, updateSearchQuery }: Props) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,6 +59,7 @@ export function ListSearchInput({ placeholder, searchQuery, updateSearchQuery }:
         {isOpen && (
           <button
             type="button"
+            aria-label={t("power_k.search_menu.clear_search")}
             className="grid place-items-center"
             onClick={() => {
               updateSearchQuery("");

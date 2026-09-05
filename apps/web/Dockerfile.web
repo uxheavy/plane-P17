@@ -79,6 +79,8 @@ RUN pnpm turbo run build --filter=web
 FROM nginx:1.31-alpine AS production
 
 RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
+# The custom config owns the listener on 3000; the inherited IPv6 script only targets default.conf.
+RUN rm -f /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
 
 COPY apps/web/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=installer /app/apps/web/build/client /usr/share/nginx/html
