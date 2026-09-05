@@ -37,7 +37,7 @@ Plane does not vendor Excalidraw source or import its private implementation.
 Release preparation records the fork source commit and package checksums, and
 publishing remains a separate release operation.
 
-The fork exposes three narrow host contracts:
+The fork exposes five narrow host contracts:
 
 - `hostToolbarItems` describes native toolbar buttons and one-level menus using
   a stable ID, translated label, icon, enabled/checked state, shortcuts, and a
@@ -55,11 +55,30 @@ The fork exposes three narrow host contracts:
   never enter this path, so URL embed activation and external-link semantics
   remain exclusive to actual URL content. The callback and its rendering are
   ephemeral and are never serialized into scene data.
+- `onElementActivate(element): boolean` is the neutral activation callback for a
+  host carrier. Excalidraw resolves the native hit or selected element and calls
+  it before native text activation for double-click and selected `Enter`. A true
+  result consumes the activation; a false result leaves native behavior in
+  place. Plane may recognize its opaque `nodeKey` and invoke its authorized
+  source action, but Excalidraw contains no Plane policy.
+- `isElementTextEditable(element): boolean` is an instance policy callback that
+  defaults to true. Excalidraw applies it through its shared text eligibility
+  path, including the text tool, bound-text hints/actions, and mixed selection.
+  A host can therefore exclude a source carrier from native bound-text editing
+  without changing its geometry, selection, arrow bindings, or history. This
+  callback is ephemeral and is never serialized.
 
 For Plane bindings, the host card is a native embed rendered above ordinary
 drawing content. Its relative card order and hit priority follow the native
 scene order. This boundary does not promise arbitrary mixed z-order between
 card pixels and drawing pixels beyond the editor's native ordering contract.
+
+The host card remains `pointer-events: none`, so a browser double-click reaches
+Excalidraw's canvas. An outer bubbling handler would run after Excalidraw's
+native double-click path and could both start native bound-text editing and
+navigate the source. Activation therefore belongs at the Excalidraw hit/command
+boundary through `onElementActivate`, rather than in a parent DOM handler or a
+render-only visibility cache.
 
 Với binding của Plane, card của host là native embed được render phía trên nội
 dung vẽ thông thường. Thứ tự tương đối và ưu tiên hit của card tuân theo thứ
@@ -99,9 +118,11 @@ edit, and verify operations while preserving the existing owners:
   edit must not become an alternate source-record mutation path or accept
   caller-supplied authority.
 - Excalidraw remains authoritative for scene arrangement, selection and hit
-  testing, transforms, binding behavior, and history. The current
+  testing, transforms, spatial binding behavior, and history. The current
   `renderHostElement` seam only projects the Plane card over the native carrier
-  (`pointer-events: none`); durable agent actions should use the public
+  (`pointer-events: none`); `onElementActivate` and
+  `isElementTextEditable` provide the shared host/editor boundary for source
+  activation and text eligibility. Durable agent actions should use the public
   host/editor seam as their primary integration, avoiding a coordinate-only
   contract. Browser interaction remains valid for visual verification or
   fallback, and tooling must not introduce a second scene store.

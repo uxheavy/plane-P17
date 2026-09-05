@@ -80,7 +80,24 @@ the authorized card is an ephemeral host projection defined by ADR-0007.
 
 Hidden mirror geometry, a second hit-test/transform system, Plane-owned arrows,
 or a separate undo track fail this architecture. A Plane node must provide every
-applicable behavior of its carrier plus Plane behavior, never less.
+applicable spatial/editor behavior of its carrier plus Plane behavior, never less;
+source-card content editing is not an applicable carrier behavior.
+
+### Source-card activation boundary
+
+The carrier owns spatial selection, geometry, transforms, native arrow bindings,
+and Excalidraw history. It does not own source-card text editing. A source
+carrier must never become a native bound-text container through card activation.
+
+The shared Excalidraw host interaction boundary is defined by
+[ADR-0007](0007-define-host-owned-excalidraw-integration.md). Through
+that boundary, Plane recognizes the opaque `nodeKey` and owns the canonical
+source action, while Excalidraw remains free of Plane logic. The Work Item action
+must open the existing authorized native peek while the map route and viewport
+remain mounted. Other source kinds retain their existing supported source
+actions; this does not introduce a generic peek surface for kinds that do not
+have one. Source-card activation must not enter native text editing, and render
+visibility caches are not semantic identity.
 
 Work Item reuses the real `WorkItemPreviewCard`, extended only for responsive
 container presentation while preserving its existing default. Presentation
@@ -206,6 +223,11 @@ after-the-fact repair of an already collaborative paste.
 - The exact carrier must pass native selection, move, resize, rotate, group,
   order, duplicate, delete, arrow binding from both endpoints, and undo on
   desktop and tablet.
+- Source-card double-click and selected `Enter` must invoke one authorized
+  source action without native text editing or bound-text mutation; Work Item
+  peek preserves the mounted map route and viewport, while other kinds retain
+  their existing supported source actions. Ordinary Excalidraw shapes retain
+  their native text behavior.
 - Hydration must remain independent under a deliberately slow source.
 - Mixed paste must prove replacement-before-insertion, retry idempotency,
   same-key topology, structural and asset preservation, whole-selection
