@@ -59,7 +59,7 @@ export type TRecoveryState =
   | { status: "replayable" }
   | {
       status: "non-replayable";
-      reason: "permission-revoked" | "generation-mismatch" | "authority-mismatch" | "expired";
+      reason: "permission-revoked" | "authority-mismatch" | "persistence-failed" | "expired";
     };
 
 export type TPersistenceStatus = "silent" | "pending" | "saving" | "error";
@@ -286,6 +286,7 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
           error && typeof error === "object" && "response" in error
             ? (error.response as { status?: number } | undefined)?.status
             : undefined;
+        const replayable = retained && !authorityChanged && (transient || generationConflict);
         const writer = recoveryWriterRef.current;
         if (writer) {
           setRecoveryStates((current) => ({
@@ -293,12 +294,14 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
             [writer.writerId]:
               status === 403
                 ? { status: "non-replayable", reason: "permission-revoked" }
-                : !authorityChanged && failed.generation === scene.generationRef.current
-                  ? { status: "replayable" }
-                  : { status: "non-replayable", reason: "generation-mismatch" },
+                : authorityChanged
+                  ? { status: "non-replayable", reason: "authority-mismatch" }
+                  : replayable
+                    ? { status: "replayable" }
+                    : { status: "non-replayable", reason: "persistence-failed" },
           }));
         }
-        if ((transient || generationConflict) && retained) {
+        if (replayable) {
           // Retained transport and same-epoch CAS failures are recoverable; keep the canvas editable while backing off.
           setPersistenceFailed(false);
           setPersistenceStatus("error");
@@ -421,19 +424,16 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
         Object.fromEntries(
           recoveryRecords.map((record) => [
             record.writerId,
-            record.generation !== scene.generationRef.current
-              ? { status: "non-replayable", reason: "generation-mismatch" }
-              : record.collaboration_epoch !== undefined &&
-                  record.collaboration_epoch !== scene.collaborationEpochRef.current
-                ? { status: "non-replayable", reason: "authority-mismatch" }
-                : editable
-                  ? { status: "replayable" }
-                  : { status: "non-replayable", reason: "permission-revoked" },
+            record.collaboration_epoch !== scene.collaborationEpochRef.current
+              ? { status: "non-replayable", reason: "authority-mismatch" }
+              : editable
+                ? { status: "replayable" }
+                : { status: "non-replayable", reason: "permission-revoked" },
           ])
         )
       );
     },
-    [recoveryRecords, scene.collaborationEpochRef, scene.generationRef]
+    [recoveryRecords, scene.collaborationEpochRef]
   );
 
   const retryRecovery = useCallback(
@@ -468,20 +468,15 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
             if (pending?.scene_binary === recoveryRecord.scene_binary) await save(pending);
             return;
           }
+          const recoveryEpoch = recoveryRecord.collaboration_epoch;
           if (
-            authoritative.generation !== recoveryRecord.generation ||
-            scene.generationRef.current !== recoveryRecord.generation ||
-            (recoveryRecord.collaboration_epoch !== undefined &&
-              (authoritative.collaboration_epoch !== recoveryRecord.collaboration_epoch ||
-                scene.collaborationEpochRef.current !== recoveryRecord.collaboration_epoch))
+            recoveryEpoch === undefined ||
+            authoritative.collaboration_epoch !== recoveryEpoch ||
+            scene.collaborationEpochRef.current !== recoveryEpoch
           ) {
             setRecoveryStates((current) => ({
               ...current,
-              [writerId]: {
-                status: "non-replayable",
-                reason:
-                  authoritative.generation !== recoveryRecord.generation ? "generation-mismatch" : "authority-mismatch",
-              },
+              [writerId]: { status: "non-replayable", reason: "authority-mismatch" },
             }));
             setPersistenceFailed(true);
             setPersistenceStatus("error");
@@ -491,8 +486,9 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
           if (!appState) return;
           const reconciled = mergeAuthoritativeScene(recoveryRecord.scene_binary, authoritative.scene_binary, appState);
           await service.saveScene(workspaceSlug, projectId, workMapId, {
-            collaboration_epoch: recoveryRecord.collaboration_epoch ?? authoritative.collaboration_epoch,
-            generation: recoveryRecord.generation,
+            collaboration_epoch: recoveryEpoch,
+            // A newer same-epoch revision is a normal CAS race; merge against it and write at its generation.
+            generation: authoritative.generation,
             scene_binary: reconciled.sceneBinary,
           });
           const durable = await service.fetchScene(workspaceSlug, projectId, workMapId);
@@ -524,21 +520,19 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
             setPersistenceStatus(remainingRecords.length > 0 ? "error" : "silent");
           }
         } catch (error) {
-          if (isGenerationConflict(error)) {
-            setRecoveryStates((current) => ({
-              ...current,
-              [writerId]: { status: "non-replayable", reason: "generation-mismatch" },
-            }));
-            setPersistenceFailed(true);
-            setPersistenceStatus("error");
-            return;
-          }
+          const generationConflict = isGenerationConflict(error);
           const status =
             error && typeof error === "object" && "response" in error
               ? (error.response as { status?: number } | undefined)?.status
               : undefined;
           const transient = isTransientPersistenceFailure(error);
-          if (transient && editable) {
+          if (generationConflict && editable) {
+            setRecoveryStates((current) => ({
+              ...current,
+              [writerId]: { status: "replayable" },
+            }));
+          }
+          if ((generationConflict || transient) && editable) {
             setPersistenceFailed(false);
             setPersistenceStatus("error");
             const delay = backgroundRetryDelayRef.current || BACKGROUND_RETRY_BASE_DELAY_MS;
@@ -559,6 +553,11 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
             setRecoveryStates((current) => ({
               ...current,
               [writerId]: { status: "non-replayable", reason: "permission-revoked" },
+            }));
+          else
+            setRecoveryStates((current) => ({
+              ...current,
+              [writerId]: { status: "non-replayable", reason: "persistence-failed" },
             }));
         }
       };

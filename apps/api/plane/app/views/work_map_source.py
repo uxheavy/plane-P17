@@ -39,7 +39,16 @@ def _source_projection(source_kind, source, project):
     elif source_kind == "cycle":
         projection.update(start_date=source.start_date, end_date=source.end_date)
     elif source_kind == "module":
-        projection.update(status=source.status, start_date=source.start_date, target_date=source.target_date)
+        projection.update(
+            status=source.status,
+            start_date=source.start_date,
+            target_date=source.target_date,
+            backlog_issues=source.backlog_issues,
+            unstarted_issues=source.unstarted_issues,
+            started_issues=source.started_issues,
+            completed_issues=source.completed_issues,
+            cancelled_issues=source.cancelled_issues,
+        )
     elif source_kind == "intake-item":
         projection.update(
             sequence_id=source.issue.sequence_id,

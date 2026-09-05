@@ -6,6 +6,7 @@ from django.db.models import Q
 
 from plane.app.permissions import ROLE
 from plane.db.models import Cycle, Document, DocumentProject, IntakeIssue, Issue, IssueView, Module, Page
+from plane.utils.module_counts import with_module_issue_counts
 
 
 def _readable_project_sources(queryset, *, user, workspace_id, feature=None, guest_owner_field=None):
@@ -27,7 +28,9 @@ def _readable_project_sources(queryset, *, user, workspace_id, feature=None, gue
     return queryset.select_related("project").distinct()
 
 
-def readable_work_map_sources(*, user, workspace_id, source_kind, source_ids=None, query="", project_id=None, limit=None):
+def readable_work_map_sources(
+    *, user, workspace_id, source_kind, source_ids=None, query="", project_id=None, limit=None
+):
     if source_kind == "work-item":
         queryset = _readable_project_sources(
             Issue.issue_objects.all(),
@@ -51,6 +54,7 @@ def readable_work_map_sources(*, user, workspace_id, source_kind, source_ids=Non
             workspace_id=workspace_id,
             feature="module_view",
         )
+        queryset = with_module_issue_counts(queryset)
         name_field = "name"
     elif source_kind == "project-view":
         queryset = _readable_project_sources(

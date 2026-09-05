@@ -43,6 +43,7 @@ from plane.db.models import (
     Issue,
     IssueView,
     Module,
+    ModuleIssue,
     Page,
     PageVersion,
     Project,
@@ -112,6 +113,7 @@ def _source_records(workspace, project, user):
     issue = Issue.objects.create(project=project, workspace=workspace, state=state, name="Work item")
     cycle = Cycle.objects.create(project=project, workspace=workspace, owned_by=user, name="Cycle")
     module = Module.objects.create(project=project, workspace=workspace, name="Module")
+    ModuleIssue.objects.create(module=module, issue=issue, project=project, workspace=workspace)
     view = IssueView.objects.create(
         project=project,
         workspace=workspace,
@@ -449,7 +451,11 @@ class TestWorkMapApp:
         assert updated.status_code == status.HTTP_200_OK
         assert updated.json()["generation"] == 1
         assert stale.status_code == status.HTTP_409_CONFLICT
-        assert current.json() == {"generation": 1, "scene_binary": base64.b64encode(scene).decode("ascii"), "collaboration_epoch": 0}
+        assert current.json() == {
+            "generation": 1,
+            "scene_binary": base64.b64encode(scene).decode("ascii"),
+            "collaboration_epoch": 0,
+        }
 
         work_map_url = _work_maps_url(workspace, project, work_map["id"])
         lock_url = _work_maps_url(workspace, project, work_map["id"], "lock/")
@@ -2071,6 +2077,12 @@ class TestWorkMapApp:
             assert [result["source_id"] for result in discovered.json()["results"]] == [str(source.id)]
             assert discovered.json()["results"][0]["project_id"] == str(source_project.id)
             assert discovered.json()["results"][0]["project_name"] == source_project.name
+            if source_kind == "module":
+                assert discovered.json()["results"][0]["backlog_issues"] == 1
+                assert discovered.json()["results"][0]["unstarted_issues"] == 0
+                assert discovered.json()["results"][0]["started_issues"] == 0
+                assert discovered.json()["results"][0]["completed_issues"] == 0
+                assert discovered.json()["results"][0]["cancelled_issues"] == 0
             picker_results = session_client.get(
                 f"{base}sources/",
                 {"source_kind": source_kind, "result_format": "issue-search"},

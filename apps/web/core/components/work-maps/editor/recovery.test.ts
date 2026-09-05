@@ -42,6 +42,72 @@ describe("Work map recovery boundary", () => {
     return values;
   };
 
+  const installPersistenceMocks = (
+    record: Record<string, unknown>,
+    values: Map<string, string>,
+    recoveryKey: string,
+    clearOnReplay = true
+  ) => {
+    vi.resetModules();
+    const stateSetter = vi.fn();
+    vi.doMock("react", () => ({
+      useCallback: (callback: unknown) => callback,
+      useEffect: () => undefined,
+      useMemo: (factory: () => unknown) => factory(),
+      useRef: (current: unknown) => ({ current }),
+      useState: (initial: unknown) => [
+        typeof initial === "function" ? (initial as () => unknown)() : initial,
+        stateSetter,
+      ],
+    }));
+    vi.doMock("./merge-authoritative-scene", () => ({
+      mergeAuthoritativeScene: (sceneBinary: string) => ({ sceneBinary, elements: [], files: {} }),
+    }));
+    vi.doMock("@/services/work-map.service", () => ({
+      WorkMapService: class WorkMapService {
+        fetchScene() {
+          return Promise.resolve({
+            collaboration_epoch: 2,
+            generation: 2,
+            scene_binary: recoveryScene("authoritative"),
+          });
+        }
+        saveScene() {
+          return Promise.resolve({ generation: 3 });
+        }
+      },
+    }));
+    vi.doMock("@/services/work-map-recovery.service", () => {
+      const records = [record];
+      return {
+        readRecovery: () => records.slice(),
+        createRecoveryWriter: () => ({
+          writerId: "current-writer",
+          isReady: () => true,
+          whenReady: () => Promise.resolve(true),
+          activate: () => undefined,
+          retain: () => null,
+          clear: () => undefined,
+          release: () => undefined,
+          revoke: () => undefined,
+        }),
+        clearRecoverySlot: (_accountId: string, _workMapId: string, writerId: string) => {
+          if (clearOnReplay && writerId === record.writerId) {
+            records.length = 0;
+            values.delete(recoveryKey);
+          }
+        },
+        withRecoveryWriterLock: async (
+          _accountId: string,
+          _workMapId: string,
+          _writerId: string,
+          callback: () => Promise<unknown>
+        ) => callback(),
+      };
+    });
+    return stateSetter;
+  };
+
   it("rejects and clears a negative base generation", () => {
     const values = installStorage({
       "work-map-recovery:user-id:map-id:writer": JSON.stringify({ generation: -1, scene_binary: recoveryScene("bad") }),
@@ -159,5 +225,107 @@ describe("Work map recovery boundary", () => {
     expect(readRecovery("user-id", "map-id")).toEqual([]);
     expect(readRecovery("other-user", "map-id")).toHaveLength(1);
     other.release();
+  });
+
+  it("rebases a retained same-epoch journal after the server generation advances", async () => {
+    vi.useFakeTimers();
+    const writtenAt = Date.now();
+    const recoveryKey = "work-map-recovery:user-id:map-id:writer";
+    const record = {
+      generation: 1,
+      collaboration_epoch: 2,
+      scene_binary: recoveryScene("pending"),
+      writtenAt,
+      expiresAt: writtenAt + recoveryTtlMs,
+      writerId: "writer",
+    };
+    const values = installStorage({ [recoveryKey]: JSON.stringify(record) });
+    installPersistenceMocks(record, values, recoveryKey);
+
+    try {
+      const [{ usePersistence }, { WorkMapService }] = await Promise.all([
+        import("./use-persistence"),
+        import("@/services/work-map.service"),
+      ]);
+      vi.spyOn(WorkMapService.prototype, "fetchScene")
+        .mockResolvedValueOnce({ collaboration_epoch: 2, generation: 2, scene_binary: recoveryScene("authoritative") })
+        .mockResolvedValueOnce({ collaboration_epoch: 2, generation: 3, scene_binary: recoveryScene("merged") });
+      const saveScene = vi.spyOn(WorkMapService.prototype, "saveScene").mockResolvedValue({ generation: 3 });
+      const persistence = usePersistence(
+        { workspaceSlug: "workspace", projectId: "project", workMapId: "map", userId: "user-id" },
+        {
+          generationRef: { current: 2 },
+          collaborationEpochRef: { current: 2 },
+          durableSceneRef: { current: recoveryScene("authoritative") },
+          getAppState: () => ({}) as never,
+          applyRemoteScene: vi.fn().mockResolvedValue(undefined),
+          applyAuthoritativeScene: vi.fn().mockResolvedValue(undefined),
+        }
+      );
+
+      persistence.evaluateRecovery(true);
+      await persistence.retryRecovery("writer", true);
+
+      expect(saveScene).toHaveBeenCalledTimes(1);
+      expect(saveScene.mock.calls[0]?.[3]).toMatchObject({ collaboration_epoch: 2, generation: 2 });
+      expect(values.has(recoveryKey)).toBe(false);
+    } finally {
+      vi.doUnmock("react");
+      vi.doUnmock("./merge-authoritative-scene");
+      vi.doUnmock("@/services/work-map.service");
+      vi.doUnmock("@/services/work-map-recovery.service");
+      vi.resetModules();
+    }
+  });
+
+  it("keeps a missing-epoch journal blocked after permission is restored", async () => {
+    vi.useFakeTimers();
+    const writtenAt = Date.now();
+    const recoveryKey = "work-map-recovery:user-id:map-id:writer";
+    const record = {
+      generation: 1,
+      scene_binary: recoveryScene("legacy"),
+      writtenAt,
+      expiresAt: writtenAt + recoveryTtlMs,
+      writerId: "writer",
+    };
+    const values = installStorage({ [recoveryKey]: JSON.stringify(record) });
+    const stateSetter = installPersistenceMocks(record, values, recoveryKey, false);
+
+    try {
+      const [{ usePersistence }, { WorkMapService }] = await Promise.all([
+        import("./use-persistence"),
+        import("@/services/work-map.service"),
+      ]);
+      vi.spyOn(WorkMapService.prototype, "fetchScene");
+      const saveScene = vi.spyOn(WorkMapService.prototype, "saveScene");
+      const persistence = usePersistence(
+        { workspaceSlug: "workspace", projectId: "project", workMapId: "map", userId: "user-id" },
+        {
+          generationRef: { current: 2 },
+          collaborationEpochRef: { current: 2 },
+          durableSceneRef: { current: recoveryScene("authoritative") },
+          getAppState: () => ({}) as never,
+          applyRemoteScene: vi.fn().mockResolvedValue(undefined),
+          applyAuthoritativeScene: vi.fn().mockResolvedValue(undefined),
+        }
+      );
+
+      await persistence.retryRecovery("writer", false);
+      await persistence.retryRecovery("writer", true);
+
+      expect(saveScene).not.toHaveBeenCalled();
+      expect(values.has(recoveryKey)).toBe(true);
+      const stateUpdates = stateSetter.mock.calls.map(([update]) =>
+        typeof update === "function" ? update({}) : update
+      );
+      expect(stateUpdates).toContainEqual({ writer: { status: "non-replayable", reason: "authority-mismatch" } });
+    } finally {
+      vi.doUnmock("react");
+      vi.doUnmock("./merge-authoritative-scene");
+      vi.doUnmock("@/services/work-map.service");
+      vi.doUnmock("@/services/work-map-recovery.service");
+      vi.resetModules();
+    }
   });
 });

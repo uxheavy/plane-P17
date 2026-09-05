@@ -86,6 +86,11 @@ export type TWorkMapSource =
       status: string;
       start_date: string | null;
       target_date: string | null;
+      backlog_issues: number;
+      unstarted_issues: number;
+      started_issues: number;
+      completed_issues: number;
+      cancelled_issues: number;
     })
   | (TWorkMapSourceBase & { source_kind: "project-view" | "page" });
 

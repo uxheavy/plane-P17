@@ -107,16 +107,18 @@ Thời hạn đã chốt: **24 giờ**, tính từ khi bản cập nhật chưa 
 The accepted retention is **24 hours** from journaling the unacknowledged update. Durable save, logout, or discard removes it earlier; reading or retrying does not renew expiry. Browsers cannot guarantee cleanup while the application is closed: expired entries must be rejected on read and removed on the next cleanup opportunity.
 
 Ưu tiên cơ chế Retry/Discard hiện có khi cần xử lý boundary, kiểm tra lại quyền
-và trạng thái server trước khi retry. Draft an toàn trong cùng epoch/generation
-có thể autosync ngầm; draft không an toàn phải non-replayable. Không tạo map
-khác hoặc thêm màn hình so sánh chỉ để phục hồi. Phải chứng minh CAS và
-generation thực tế ngăn ghi đè stale; kiểm tra generation trong UI chưa đủ.
+và trạng thái server trước khi retry. Draft trong cùng epoch có thể merge qua
+các revision CAS thông thường và autosync ngầm; draft qua boundary không được
+replay. Không tạo map khác hoặc thêm màn hình so sánh chỉ để phục hồi. Phải
+chứng minh CAS và generation thực tế ngăn ghi đè stale; kiểm tra generation
+trong UI chưa đủ.
 
 Reuse the existing explicit Retry/Discard mechanism at a boundary with fresh
-authorization and server-state checks. Same-epoch/generation drafts may autosync
-silently; unsafe drafts remain non-replayable. Do not create another map or add
-comparison UI just for recovery. Verify actual CAS/generation enforcement
-against stale overwrites rather than treating a UI generation check as proof.
+authorization and server-state checks. Same-epoch drafts may merge through
+ordinary CAS revisions and autosync silently; drafts across an authority
+boundary remain non-replayable. Do not create another map or add comparison UI
+just for recovery. Verify actual CAS/generation enforcement against stale
+overwrites rather than treating a UI generation check as proof.
 
 **Thay điều khoản hiển thị saving của ADR-0004:** chỉ hiện trạng thái khi đang lưu, chưa lưu hoặc có lỗi; ẩn sau xác nhận lưu bền vững. `connected` không có nghĩa `saved`.
 

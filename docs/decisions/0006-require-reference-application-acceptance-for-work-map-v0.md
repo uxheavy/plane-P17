@@ -147,9 +147,9 @@ are provisioned but must remain absent from discovery, proving the exclusion
 rather than presenting an unauthorized stale card.
 
 Recovery proof covers durable-acknowledgement cleanup, explicit discard, expiry
-cleanup, generation-mismatch rejection, authority-revocation rejection, and
-local-storage failure handling, without silent replay or unauthorized source,
-binding, or asset mutation.
+cleanup, same-epoch generation/CAS convergence, authority-revocation rejection,
+and local-storage failure handling, without silent replay or unauthorized
+source, binding, or asset mutation.
 
 #### Supported performance envelope
 

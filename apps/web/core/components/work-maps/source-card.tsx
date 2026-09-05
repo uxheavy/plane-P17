@@ -14,7 +14,9 @@ import { useTranslation } from "@plane/i18n";
 import { CycleIcon, IntakeIcon, ModuleIcon, PageIcon, ViewsIcon } from "@plane/propel/icons";
 import type { TWorkMapHydration, TWorkMapSourceKind } from "@plane/types";
 import { formatLocalizedDateOnly } from "@plane/utils";
+import { InboxStatusIcon } from "@/components/inbox/inbox-status-icon";
 import { WorkItemPreviewCard } from "@/components/issues/preview-card";
+import { ModuleProgressSummary } from "@/components/modules/module-progress-summary";
 
 type Props = {
   projection: TWorkMapHydration | undefined;
@@ -83,26 +85,27 @@ export function WorkMapSourceCard({ projection }: Props) {
   if (source.source_kind === "intake-item") {
     const status = INBOX_STATUS.find((item) => item.status === source.intake_status);
     return (
-      <div className="flex size-full flex-col gap-2 rounded-lg border border-subtle bg-surface-1 p-3 text-left shadow-raised-100">
-        <div className="flex items-center justify-between gap-2 text-11 text-secondary">
-          <span className="flex items-center gap-1.5 font-medium">
-            <IntakeIcon className="size-3.5" />
-            {t(SOURCE_KIND_LABELS[source.source_kind])}
+      <div className="relative size-full text-left" data-status={source.intake_status}>
+        <WorkItemPreviewCard
+          className="size-full w-full overflow-hidden shadow-none"
+          projectId={source.project_id}
+          stateDetails={source.state ?? {}}
+          workItem={{
+            id: source.source_id,
+            name: source.name,
+            sequence_id: source.sequence_id,
+            priority: source.priority,
+            start_date: source.start_date,
+            target_date: source.target_date,
+            type_id: source.type_id,
+          }}
+        />
+        {status && source.intake_status !== undefined && (
+          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-sm bg-surface-1 px-1 text-11 font-medium text-secondary">
+            <InboxStatusIcon type={status.status} size={12} />
+            {t(status.i18n_title)}
           </span>
-          {status && <span data-status={source.intake_status}>{t(status.i18n_title)}</span>}
-        </div>
-        <strong className="line-clamp-3 text-14 font-medium text-primary">{source.name}</strong>
-        <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 text-11 text-secondary">
-          <span>{source.project_name}</span>
-          <span>#{source.sequence_id}</span>
-          {source.priority && <span className="capitalize">{source.priority}</span>}
-          {(source.start_date || source.target_date) && (
-            <span>
-              {formatLocalizedDateOnly(source.start_date, currentLocale) ?? "…"} →{" "}
-              {formatLocalizedDateOnly(source.target_date, currentLocale) ?? "…"}
-            </span>
-          )}
-        </div>
+        )}
       </div>
     );
   }
@@ -142,6 +145,13 @@ export function WorkMapSourceCard({ projection }: Props) {
           {status && <span style={{ color: status.color }}>{t(status.i18n_label)}</span>}
         </div>
         <strong className="line-clamp-3 text-14 font-medium text-primary">{source.name}</strong>
+        <ModuleProgressSummary
+          backlog_issues={source.backlog_issues}
+          unstarted_issues={source.unstarted_issues}
+          started_issues={source.started_issues}
+          completed_issues={source.completed_issues}
+          cancelled_issues={source.cancelled_issues}
+        />
         <div className="mt-auto flex flex-col gap-1 text-11 text-secondary">
           <span>{source.project_name}</span>
           {(source.start_date || source.target_date) && (
