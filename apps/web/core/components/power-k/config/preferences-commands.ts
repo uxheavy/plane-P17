@@ -21,7 +21,7 @@ import { useUser, useUserProfile } from "@/hooks/store/user";
  */
 export const usePowerKPreferencesCommands = (): TPowerKCommandConfig[] => {
   // store hooks
-  const { setTheme } = useTheme();
+  const { setTheme, theme } = useTheme();
   const { updateCurrentUser } = useUser();
   const { updateUserProfile, updateUserTheme } = useUserProfile();
   // translation
@@ -29,19 +29,19 @@ export const usePowerKPreferencesCommands = (): TPowerKCommandConfig[] => {
 
   const handleUpdateTheme = useCallback(
     async (newTheme: string) => {
+      const priorTheme = theme ?? "system";
       setTheme(newTheme);
       return updateUserTheme({ theme: newTheme })
         .then(() => {
           setToast({
             type: TOAST_TYPE.SUCCESS,
-            title: "Theme updated",
-            message: "Reloading to apply changes...",
+            title: t("toast.success"),
+            message: t("power_k.preferences_actions.toast.theme.success"),
           });
-          // reload the page after showing the toast
-          window.location.reload();
           return;
         })
         .catch(() => {
+          setTheme(priorTheme);
           setToast({
             type: TOAST_TYPE.ERROR,
             title: t("toast.error"),
@@ -51,7 +51,7 @@ export const usePowerKPreferencesCommands = (): TPowerKCommandConfig[] => {
         });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [setTheme, updateUserTheme]
+    [setTheme, t, theme, updateUserTheme]
   );
 
   const handleUpdateTimezone = useCallback(

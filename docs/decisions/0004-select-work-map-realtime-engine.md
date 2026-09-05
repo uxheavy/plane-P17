@@ -1,4 +1,4 @@
-# ADR-0004: Use Plane Live as the Work Map transport relay
+# ADR-0004: Use Plane Live as the Work map transport relay
 
 ## Status
 
@@ -25,15 +25,15 @@ evidence-gated choice inside that boundary.
 
 ## Decision
 
-`apps/live` is the sole Work Map realtime shell in V0. The bounded host gate
-rejected Yjs scene projection, so Work Map uses the approved Plane-secured
+`apps/live` is the sole Work map realtime shell in V0. The bounded host gate
+rejected Yjs scene projection, so Work map uses the approved Plane-secured
 transport-only native-style relay. The closed document identity remains
 `project_page | work_map`, but the existing Page collaboration path is not
 changed.
 
 - Page retains its existing locator, rich-text conversion, title sync, editor,
   and supported APIs.
-- Work Map frames use the validated `SCENE_UPDATE`, `POINTER_UPDATE`, and
+- Work map frames use the validated `SCENE_UPDATE`, `POINTER_UPDATE`, and
   `PRESENCE_UPDATE` native-style shapes. They never enter a Hocuspocus document,
   Yjs content, Page serializer, HTML/JSON conversion, title observer,
   XML-fragment assumption, or IndexedDB offline persistence.
@@ -54,19 +54,21 @@ This is a closed dispatch, not a generic document-adapter registry.
 ### Per-attachment authorization
 
 Every WebSocket attachment independently validates the closed document type,
-workspace, active project association, document ID, user, and Work Map
+workspace, active project association, document ID, user, and Work map
 generation. It must call the current Plane permission owner even if the relay
 room is already active on that server.
 
 Unreadable documents are denied before content is sent. Readable but noneditable
 documents may send and receive only ephemeral pointer and presence frames;
 `SCENE_UPDATE` is rejected. Lock, archive, lost map permission, project-link
-loss, or version restoration force-close affected Work Map rooms across
+loss, or version restoration force-close affected Work map connections across
 instances and require fresh authorization on reconnect. Query-parameter casts
 and room knowledge are never authority.
 
-Existing Page realtime locators remain unchanged. Work Map room identity is
-derived server-side from the authorized workspace, project, and Work Map. The
+Existing Page realtime locators remain unchanged. The original project-inclusive
+Work map room identity is superseded by the shared-document identity decision
+in [ADR-0008](0008-define-work-map-host-authority-and-session-policy.md).
+Project association remains a per-attachment authorization requirement. The
 client-supplied generation is checked for attach freshness but does not partition
 the room: a successful save advances generation without splitting attached
 collaborators. Plane Live periodically reauthorizes active connections and
@@ -80,7 +82,7 @@ selection, and idle state. It is neither persisted history nor map content.
 
 ### Persistence and failure semantics
 
-Persist the exact Work Map scene binary through the generation-CAS scene API.
+Persist the exact Work map scene binary through the generation-CAS scene API.
 The relay does not persist, acknowledge, reconstruct, or merge scenes. A
 byte-identical retry of the immediately preceding stale generation is
 idempotently acknowledged; every other stale write is rejected without changing
@@ -93,9 +95,11 @@ Redis publication, or another client's observation is not durability
 acknowledgement. The exact callback implementing that boundary must be proved
 against the installed persistence path.
 
-Normal durable acknowledgement is silent in the editor. V0 shows no routine
-Saving/Saved status, but it must show actionable disconnected, read-only, and
-persistence-failed states.
+Điều khoản hiển thị trạng thái lưu được thay bởi [ADR-0008](0008-define-work-map-host-authority-and-session-policy.md): chỉ hiện saving/pending/error; ẩn sau xác nhận lưu bền vững.
+
+The saving-status clause is superseded by ADR-0008: show saving, pending, or
+error states only; normal durable acknowledgement remains silent. Actionable
+disconnected, read-only, and persistence-failed states remain required.
 
 ADR-0008 is the canonical owner of local authoring and recovery policy. During
 transient relay or save failures, the editor may continue native geometry and
@@ -114,11 +118,18 @@ offline asset guarantee is made; raw image bytes are not journaled.
 
 ### Versions and generation
 
-One Work Map version identifies exact binary and the protected binding snapshot
+One Work map version identifies exact binary and the protected binding snapshot
 from ADR-0002. Restoration changes both atomically, advances generation, and
 force-closes the old generation. Clients resynchronize through the same live
 editor experience as Page restore. Neither the transport nor recovery journal
 may merge a pre-restore update into the new generation.
+
+Scene reads return `collaboration_epoch` alongside generation and binary in one
+snapshot. Autosave captures that epoch when an edit is queued and checks it before
+each CAS retry. Generation conflicts may merge concurrent edits within an epoch;
+an epoch change stops autosave and retains the local recovery bytes for explicit
+resolution. Late acknowledgements must not apply an old epoch to a resynchronized
+canvas. Ordinary saves advance generation without changing the epoch.
 
 ### Scene-encoding and host gate
 
@@ -173,7 +184,7 @@ The decisive undo requirement failed: after A moved one native rectangle and B
 moved another, A's native Undo reverted both A's local move and B's remote move
 on both clients. Therefore the Yjs scene projection is rejected and the
 transport-only relay is selected. The durable gate receipt is owned by the
-Work Map acceptance suite rather than copied into production code.
+Work map acceptance suite rather than copied into production code.
 
 ## Verification obligations
 
@@ -222,7 +233,7 @@ cross-epoch recovery merge is introduced.
 
 - Existing Plane Live authentication is hardened into per-attachment document
   authorization plus bounded periodic reauthorization.
-- Work Map gains cross-instance transport without a second persistence owner or
+- Work map gains cross-instance transport without a second persistence owner or
   a second standalone realtime service.
 - Native geometry/text authoring can continue through transient relay or save
   failures under ADR-0008; server-authorized source, binding, and asset

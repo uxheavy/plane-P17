@@ -5,14 +5,18 @@ packages:
   - "!apps/proxy"
 
 catalog:
+  # UXHeavy internal editor package, tag target ce4cf4880607bcfdc28829a3d572d37d842fe742.
+  # Release asset SHA-256 values:
+  #   common: fe3fc6f023db0e8c9f2d042a4b63aad19626b8c25a1c6f18236652098c0b085e
+  #   excalidraw: 7f029a40f80be8a5edc4df9e7877bfdb68616cbd6ee3e26acdd4bc485ac9c8c6
+  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-common-0.18.1-ce4cf488.tgz"
+  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-ce4cf488/uxheavy-excalidraw-0.18.1-ce4cf488.tgz"
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
   "@base-ui-components/react": "1.0.0-beta.3"
   "@bprogress/core": "^1.3.4"
   "@chromatic-com/storybook": "5.2.1"
-  "@effect/platform": "^0.94.0"
-  "@effect/platform-node": "^0.104.0"
   "@floating-ui/dom": "^1.7.1"
   "@floating-ui/react": "^0.27.20"
   "@fontsource-variable/inter": "5.2.8"
@@ -101,7 +105,7 @@ catalog:
   "cors": "^2.8.5"
   "date-fns": "^4.1.0"
   "dotenv": "16.4.7"
-  "effect": "3.20.0"
+  "effect": "4.0.0-beta.107"
   "emoji-picker-react": "^4.5.16"
   "emoji-regex": "^10.3.0"
   "export-to-csv": "^1.4.0"
@@ -271,6 +275,9 @@ allowBuilds:
   sharp: false
 
 minimumReleaseAgeExclude:
+  # GitHub-only release artifacts reviewed above and pinned by exact SHA-256.
+  - "@uxheavy/excalidraw-common@0.18.1-ce4cf488"
+  - "@uxheavy/excalidraw@0.18.1-ce4cf488"
   - "@storybook/addon-docs@10.4.6"
   - "@storybook/builder-vite@10.4.6"
   - "@storybook/csf-plugin@10.4.6"

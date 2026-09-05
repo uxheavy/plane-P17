@@ -1,4 +1,4 @@
-# ADR-0002: Share Document lifecycle between Pages and Work Maps
+# ADR-0002: Share Document lifecycle between Pages and Work maps
 
 ## Status
 
@@ -16,7 +16,7 @@ associations and `PageVersion` owns Page snapshots. Page APIs, permissions,
 favorites, recents, search, assets, web stores, and `project_page` realtime
 locators all depend on the existing Page UUID and project-scoped behavior.
 
-Work Map needs the same owner, access, project, archive, lock, duplication,
+Work map needs the same owner, access, project, archive, lock, duplication,
 discovery, and version lifecycle but a flat Excalidraw content engine. Copying
 those fields would create two policies; adding spatial nullable fields to Page
 would make Page the accidental owner of every document engine. Retrofitting a
@@ -26,7 +26,7 @@ consumer contracts must not move.
 ## Decision
 
 Introduce one durable **Document** identity for concerns genuinely shared by
-Pages and Work Maps. `Page` and `WorkMap` are sibling Document subtypes and use
+Pages and Work maps. `Page` and `WorkMap` are sibling Document subtypes and use
 the same immutable UUID as their Document identity.
 
 Document is the sole final owner of:
@@ -41,25 +41,25 @@ Subtype owners remain narrow:
 
 - Page owns rich-text content, labels and rich-text transactions, and its
   parent-child hierarchy.
-- Work Map owns exact collaborative scene content and the protected node-binding
+- Work map owns exact collaborative scene content and the protected node-binding
   set described by ADR-0003.
 - PageVersion owns Page-specific rich-text snapshot payload.
-- WorkMapVersion owns exact Work Map binary content and a protected binding
+- WorkMapVersion owns exact Work map binary content and a protected binding
   snapshot. One Document version identifies both parts; they restore atomically.
 
 Plane's existing asset system remains the authority for file bytes and access.
-Work Map collaborative content stores only asset references and Excalidraw file
-metadata, never a second authoritative byte store. Work Map duplication copies
+Work map collaborative content stores only asset references and Excalidraw file
+metadata, never a second authoritative byte store. Work map duplication copies
 native assets using the established Page asset-duplication semantics and checks
 access through the new Document/project context.
 
-A retained Work Map version keeps every Plane asset reference required to render
+A retained Work map version keeps every Plane asset reference required to render
 that historical scene reachable under the version viewer's document permission.
 Version retention never makes an asset public and never moves file bytes into
 the collaborative binary.
 
 This decision does not create a generic content-adapter registry. Shared
-lifecycle is one concrete owner; Page and Work Map content remain a closed
+lifecycle is one concrete owner; Page and Work map content remain a closed
 two-case dispatch where dispatch is necessary.
 
 ### Page compatibility boundary
@@ -106,18 +106,18 @@ Page behavior is the source of truth:
 
 Current Page project-deletion behavior is preserved: deleting a project removes
 its document association but does not delete the document, including when that
-was the final active association. Such a Work Map remains durable but is
+was the final active association. Such a Work map remains durable but is
 unreachable through V0 routes. This is the sole approved exception to the
 normal final-association invariant. V0 adds no recovery route to compensate.
 
 Lock, archive, insufficient map permission, and realtime disconnection prevent
-Work Map-owned mutations. They do not suppress a canonical source action that
+Work map-owned mutations. They do not suppress a canonical source action that
 the source entity independently authorizes.
 
 ### Duplication and versions
 
-Duplicating a Work Map is one aggregate operation. It creates a new Document
-and Work Map identity, copies scene content and assets, issues target-map-owned
+Duplicating a Work map is one aggregate operation. It creates a new Document
+and Work map identity, copies scene content and assets, issues target-map-owned
 opaque binding keys for the same authoritative sources, and applies Page
 duplication defaults for owner, access, and projects. Source access is evaluated
 again for every viewer of the duplicate. The operation exposes one complete
@@ -126,20 +126,20 @@ visible.
 
 Version restoration follows the Page product experience: the selected version
 becomes current content through the live editor and later history remains
-available. Work Map binary and protected binding snapshot become current in one
+available. Work map binary and protected binding snapshot become current in one
 transaction and one new generation. A client can never observe a restored scene
 paired with bindings from another version. Restore failure leaves the prior
 binary, binding set, generation, current asset reachability, and historical
 asset reachability unchanged.
 
-Work Map V0 adds no activity/compliance subsystem. Creator, last editor,
+Work map V0 adds no activity/compliance subsystem. Creator, last editor,
 timestamps, and versions provide document-state attribution. Presence, cursors,
 raw scene mutations, hydration, iframe interaction, and source edits do not
-create Work Map activity records. Source edits retain source-owned history.
+create Work map activity records. Source edits retain source-owned history.
 
 ### V1 decision horizon
 
-V1 reserves semantic mentions from Work Maps. Ordinary `@name` canvas text
+V1 reserves semantic mentions from Work maps. Ordinary `@name` canvas text
 remains non-semantic until an explicit interaction and notification lifecycle is
 decided.
 
@@ -167,12 +167,12 @@ or logging infrastructure.
 
 ## Alternatives considered
 
-### Keep unrelated Page and Work Map lifecycle models
+### Keep unrelated Page and Work map lifecycle models
 
 Rejected because shared rules would drift and every future lifecycle change
 would need two security reviews.
 
-### Add Work Map fields to Page
+### Add Work map fields to Page
 
 Rejected because Page hierarchy and rich-text state would become the schema and
 vocabulary for another engine.
@@ -189,5 +189,5 @@ condition rather than a bounded migration risk.
   Page content remains Page-specific.
 - A document may be durable but unreachable after deletion of its final project,
   matching current Page semantics.
-- Work Map version and duplication operations must coordinate scene, bindings,
+- Work map version and duplication operations must coordinate scene, bindings,
   assets, and generation as one aggregate.

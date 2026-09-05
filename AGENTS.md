@@ -52,6 +52,14 @@ Prereq (once): `./setup.sh` — generates `apps/api/.env` from `.env.example`.
 
 See `apps/api/tests/RUNNING_TESTS.md` for the full walkthrough and troubleshooting; see `apps/api/tests/TESTING_GUIDE.md` for test conventions and fixtures.
 
+## Effect v4 migration
+
+- Before writing Effect code, read `node_modules/effect/AGENTS.md` completely and follow its required links. Resolve API questions against `node_modules/effect/src`, matching the installed version.
+
+- Use Effect's canonical `MIGRATION.md`, `migration/v3-to-v4.md`, and linked per-topic guides for API mappings; confirm replacements against v4 source signatures.
+- Keep `effect` and every remaining `@effect/*` dependency on one exact v4 beta; `@effect/platform` APIs are consolidated into `effect`, while platform-specific packages remain separate.
+- Resolve migration errors at their call sites; do not add v3 compatibility layers or casts that hide type errors.
+
 ## Work Map ownership map
 
 Keep this boundary DRY: each concern has one canonical owner, and this file

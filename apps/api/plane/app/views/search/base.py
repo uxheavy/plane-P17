@@ -40,6 +40,7 @@ from plane.db.models import (
     ProjectMember,
     DocumentProject,
     WorkspaceMember,
+    Document,
 )
 
 
@@ -209,6 +210,62 @@ class GlobalSearchEndpoint(BaseAPIView):
             .values("name", "id", "project_ids", "project_identifiers", "workspace__slug")
         )
 
+    def filter_work_maps(self, query, slug, project_id, workspace_search):
+        visible_project = Q(
+            document_projects__deleted_at__isnull=True,
+            document_projects__workspace__slug=slug,
+            document_projects__project__workspace__slug=slug,
+            document_projects__project__project_projectmember__member=self.request.user,
+            document_projects__project__project_projectmember__is_active=True,
+            document_projects__project__archived_at__isnull=True,
+        )
+        work_maps = (
+            Document.objects.filter(
+                visible_project,
+                kind=Document.Kind.WORK_MAP,
+                workspace__slug=slug,
+            )
+            .filter(Q(owned_by=self.request.user) | Q(access=Document.PUBLIC_ACCESS))
+            .filter(Q(name__icontains=query) if query else Q())
+            .annotate(
+                project_ids=Coalesce(
+                    ArrayAgg(
+                        "document_projects__project_id",
+                        distinct=True,
+                        filter=visible_project,
+                    ),
+                    Value([], output_field=ArrayField(UUIDField())),
+                ),
+                project_identifiers=Coalesce(
+                    ArrayAgg(
+                        "document_projects__project__identifier",
+                        distinct=True,
+                        filter=visible_project,
+                    ),
+                    Value([], output_field=ArrayField(CharField())),
+                ),
+            )
+        )
+
+        if workspace_search == "false" and project_id:
+            project_subquery = DocumentProject.objects.filter(
+                document_id=OuterRef("id"),
+                project_id=project_id,
+                workspace__slug=slug,
+                deleted_at__isnull=True,
+                project__workspace__slug=slug,
+                project__project_projectmember__member=self.request.user,
+                project__project_projectmember__is_active=True,
+                project__archived_at__isnull=True,
+            ).values_list("project_id", flat=True)[:1]
+            work_maps = work_maps.annotate(project_id=Subquery(project_subquery)).filter(project_id=project_id)
+
+        return (
+            work_maps.order_by("-created_at")
+            .distinct()
+            .values("name", "id", "project_ids", "project_identifiers", "workspace__slug")
+        )
+
     def filter_views(self, query, slug, project_id, workspace_search):
         fields = ["name"]
         q = Q()
@@ -284,6 +341,7 @@ class GlobalSearchEndpoint(BaseAPIView):
             "module": self.filter_modules,
             "issue_view": self.filter_views,
             "page": self.filter_pages,
+            "work_map": self.filter_work_maps,
             "intake": self.filter_intakes,
         }
 

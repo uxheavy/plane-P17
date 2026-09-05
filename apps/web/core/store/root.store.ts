@@ -19,6 +19,9 @@ import { StateStore } from "@/store/state.store";
 import type { ICommandPaletteStore } from "@/store/base-command-palette.store";
 import { CommandPaletteStore } from "@/store/base-command-palette.store";
 import { WorkspaceRootStore } from "@/store/workspace";
+import type { IWorkMapStore } from "@/store/work-map.store";
+import { WorkMapStore } from "@/store/work-map.store";
+import { revokeRecoveryWriters } from "@/services/work-map-recovery.service";
 import type { ITimelineStore } from "./timeline/timeline.store";
 import { TimeLineStore } from "./timeline/timeline.store";
 // stores
@@ -88,6 +91,7 @@ export class CoreRootStore {
   dashboard: IDashboardStore;
   analytics: IAnalyticsStore;
   projectPages: IProjectPageStore;
+  projectWorkMaps: IWorkMapStore;
   router: IRouterStore;
   commandPalette: ICommandPaletteStore;
   theme: IThemeStore;
@@ -126,6 +130,7 @@ export class CoreRootStore {
     this.multipleSelect = new MultipleSelectStore();
     this.projectInbox = new ProjectInboxStore(this);
     this.projectPages = new ProjectPageStore(this);
+    this.projectWorkMaps = new WorkMapStore();
     this.projectEstimate = new ProjectEstimateStore(this);
     this.workspaceNotification = new WorkspaceNotificationStore(this);
     this.favorite = new FavoriteStore(this);
@@ -138,6 +143,8 @@ export class CoreRootStore {
   }
 
   resetOnSignOut() {
+    const accountId = this.user.data?.id;
+    if (accountId) revokeRecoveryWriters(accountId);
     // handling the system theme when user logged out from the app
     localStorage.setItem("theme", "system");
     void setLanguage(FALLBACK_LANGUAGE);
@@ -160,6 +167,7 @@ export class CoreRootStore {
     this.dashboard = new DashboardStore(this);
     this.projectInbox = new ProjectInboxStore(this);
     this.projectPages = new ProjectPageStore(this);
+    this.projectWorkMaps = new WorkMapStore();
     this.multipleSelect = new MultipleSelectStore();
     this.projectEstimate = new ProjectEstimateStore(this);
     this.workspaceNotification = new WorkspaceNotificationStore(this);

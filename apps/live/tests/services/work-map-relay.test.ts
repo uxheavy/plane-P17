@@ -9,9 +9,11 @@ import type { Request } from "express";
 import type { WebSocket } from "ws";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkMapAuthorization } from "@/services/work-map.service";
+import { workMapAuthorizationSchema } from "@/services/work-map.service";
 import { WorkMapRelay } from "@/services/work-map-relay";
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_PROJECT_ID = "55555555-5555-4555-8555-555555555555";
 const WORK_MAP_ID = "22222222-2222-4222-8222-222222222222";
 const OTHER_WORK_MAP_ID = "33333333-3333-4333-8333-333333333333";
 const USER_ID = "44444444-4444-4444-8444-444444444444";
@@ -22,7 +24,9 @@ const authorization = (overrides: Partial<WorkMapAuthorization> = {}): WorkMapAu
   project_id: PROJECT_ID,
   work_map_id: WORK_MAP_ID,
   sender_id: USER_ID,
+  profile: { display_name: "Test User", avatar_url: "https://cdn.example/avatar.png" },
   generation: 7,
+  collaboration_epoch: 2,
   readable: true,
   editable: true,
   is_locked: false,
@@ -87,9 +91,9 @@ class TestRedisConnection extends EventEmitter {
   async quit() {}
 }
 
-const request = (workMapId = WORK_MAP_ID, generation = 7) =>
+const request = (workMapId = WORK_MAP_ID, generation = 7, projectId = PROJECT_ID) =>
   ({
-    url: `/?workspaceSlug=workspace&projectId=${PROJECT_ID}&workMapId=${workMapId}&generation=${generation}`,
+    url: `/?workspaceSlug=workspace&projectId=${projectId}&workMapId=${workMapId}&generation=${generation}`,
     headers: { cookie: "session=test" },
   }) as Request;
 
@@ -112,6 +116,22 @@ const initializeRelay = async (
 };
 
 describe("WorkMapRelay", () => {
+  it("requires a nonnegative collaboration epoch in authorization", () => {
+    expect(() => workMapAuthorizationSchema.parse({ ...authorization(), collaboration_epoch: -1 })).toThrow();
+    expect(() => workMapAuthorizationSchema.parse({ ...authorization(), collaboration_epoch: undefined })).toThrow();
+    expect(workMapAuthorizationSchema.parse(authorization()).collaboration_epoch).toBe(2);
+    expect(workMapAuthorizationSchema.parse(authorization()).profile).toEqual({
+      display_name: "Test User",
+      avatar_url: "https://cdn.example/avatar.png",
+    });
+    expect(() =>
+      workMapAuthorizationSchema.parse({
+        ...authorization(),
+        profile: { ...authorization().profile, id: USER_ID },
+      })
+    ).toThrow();
+  });
+
   it("does not accept frames before authorization and limits read-only viewers to awareness", async () => {
     let resolveAuthorization!: (value: WorkMapAuthorization) => void;
     const pendingAuthorization = new Promise<WorkMapAuthorization>((resolve) => {
@@ -150,16 +170,24 @@ describe("WorkMapRelay", () => {
     const relay = await initializeRelay(bus, async () => authorization());
     const invalid = websocket();
     const oversized = websocket();
+    const identityClaim = websocket();
     void relay.handleConnection(invalid, request());
     void relay.handleConnection(oversized, request());
+    void relay.handleConnection(identityClaim, request());
     await nextTurn();
 
     invalid.emit("message", Buffer.from('{"type":"UNKNOWN"}'), false);
     oversized.emit("message", Buffer.alloc(5 * 1024 * 1024 + 1, "x"), false);
+    identityClaim.emit(
+      "message",
+      Buffer.from('{"type":"PRESENCE_UPDATE","senderId":"attacker","payload":{"state":"active"}}'),
+      false
+    );
     await nextTurn();
 
     expect((invalid as unknown as TestWebSocket).closed?.code).toBe(4400);
     expect((oversized as unknown as TestWebSocket).closed?.code).toBe(4400);
+    expect((identityClaim as unknown as TestWebSocket).closed?.code).toBe(4400);
     expect(bus.published).toHaveLength(0);
     await relay.destroy();
   });
@@ -180,10 +208,98 @@ describe("WorkMapRelay", () => {
     vi.useRealTimers();
   });
 
+  it("closes on collaboration epoch changes but not routine generation changes", async () => {
+    vi.useFakeTimers();
+    const bus = new TestRedisBus();
+    const authorize = vi
+      .fn()
+      .mockResolvedValueOnce(authorization())
+      .mockResolvedValueOnce(authorization({ generation: 8 }))
+      .mockResolvedValueOnce(authorization({ generation: 9, collaboration_epoch: 3 }));
+    const relay = await initializeRelay(bus, authorize);
+    const ws = websocket();
+    void relay.handleConnection(ws, request());
+    await vi.runAllTicks();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((ws as unknown as TestWebSocket).closed).toBeNull();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((ws as unknown as TestWebSocket).closed).toEqual({ code: 4409, reason: "Work map authority changed" });
+    await relay.destroy();
+    vi.useRealTimers();
+  });
+
+  it("closes only the exact work map targeted by an admin force-close command", async () => {
+    const bus = new TestRedisBus();
+    const authorize = vi.fn(async (_workspace: string, _projectId: string, workMapId: string) =>
+      authorization({ work_map_id: workMapId })
+    );
+    const relay = await initializeRelay(bus, authorize);
+    const target = websocket();
+    const unrelated = websocket();
+    void relay.handleConnection(target, request(WORK_MAP_ID));
+    void relay.handleConnection(unrelated, request(OTHER_WORK_MAP_ID));
+    await nextTurn();
+
+    await bus.publish(
+      "hocuspocus:admin",
+      JSON.stringify({
+        command: "force_close",
+        docId: `${WORK_MAP_ID}not-a-uuid`,
+        reason: "admin_request",
+        code: 4000,
+        originServer: "test",
+      })
+    );
+    expect((target as unknown as TestWebSocket).closed).toBeNull();
+    expect((unrelated as unknown as TestWebSocket).closed).toBeNull();
+
+    await bus.publish(
+      "hocuspocus:admin",
+      JSON.stringify({
+        command: "force_close",
+        docId: WORK_MAP_ID,
+        reason: "admin_request",
+        code: 4000,
+        originServer: "test",
+      })
+    );
+    expect((target as unknown as TestWebSocket).closed).toEqual({
+      code: 4409,
+      reason: "Work map authority changed",
+    });
+    expect((unrelated as unknown as TestWebSocket).closed).toBeNull();
+    await relay.destroy();
+  });
+
+  it("refreshes the server-stamped profile after successful reauthorization", async () => {
+    vi.useFakeTimers();
+    const bus = new TestRedisBus();
+    const refreshedProfile = { display_name: "Updated User", avatar_url: null };
+    const authorize = vi
+      .fn()
+      .mockResolvedValueOnce(authorization({ profile: { display_name: "Initial User", avatar_url: null } }))
+      .mockResolvedValueOnce(authorization({ profile: refreshedProfile }));
+    const relay = await initializeRelay(bus, authorize);
+    const ws = websocket();
+    void relay.handleConnection(ws, request());
+    await vi.runAllTicks();
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    ws.emit("message", Buffer.from('{"type":"PRESENCE_UPDATE","payload":{"state":"active"}}'), false);
+    await vi.runAllTicks();
+
+    expect(JSON.parse(bus.published[0].message)).toMatchObject({
+      senderId: USER_ID,
+      profile: refreshedProfile,
+    });
+    await relay.destroy();
+    vi.useRealTimers();
+  });
+
   it("forwards validated frames across instances without self-echo or cross-room leakage", async () => {
     const bus = new TestRedisBus();
-    const authorize = vi.fn(async (_workspace: string, _project: string, workMapId: string) =>
-      authorization({ work_map_id: workMapId })
+    const authorize = vi.fn(async (_workspace: string, projectId: string, workMapId: string) =>
+      authorization({ project_id: projectId, work_map_id: workMapId })
     );
     const firstRelay = await initializeRelay(bus, authorize);
     const secondRelay = await initializeRelay(bus, authorize);
@@ -191,7 +307,7 @@ describe("WorkMapRelay", () => {
     const peer = websocket();
     const otherRoom = websocket();
     void firstRelay.handleConnection(sender, request());
-    void secondRelay.handleConnection(peer, request());
+    void secondRelay.handleConnection(peer, request(WORK_MAP_ID, 7, OTHER_PROJECT_ID));
     void secondRelay.handleConnection(otherRoom, request(OTHER_WORK_MAP_ID));
     await nextTurn();
     const senderSocket = sender as unknown as TestWebSocket;
@@ -211,6 +327,7 @@ describe("WorkMapRelay", () => {
       type: "SCENE_UPDATE",
       payload: "AQI=",
       senderId: USER_ID,
+      profile: authorization().profile,
     });
     expect(JSON.parse(peerSocket.sent[0]).connectionId).toMatch(/^[0-9a-f-]{36}$/);
     senderSocket.close(1000, "Test complete");

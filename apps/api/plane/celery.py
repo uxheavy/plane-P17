@@ -21,6 +21,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plane.settings.production")
 
 ri = redis_instance()
 
+
 # Configurable metrics push interval (in minutes)
 # Default: 360 (6 hours), set to 5 for development/testing
 def _get_metrics_push_interval_minutes() -> int:
@@ -32,6 +33,7 @@ def _get_metrics_push_interval_minutes() -> int:
         return value if 0 < value <= 10_000_000 else 360
     except (ValueError, OverflowError):
         return 360
+
 
 METRICS_PUSH_INTERVAL_MINUTES = _get_metrics_push_interval_minutes()
 
@@ -50,6 +52,14 @@ app.conf.beat_schedule = {
     "push-instance-metrics": {
         "task": "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
         "schedule": schedule(run_every=timedelta(minutes=METRICS_PUSH_INTERVAL_MINUTES)),
+    },
+    "cleanup-stale-work-map-asset-copies": {
+        "task": "plane.bgtasks.work_map_asset_task.cleanup_stale_work_map_asset_copies",
+        "schedule": crontab(minute="*/15"),
+    },
+    "expire-stale-work-map-binding-placements": {
+        "task": "plane.bgtasks.work_map_binding_task.expire_stale_work_map_binding_placements",
+        "schedule": crontab(minute="*/15"),
     },
     # Occurs once every day
     "check-every-day-to-delete-hard-delete": {
