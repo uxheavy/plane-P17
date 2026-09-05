@@ -85,9 +85,17 @@ export function WorkMapSourceCard({ projection }: Props) {
   if (source.source_kind === "intake-item") {
     const status = INBOX_STATUS.find((item) => item.status === source.intake_status);
     return (
-      <div className="relative size-full text-left" data-status={source.intake_status}>
+      <div className="size-full text-left" data-status={source.intake_status}>
         <WorkItemPreviewCard
           className="size-full w-full overflow-hidden shadow-none"
+          headerStatus={
+            status && source.intake_status !== undefined ? (
+              <>
+                <InboxStatusIcon type={status.status} size={12} />
+                <span className="text-11 font-medium">{t(status.i18n_title)}</span>
+              </>
+            ) : undefined
+          }
           projectId={source.project_id}
           stateDetails={source.state ?? {}}
           workItem={{
@@ -100,12 +108,6 @@ export function WorkMapSourceCard({ projection }: Props) {
             type_id: source.type_id,
           }}
         />
-        {status && source.intake_status !== undefined && (
-          <span className="absolute top-3 right-3 flex items-center gap-1 rounded-sm bg-surface-1 px-1 text-11 font-medium text-secondary">
-            <InboxStatusIcon type={status.status} size={12} />
-            {t(status.i18n_title)}
-          </span>
-        )}
       </div>
     );
   }

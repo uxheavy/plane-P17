@@ -5,6 +5,7 @@
  */
 
 import { observer } from "mobx-react";
+import type { ReactNode } from "react";
 // plane imports
 import { PriorityIcon, StateGroupIcon } from "@plane/propel/icons";
 import type { TIssue, TStateGroups } from "@plane/types";
@@ -19,6 +20,7 @@ import { WorkItemPreviewCardDate } from "./date";
 
 type Props = {
   className?: string;
+  headerStatus?: ReactNode;
   projectId: string;
   stateDetails: {
     group?: TStateGroups;
@@ -29,7 +31,7 @@ type Props = {
 };
 
 export const WorkItemPreviewCard = observer(function WorkItemPreviewCard(props: Props) {
-  const { className, projectId, stateDetails, workItem } = props;
+  const { className, headerStatus, projectId, stateDetails, workItem } = props;
   // store hooks
   const { getProjectIdentifierById } = useProject();
   const { getStateById } = useProjectState();
@@ -56,8 +58,12 @@ export const WorkItemPreviewCard = observer(function WorkItemPreviewCard(props: 
           issueTypeId={workItem.type_id}
         />
         <div className="flex shrink-0 items-center gap-1 @max-[220px]:hidden">
-          <StateGroupIcon stateGroup={stateGroup} className="size-3 shrink-0" />
-          <p className="text-11 font-medium">{stateName}</p>
+          {headerStatus ?? (
+            <>
+              <StateGroupIcon stateGroup={stateGroup} className="size-3 shrink-0" />
+              <p className="text-11 font-medium">{stateName}</p>
+            </>
+          )}
         </div>
       </div>
       <div>
