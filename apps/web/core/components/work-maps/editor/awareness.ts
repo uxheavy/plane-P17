@@ -25,12 +25,15 @@ type TPointerUpdate = {
   button: "down" | "up";
 };
 
-export type TAwarenessFrame =
+type TAwarenessIdentity = {
+  senderId: string;
+  connectionId: string;
+  profile: TWorkMapProfile;
+};
+
+export type TAwarenessOutboundFrame =
   | {
       type: "POINTER_UPDATE";
-      senderId: string;
-      connectionId: string;
-      profile: TWorkMapProfile;
       payload: {
         pointer: { x: number; y: number; tool: "pointer" | "laser" };
         button: "down" | "up";
@@ -39,10 +42,16 @@ export type TAwarenessFrame =
     }
   | {
       type: "PRESENCE_UPDATE";
-      senderId: string;
-      connectionId: string;
-      profile: TWorkMapProfile;
       payload: { state: "active" | "idle" | "away" };
+    };
+
+export type TAwarenessFrame = TAwarenessOutboundFrame & TAwarenessIdentity;
+
+export type TWorkMapOutboundFrame =
+  | TAwarenessOutboundFrame
+  | {
+      type: "SCENE_UPDATE";
+      payload: string;
     };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -58,7 +67,7 @@ const isWorkMapProfile = (value: unknown): value is TWorkMapProfile => {
 export const createPointerUpdateFrame = (
   update: TPointerUpdate,
   selectedElementIds: Record<string, true>
-): Pick<TAwarenessFrame, "type" | "payload"> => ({
+): TAwarenessOutboundFrame => ({
   type: "POINTER_UPDATE",
   payload: {
     pointer: update.pointer,

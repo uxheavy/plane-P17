@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState, type MutableRefObject } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { LIVE_BASE_PATH, LIVE_BASE_URL } from "@plane/constants";
-import { parseAwarenessFrame } from "./awareness";
+import { parseAwarenessFrame, type TWorkMapOutboundFrame } from "./awareness";
 import { parseSourceInvalidationFrame } from "./source-invalidation";
 import { useAwareness } from "./use-awareness";
 
@@ -68,7 +68,7 @@ export const useCollaboration = (
     setConnectionState(state);
   }, []);
 
-  const sendFrame = useCallback((frame: unknown) => {
+  const sendFrame = useCallback((frame: TWorkMapOutboundFrame) => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
     socketRef.current.send(JSON.stringify(frame));
   }, []);

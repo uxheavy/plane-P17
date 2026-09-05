@@ -56,7 +56,7 @@ describe("Work map scene boundary", () => {
       backgroundColor: "rgba(0, 0, 0, 0.001)",
       customData: { nodeKey },
     });
-    expect(decoded.elements[0]).not.toHaveProperty("link");
+    expect(decoded.elements[0].link).toBeNull();
     expect(atob(encoded)).not.toContain("source_id");
     expect(atob(encoded)).not.toContain("source_kind");
     expect(atob(encoded)).not.toContain("must-not-survive");

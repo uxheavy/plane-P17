@@ -76,15 +76,15 @@ export const normalizeNodeCarrier = (element: ExcalidrawElement): ExcalidrawElem
   if (element.type !== "rectangle" && element.type !== "embeddable") return element;
   const nodeKey = getCustomDataNodeKey(element);
   if (!nodeKey) return element;
-  const { link: _link, ...withoutLink } = element;
   return {
-    ...withoutLink,
+    ...element,
     type: "rectangle",
+    link: null,
     // Excalidraw only hit-tests the interior of a filled shape. The host card
     // covers this imperceptible fill while preserving native whole-card selection.
     backgroundColor: NODE_CARRIER_HIT_AREA,
     customData: { nodeKey },
-  } as unknown as ExcalidrawElement;
+  };
 };
 
 export const isAllowedEmbedUrl = (link: string): boolean => {

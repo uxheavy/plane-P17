@@ -19,6 +19,7 @@ import {
   projectCollaborator,
   type TAwarenessFrame,
   type TCollaboratorLease,
+  type TWorkMapOutboundFrame,
 } from "./awareness";
 
 const POINTER_INTERVAL = 33;
@@ -44,7 +45,7 @@ export const useAwareness = (
   enabled: boolean,
   connected: boolean,
   api: ExcalidrawImperativeAPI | null,
-  sendFrame: (frame: unknown) => void,
+  sendFrame: (frame: TWorkMapOutboundFrame) => void,
   userId: string
 ): TAwareness => {
   const collaboratorsRef = useRef(new Map<SocketId, TCollaboratorLease>());
