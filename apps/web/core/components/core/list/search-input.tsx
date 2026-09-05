@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026-present Ngo Quoc Huy
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import { useRef, useState } from "react";
 import { useTranslation } from "@plane/i18n";
 import { useOutsideClickDetector } from "@plane/hooks";

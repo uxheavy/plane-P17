@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026-present Ngo Quoc Huy
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import { ArchiveRestoreIcon, Earth, Info, LockKeyhole, LockKeyholeOpen, Minus, Pencil } from "lucide-react";
 import { LinkIcon, CopyIcon, LockIcon, NewTabIcon, ArchiveIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";

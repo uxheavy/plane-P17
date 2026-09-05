@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026-present Ngo Quoc Huy
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { CheckIcon, LinkIcon } from "@plane/propel/icons";

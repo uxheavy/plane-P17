@@ -573,7 +573,7 @@ overrides:
   '@opentelemetry/sdk-trace-base': 2.8.0
   morgan: 1.11.0
 
-pnpmfileChecksum: sha256-/xBkE+vGykvmsDl4PErBGHfvxBduL6GcDYlQLDFmEsw=
+pnpmfileChecksum: sha256-H9dVB/v79a0uuELlvuamUXJKBGwzjeBJqiKCZUgLmZs=
 
 patchedDependencies:
   react-color@2.19.3: 311b81530f5338988f8b57718f24870a7550637159d8360d69f668cba2f2033f
