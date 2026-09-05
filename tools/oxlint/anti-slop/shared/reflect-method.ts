@@ -1,9 +1,6 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
-function resolveVariable(
-  sourceCode: SourceCode,
-  identifier: ESTree.IdentifierReference,
-): Variable | null {
+function resolveVariable(sourceCode: SourceCode, identifier: ESTree.IdentifierReference): Variable | null {
   let scope: Scope | null = sourceCode.getScope(identifier);
   while (scope !== null) {
     const variable = scope.set.get(identifier.name);
@@ -24,7 +21,7 @@ function isGlobalReflect(sourceCode: SourceCode, expression: ESTree.Expression):
 export function isGlobalReflectMethodCall(
   sourceCode: SourceCode,
   callee: ESTree.Expression,
-  methodName: string,
+  methodName: string
 ): boolean {
   if (!("property" in callee) || !("object" in callee) || !("computed" in callee)) return false;
   if (!isGlobalReflect(sourceCode, callee.object)) return false;

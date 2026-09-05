@@ -22,6 +22,7 @@ import { FiltersDropdown } from "./filters";
 import { RecentIssue } from "./issue";
 import { RecentPage } from "./page";
 import { RecentProject } from "./project";
+import { RecentWorkMap } from "./work-map";
 
 const WIDGET_KEY = EWidgetKeys.RECENT_ACTIVITY;
 const workspaceService = new WorkspaceService();
@@ -70,6 +71,8 @@ export const RecentActivityWidget = observer(function RecentActivityWidget(props
         return <RecentProject activity={activity} ref={ref} workspaceSlug={workspaceSlug} />;
       case "issue":
         return <RecentIssue activity={activity} ref={ref} workspaceSlug={workspaceSlug} />;
+      case "work_map":
+        return <RecentWorkMap activity={activity} ref={ref} workspaceSlug={workspaceSlug} />;
       default:
         return <></>;
     }

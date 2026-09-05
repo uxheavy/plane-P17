@@ -17,8 +17,7 @@ function isConditionalEmptyObjectSpread(node: ESTree.Expression): boolean {
   const conditional = unwrapParentheses(node);
   return (
     conditional.type === "ConditionalExpression" &&
-    (isEmptyObjectExpression(conditional.consequent) ||
-      isEmptyObjectExpression(conditional.alternate))
+    (isEmptyObjectExpression(conditional.consequent) || isEmptyObjectExpression(conditional.alternate))
   );
 }
 
@@ -27,8 +26,7 @@ export const noConditionalEmptyObjectSpreadRule = defineRule({
   meta: {
     type: "suggestion",
     docs: {
-      description:
-        "Disallow object spreads that conditionally spread an empty object to omit fields.",
+      description: "Disallow object spreads that conditionally spread an empty object to omit fields.",
     },
     messages: {
       avoid:

@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-URL embeds differ from Plane nodes: their URL and title are authored Work Map
+URL embeds differ from Plane nodes: their URL and title are authored Work map
 content rather than protected references to another Plane authority. They also
 execute untrusted remote content and compete with canvas pan/select gestures.
 
@@ -23,9 +23,13 @@ and whether that state belongs to the viewer or the document.
 
 ## Decision
 
-Work Map preserves Excalidraw's native Web Embed tool, click-drag link editor,
+Work map preserves Excalidraw's native Web Embed tool, click-drag link editor,
 URL parsing, intrinsic sizing, paste/drop, sandbox, and click-to-interact
 behavior. Plane does not implement a parallel URL insertion or gesture path.
+Because Work map reserves `W` for Work Item placement, Web Embed remains
+discoverable through Excalidraw's native More tools menu. The host toolbar
+extension used for Plane node placement is defined by ADR-0007; it does not add
+an `Add URL embed` button or a second embed workflow.
 
 Override provider eligibility so every syntactically valid `http` or `https`
 URL may use Excalidraw's native generic iframe fallback. Non-web schemes are
@@ -37,7 +41,7 @@ being represented as successful content.
 ### State ownership
 
 - URL, title, geometry, native element state, enablement, and the enabled origin
-  belong to the Work Map scene and version history.
+  belong to the Work map scene and version history.
 - Persisted enablement belongs to the **document node**, not to a viewer. Once a
   map editor enables that node, it loads for all viewers who can open the map.
 - A read-only viewer may load an inert node temporarily for their current
@@ -47,7 +51,7 @@ being represented as successful content.
 - Excalidraw native duplication copies the node-owned enablement with the node.
 
 Every arbitrary URL starts as an inert domain-labelled shell. Only a user with
-current Work Map edit permission may persist enablement. The enabled iframe uses
+current Work map edit permission may persist enablement. The enabled iframe uses
 the existing Excalidraw sandbox and referrer policy; Plane must not add
 permissions or weaken either to make a destination work. Plane never forwards
 Plane authentication headers, cookies, tokens, or credentials to the embed
@@ -59,7 +63,7 @@ Embeds use native explicit click/tap-to-interact. Trackpad or touch panning does
 not activate an iframe merely because the cursor passes over it. V0 adds no
 pointer-motion classifier, pan gate, focus timer, or cross-origin cooperation.
 
-Iframe scrolling/navigation is not a Work Map mutation. Therefore an enabled
+Iframe scrolling/navigation is not a Work map mutation. Therefore an enabled
 embed remains interactable when the map is permission-read-only, locked,
 archived, or temporarily disconnected. Moving, resizing, editing the URL,
 enabling for the document, or deleting the element remains disabled with other
@@ -102,7 +106,7 @@ and a separate decision because it changes document and browser behavior.
 
 ### Provider allowlist only
 
-Rejected because Work Map is a general spatial document and Excalidraw already
+Rejected because Work map is a general spatial document and Excalidraw already
 has a generic iframe fallback.
 
 ### Viewer-owned remembered enablement

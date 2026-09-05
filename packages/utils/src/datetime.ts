@@ -37,6 +37,46 @@ export const renderFormattedDate = (
   return formattedDate;
 };
 
+const normalizeLocale = (locale: string) => (locale === "ua" ? "uk" : locale);
+
+export const formatLocalizedTimestamp = (
+  date: string | number | Date | undefined | null,
+  locale: string,
+  userTimezone?: string,
+  mode: "date" | "dateTime" = "date"
+): string | undefined => {
+  if (date === undefined || date === null || date === "") return;
+  const parsedDate = date instanceof Date ? date : new Date(date);
+  if (!isValid(parsedDate)) return;
+  return new Intl.DateTimeFormat(normalizeLocale(locale), {
+    dateStyle: "medium",
+    ...(mode === "dateTime" ? { timeStyle: "short" } : {}),
+    timeZone: userTimezone || "UTC",
+  }).format(parsedDate);
+};
+
+export const formatLocalizedDateOnly = (date: string | undefined | null, locale: string): string | undefined => {
+  if (!date) return;
+  const datePart = date.substring(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+  if (!match) return;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    !isValid(parsedDate) ||
+    parsedDate.getUTCFullYear() !== year ||
+    parsedDate.getUTCMonth() !== month - 1 ||
+    parsedDate.getUTCDate() !== day
+  )
+    return;
+  return new Intl.DateTimeFormat(normalizeLocale(locale), {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(parsedDate);
+};
+
 /**
  * @returns {string} formatted date in the format of MMM dd
  * @description Returns date in the formatted format

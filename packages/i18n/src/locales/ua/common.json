@@ -453,6 +453,31 @@
     "activity": "Активність",
     "analytics": "Аналітика",
     "dates": "Дати",
+    "work_map": {
+      "empty_state": {
+        "title": "No Work maps yet",
+        "description": "Create a spatial document for work, drawings, and web embeds."
+      },
+      "untitled": "Untitled work map",
+      "updated": "Updated {date}",
+      "source_unavailable": "Source unavailable",
+      "recovery": {
+        "title": "This local change cannot be applied.",
+        "description": "Editing is paused because this change cannot be applied safely. Discard local changes to return to the saved scene.",
+        "storage_error": "We couldn't keep a recovery copy of your unsaved changes. Check browser storage and try again.",
+        "waiting": "Checking whether these changes can be saved.",
+        "replayable": "These local changes are ready to save again.",
+        "non_replayable": "This change cannot be applied safely to the current map.",
+        "unsaved_update": "Local changes · {date}",
+        "discard_local_changes": "Discard local changes",
+        "save_failed": "Changes not saved"
+      },
+      "pending_scene": {
+        "title": "The latest change could not be prepared for saving.",
+        "description": "Retry it, or reload the last saved scene.",
+        "reload_saved_scene": "Reload saved scene"
+      }
+    },
     "success": "Успіх!",
     "something_went_wrong": "Щось пішло не так",
     "error": {

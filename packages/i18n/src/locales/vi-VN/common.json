@@ -453,6 +453,31 @@
     "activity": "Hoạt động",
     "analytics": "Phân tích",
     "dates": "Ngày",
+    "work_map": {
+      "empty_state": {
+        "title": "Chưa có bản đồ công việc nào",
+        "description": "Tạo tài liệu không gian cho công việc, bản vẽ và nội dung nhúng trên web."
+      },
+      "untitled": "Bản đồ công việc chưa đặt tên",
+      "updated": "Đã cập nhật {date}",
+      "source_unavailable": "Không thể truy cập nguồn",
+      "recovery": {
+        "title": "Không thể áp dụng thay đổi cục bộ này.",
+        "description": "Tạm dừng chỉnh sửa vì không thể áp dụng thay đổi này an toàn. Hãy xóa thay đổi cục bộ để trở về cảnh đã lưu.",
+        "storage_error": "Không thể giữ bản sao khôi phục của các thay đổi chưa lưu. Hãy kiểm tra bộ nhớ trình duyệt và thử lại.",
+        "waiting": "Đang kiểm tra xem có thể lưu các thay đổi này hay không.",
+        "replayable": "Các thay đổi cục bộ này đã sẵn sàng để lưu lại.",
+        "non_replayable": "Không thể áp dụng thay đổi này an toàn vào bản đồ hiện tại.",
+        "unsaved_update": "Thay đổi cục bộ · {date}",
+        "discard_local_changes": "Xóa thay đổi cục bộ",
+        "save_failed": "Chưa lưu được thay đổi"
+      },
+      "pending_scene": {
+        "title": "Không thể chuẩn bị thay đổi mới nhất để lưu.",
+        "description": "Hãy thử lại hoặc tải lại cảnh đã lưu gần nhất.",
+        "reload_saved_scene": "Tải lại cảnh đã lưu"
+      }
+    },
     "success": "Thành công",
     "something_went_wrong": "Đã xảy ra lỗi",
     "error": {

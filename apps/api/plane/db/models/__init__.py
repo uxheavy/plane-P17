@@ -49,7 +49,7 @@ from .issue import (
 )
 from .module import Module, ModuleIssue, ModuleLink, ModuleMember, ModuleUserProperties
 from .notification import EmailNotificationLog, Notification, UserNotificationPreference
-from .document import Document, DocumentProject, DocumentVersion
+from .document import Document, DocumentProject, DocumentVersion, DocumentVersionAsset
 from .page import Page, PageLabel, PageLog, PageVersion
 from .project import (
     Project,
@@ -90,6 +90,14 @@ from .label import Label
 from .device import Device, DeviceSession
 
 from .sticky import Sticky
-from .work_map import WorkMap, WorkMapBinding
+from .work_map import (
+    WorkMap,
+    WorkMapBinding,
+    WorkMapBindingPlacement,
+    WorkMapDuplicateOperation,
+    WorkMapPasteRebinding,
+    WorkMapSceneAssetPlacement,
+    WorkMapVersion,
+)
 
 from .description import Description, DescriptionVersion

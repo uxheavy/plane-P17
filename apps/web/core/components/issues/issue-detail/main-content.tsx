@@ -14,6 +14,7 @@ import { EFileAssetType, EIssueServiceType } from "@plane/types";
 // components
 import { DescriptionVersionsRoot } from "@/components/core/description-versions";
 import { DescriptionInput } from "@/components/editor/rich-text/description-input";
+import { UpdateStatus } from "@/components/common/update-status";
 import { IssueTypeSwitcher } from "@/components/issues/issue-type-switcher";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -25,7 +26,6 @@ import useSize from "@/hooks/use-window-size";
 import { WorkItemVersionService } from "@/services/issue";
 // local imports
 import { IssueDetailWidgets } from "../issue-detail-widgets";
-import { NameDescriptionUpdateStatus } from "../issue-update-status";
 import { PeekOverviewProperties } from "../peek-overview/properties";
 import { IssueTitleInput } from "../title-input";
 import { IssueActivity } from "./issue-activity";
@@ -91,7 +91,7 @@ export const IssueMainContent = observer(function IssueMainContent(props: Props)
         <div className="mb-2.5 flex items-center justify-between gap-4">
           <IssueTypeSwitcher issueId={issueId} disabled={isArchived || !isEditable} />
           <div className="flex items-center gap-3">
-            <NameDescriptionUpdateStatus isSubmitting={isSubmitting} />
+            <UpdateStatus status={isSubmitting === "submitting" ? "saving" : "saved"} />
           </div>
         </div>
 

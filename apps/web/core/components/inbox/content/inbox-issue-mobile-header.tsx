@@ -21,7 +21,7 @@ import type { TNameDescriptionLoader } from "@plane/types";
 import { Header, CustomMenu, EHeaderVariant } from "@plane/ui";
 import { cn, findHowManyDaysLeft, generateWorkItemLink } from "@plane/utils";
 // components
-import { NameDescriptionUpdateStatus } from "@/components/issues/issue-update-status";
+import { UpdateStatus } from "@/components/common/update-status";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useAppRouter } from "@/hooks/use-app-router";
@@ -130,7 +130,7 @@ export const InboxIssueActionsMobileHeader = observer(function InboxIssueActions
         <div className="flex items-center gap-4">
           <InboxIssueStatus inboxIssue={inboxIssue} iconSize={12} />
           <div className="flex w-full items-center justify-end">
-            <NameDescriptionUpdateStatus isSubmitting={isSubmitting} />
+            <UpdateStatus status={isSubmitting === "submitting" ? "saving" : "saved"} />
           </div>
         </div>
         <div className="ml-auto">

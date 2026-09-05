@@ -291,6 +291,7 @@ export const WORKSPACE_DEFAULT_SEARCH_RESULT: IWorkspaceSearchResults = {
     module: [],
     issue_view: [],
     page: [],
+    work_map: [],
   },
 };
 

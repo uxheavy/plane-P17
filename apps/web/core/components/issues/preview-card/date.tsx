@@ -6,9 +6,10 @@
 
 import { CalendarDays } from "lucide-react";
 // plane imports
+import { useTranslation } from "@plane/i18n";
 import { DueDatePropertyIcon, StartDatePropertyIcon } from "@plane/propel/icons";
 import type { TStateGroups } from "@plane/types";
-import { cn, renderFormattedDate, shouldHighlightIssueDueDate } from "@plane/utils";
+import { cn, formatLocalizedDateOnly, shouldHighlightIssueDueDate } from "@plane/utils";
 
 type Props = {
   startDate: string | null;
@@ -18,6 +19,7 @@ type Props = {
 
 export function WorkItemPreviewCardDate(props: Props) {
   const { startDate, stateGroup, targetDate } = props;
+  const { currentLocale } = useTranslation();
   // derived values
   const isDateRangeEnabled = Boolean(startDate && targetDate);
   const shouldHighlightDate = shouldHighlightIssueDueDate(targetDate, stateGroup);
@@ -34,13 +36,13 @@ export function WorkItemPreviewCardDate(props: Props) {
         >
           <CalendarDays className="size-3 shrink-0" />
           <span>
-            {renderFormattedDate(startDate)} - {renderFormattedDate(targetDate)}
+            {formatLocalizedDateOnly(startDate, currentLocale)} - {formatLocalizedDateOnly(targetDate, currentLocale)}
           </span>
         </div>
       ) : startDate ? (
         <div className="flex h-full items-center gap-1">
           <StartDatePropertyIcon className="size-3 shrink-0" />
-          <span>{renderFormattedDate(startDate)}</span>
+          <span>{formatLocalizedDateOnly(startDate, currentLocale)}</span>
         </div>
       ) : (
         <div
@@ -49,7 +51,7 @@ export function WorkItemPreviewCardDate(props: Props) {
           })}
         >
           <DueDatePropertyIcon className="size-3 shrink-0" />
-          <span>{renderFormattedDate(targetDate)}</span>
+          <span>{formatLocalizedDateOnly(targetDate, currentLocale)}</span>
         </div>
       )}
     </div>

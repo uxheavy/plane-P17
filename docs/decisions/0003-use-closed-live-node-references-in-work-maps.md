@@ -1,8 +1,11 @@
-# ADR-0003: Use closed protected live-node references in Work Maps
+# ADR-0003: Use closed protected live-node references in Work maps
 
 ## Status
 
 Accepted
+
+The toolbar and shortcut integration portions are amended by ADR-0007. The
+closed live-node, disclosure, carrier, and binding decisions remain in force.
 
 ## Date
 
@@ -10,7 +13,7 @@ Accepted
 
 ## Context
 
-A Work Map viewer may read the map without permission to read every referenced
+A Work map viewer may read the map without permission to read every referenced
 Plane entity. Collaborative scene bytes are delivered to every map viewer, so
 placing source kinds, IDs, project IDs, titles, or hydrated state in Excalidraw
 data would disclose metadata before the client could redact it.
@@ -38,7 +41,7 @@ source kinds are:
 
 Feature availability is necessary but never sufficient. Existing source
 membership and authorization govern discovery, binding, hydration, opening,
-and editing. Work Map project associations do not restrict source discovery;
+and editing. Work map project associations do not restrict source discovery;
 same-workspace scope and the source project rules do.
 
 Do not add a runtime plugin registry, generic entity adapter, or Power K
@@ -46,14 +49,14 @@ dependency. Power K was only an interaction reference.
 
 ### State ownership and disclosure
 
-| State | Owner and visibility |
-| --- | --- |
-| Geometry, selection, order, native bindings, canvas element ID | Excalidraw collaborative scene; visible to map viewers |
-| Opaque globally unique `nodeKey` | Excalidraw carrier custom data; visible but non-authorizing |
-| Source kind, source ID, and binding revision | Plane protected Work Map binding state; never collaborative content |
-| Hydrated title, state, identifiers, actions, canonical project context | Viewer-scoped server response and viewer-scoped cache |
-| Placement ghost and unresolved create/select state | Local ephemeral client state only |
-| Presence, pointer, and selection | Realtime awareness; ephemeral |
+| State                                                                  | Owner and visibility                                                |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Geometry, selection, order, native bindings, canvas element ID         | Excalidraw collaborative scene; visible to map viewers              |
+| Opaque globally unique `nodeKey`                                       | Excalidraw carrier custom data; visible but non-authorizing         |
+| Source kind, source ID, and binding revision                           | Plane protected Work map binding state; never collaborative content |
+| Hydrated title, state, identifiers, actions, canonical project context | Viewer-scoped server response and viewer-scoped cache               |
+| Placement ghost and unresolved create/select state                     | Local ephemeral client state only                                   |
+| Presence, pointer, and selection                                       | Realtime awareness; ephemeral                                       |
 
 A `nodeKey` locates a protected binding and grants no authority. The server
 resolves it only after current map and source authorization. Missing, deleted,
@@ -71,11 +74,30 @@ Each Plane projection uses one native bindable Excalidraw carrier. That carrier
 is the sole owner of geometry, selection, hit testing, resize, rotation,
 grouping, z-order, duplication, deletion, native arrow binding, and Excalidraw
 history. Plane adds only `nodeKey`, viewer-authorized rendering, placement, and
-the canonical source action.
+the canonical source action. The V0 carrier is an ordinary rectangle with no
+link and no embeddable type. Its only host-owned scene field is `customData.nodeKey`;
+the authorized card is an ephemeral host projection defined by ADR-0007.
 
 Hidden mirror geometry, a second hit-test/transform system, Plane-owned arrows,
 or a separate undo track fail this architecture. A Plane node must provide every
-applicable behavior of its carrier plus Plane behavior, never less.
+applicable spatial/editor behavior of its carrier plus Plane behavior, never less;
+source-card content editing is not an applicable carrier behavior.
+
+### Source-card activation boundary
+
+The carrier owns spatial selection, geometry, transforms, native arrow bindings,
+and Excalidraw history. It does not own source-card text editing. A source
+carrier must never become a native bound-text container through card activation.
+
+The shared Excalidraw host interaction boundary is defined by
+[ADR-0007](0007-define-host-owned-excalidraw-integration.md). Through
+that boundary, Plane recognizes the opaque `nodeKey` and owns the canonical
+source action, while Excalidraw remains free of Plane logic. The Work Item action
+must open the existing authorized native peek while the map route and viewport
+remain mounted. Other source kinds retain their existing supported source
+actions; this does not introduce a generic peek surface for kinds that do not
+have one. Source-card activation must not enter native text editing, and render
+visibility caches are not semantic identity.
 
 Work Item reuses the real `WorkItemPreviewCard`, extended only for responsive
 container presentation while preserving its existing default. Presentation
@@ -87,13 +109,14 @@ controllers or full editors in the canvas. CSS container queries reflow or hide
 secondary fields as bounds shrink; V0 adds no separate display-mode state or
 ResizeObserver layout engine.
 
-Primary click/tap selects and drag moves. Double-click, `Enter` on a selected
-node, or a visible Open control invokes the canonical source action. Hover may
-reveal Open on pointer devices; selection must reveal an equivalent on tablet.
+Primary click/tap selects and drag moves. Double-click or `Enter` on a selected
+node invokes the canonical source action. Selection reveals the same action in
+the native toolbar, including on tablet; cards do not carry a permanent Open
+control or external-link badge.
 Work Item and Page use centered modal peek where supported; Cycle and Module use
 their existing peek; Project View and Intake use existing detail/navigation.
 Source editing occurs there under source permissions, not inline in the card.
-Cards expose no inline status, assignee, or action-menu mutation, and Work Map
+Cards expose no inline status, assignee, or action-menu mutation, and Work map
 has no persistent right-side inspector in V0.
 
 ### Placement and hydration
@@ -101,10 +124,23 @@ has no persistent right-side inspector in V0.
 One placement controller owns tool activation, fixed-size ghost, click-to-place,
 create-or-select, cancellation, and Excalidraw keep-tool-active behavior. `W`
 activates Work Item; the other kinds occupy one feature/permission-filtered
-dropdown. At workspace scope, availability is the union of kinds enabled across
-projects the viewer may access. Each chooser groups or filters results by source
-project and omits projects where that kind's feature is disabled. Selection of
-an existing source is always supported. `Create new`
+menu inside the native Excalidraw toolbar. The host contract and ownership
+boundary are recorded in ADR-0007.
+
+Work map owns these route-scoped shortcut overrides: `W` activates Work Item,
+and `D`, `B`, `X`, or `P` activates native free drawing to preserve tldraw
+muscle memory; `3` activates Diamond and `Shift+X` activates Autoshape. The
+overrides do not run while the user is typing or outside a Work map; normal
+Plane shortcuts remain unchanged. Native Excalidraw tools keep their other
+shortcuts, with Bucket Fill remaining in the native More tools menu. ADR-0007
+makes Excalidraw the owner of merged shortcut resolution and toolbar
+accessibility semantics, while Plane supplies only these descriptors. Web
+Embed remains in the native More tools menu as specified by ADR-0005.
+
+At workspace scope, availability is the union of kinds enabled across projects
+the viewer may access. Each chooser groups or filters results by source project
+and omits projects where that kind's feature is disabled. Selection of an
+existing source is always supported. `Create new`
 appears only when Plane already has a canonical create flow and the viewer may
 use it. Creating a Work Item retains the normal project picker.
 
@@ -121,7 +157,7 @@ cleanup must not delete a binding referenced by an acknowledged carrier.
 Scene and skeletons render before hydration. The server batch-hydrates
 viewer-scoped projections, with each source resolving independently. Revalidate
 on open and browser focus/connectivity return; reuse same-client source-store
-updates and provide manual stale retry. V0 promises no Work Map-specific polling
+updates and provide manual stale retry. V0 promises no Work map-specific polling
 or continuous cross-client source-update stream.
 
 An active session must also consume an authorization or source-invalidation
@@ -133,17 +169,17 @@ uses current authorization, and a known revocation immediately removes cached
 metadata.
 
 V1 may strengthen business-data freshness through a shared Plane entity-update
-channel owned by the authoritative sources. V0 adds neither Work Map-specific
+channel owned by the authoritative sources. V0 adds neither Work map-specific
 polling nor a second source of truth for entity updates.
 
 Deleting a projection never deletes its source. Native arrows unbind according
 to Excalidraw behavior; map Undo restores the projection and bindings. Map Undo
-and Work Map versions never roll back source state.
+and Work map versions never roll back source state.
 
 ### Cross-map clipboard
 
 Native clipboard data carries the existing carrier plus its opaque `nodeKey`.
-It never carries source Work Map, workspace/project identity, source kind/ID,
+It never carries source Work map, workspace/project identity, source kind/ID,
 hydrated metadata, credential, or transfer token.
 
 Before any pasted element enters collaborative state, one server operation:
@@ -187,6 +223,11 @@ after-the-fact repair of an already collaborative paste.
 - The exact carrier must pass native selection, move, resize, rotate, group,
   order, duplicate, delete, arrow binding from both endpoints, and undo on
   desktop and tablet.
+- Source-card double-click and selected `Enter` must invoke one authorized
+  source action without native text editing or bound-text mutation; Work Item
+  peek preserves the mounted map route and viewport, while other kinds retain
+  their existing supported source actions. Ordinary Excalidraw shapes retain
+  their native text behavior.
 - Hydration must remain independent under a deliberately slow source.
 - Mixed paste must prove replacement-before-insertion, retry idempotency,
   same-key topology, structural and asset preservation, whole-selection

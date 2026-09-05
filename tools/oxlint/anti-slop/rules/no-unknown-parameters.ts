@@ -37,9 +37,7 @@ function parameterName(parameter: Parameter, sourceText: string): string {
   if (parameter.type === "RestElement") {
     return parameterName(parameter.argument, sourceText);
   }
-  return parameter.type === "Identifier"
-    ? parameter.name
-    : sourceText.replace(/\s*:\s*unknown\s*$/u, "");
+  return parameter.type === "Identifier" ? parameter.name : sourceText.replace(/\s*:\s*unknown\s*$/u, "");
 }
 
 /** Disallow unknown inputs except explicitly named error-cause enrichment. */
