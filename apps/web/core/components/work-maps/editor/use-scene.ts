@@ -30,23 +30,23 @@ import {
 
 const fileService = new FileService();
 const workMapService = new WorkMapService();
-const UPLOAD_RETRY_BASE_DELAY_MS = 250;
-const MAX_UPLOAD_RETRY_DELAY_MS = 2_000;
+const ASSET_RETRY_BASE_DELAY_MS = 250;
+const MAX_ASSET_RETRY_DELAY_MS = 2_000;
 
-class WorkMapUploadCancelledError extends Error {
+class WorkMapAssetOperationCancelledError extends Error {
   constructor() {
-    super("Work map image upload canceled");
+    super("Work map asset operation canceled");
     this.name = "AbortError";
   }
 }
 
-const waitForUploadRetry = (attempt: number, signal: AbortSignal): Promise<void> =>
+const waitForAssetRetry = (attempt: number, signal: AbortSignal): Promise<void> =>
   new Promise((resolve, reject) => {
-    const delay = Math.min(MAX_UPLOAD_RETRY_DELAY_MS, UPLOAD_RETRY_BASE_DELAY_MS * 2 ** Math.min(attempt, 4));
+    const delay = Math.min(MAX_ASSET_RETRY_DELAY_MS, ASSET_RETRY_BASE_DELAY_MS * 2 ** Math.min(attempt, 4));
     let timeout: number | undefined;
     const onAbort = () => {
       if (timeout !== undefined) window.clearTimeout(timeout);
-      reject(new WorkMapUploadCancelledError());
+      reject(new WorkMapAssetOperationCancelledError());
     };
     if (signal.aborted) {
       onAbort();
@@ -87,17 +87,28 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
   );
   const uploadGenerationRef = useRef(0);
   const activeUploadsRef = useRef(0);
+  const materializationGenerationRef = useRef(0);
+  const materializationControllerRef = useRef(new AbortController());
+  const materializingFileIdsRef = useRef(new Set<string>());
   const mountedRef = useRef(false);
   const [uploadsInProgress, setUploadsInProgress] = useState(false);
   const applyingFingerprintRef = useRef<string | null>(null);
+
+  const cancelMaterializations = useCallback(() => {
+    materializationGenerationRef.current += 1;
+    materializationControllerRef.current.abort();
+    materializationControllerRef.current = new AbortController();
+    materializingFileIdsRef.current.clear();
+  }, []);
 
   const cancelUploads = useCallback(() => {
     uploadGenerationRef.current += 1;
     for (const upload of uploadsRef.current.values()) upload.controller.abort();
     uploadsRef.current.clear();
     activeUploadsRef.current = 0;
+    cancelMaterializations();
     if (mountedRef.current) setUploadsInProgress(false);
-  }, []);
+  }, [cancelMaterializations]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -127,15 +138,52 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
   }, []);
 
   const addMaterializedFiles = useCallback(
-    async (files: TWorkMapFiles) => {
-      if (!api) return;
+    (files: TWorkMapFiles, epoch = collaborationEpochRef.current) => {
+      if (!api || !mountedRef.current || epoch !== collaborationEpochRef.current) return;
       const currentFiles = api.getFiles();
-      const missing = Object.fromEntries(Object.entries(files).filter(([fileId]) => !currentFiles[fileId]));
+      const missing = Object.fromEntries(
+        Object.entries(files).filter(
+          ([fileId]) => !currentFiles[fileId] && !materializingFileIdsRef.current.has(fileId)
+        )
+      );
       if (Object.keys(missing).length === 0) return;
-      const materialized = await materializeFiles(fileService, workspaceSlug, projectId, workMapId, missing);
-      api.addFiles(Object.values(addWorkMapAssetMetadata(materialized, missing)));
+      const fileIds = Object.keys(missing);
+      fileIds.forEach((fileId) => materializingFileIdsRef.current.add(fileId));
+      const generation = materializationGenerationRef.current;
+      const signal = materializationControllerRef.current.signal;
+      const isCurrent = () =>
+        mountedRef.current &&
+        !signal.aborted &&
+        generation === materializationGenerationRef.current &&
+        epoch === collaborationEpochRef.current;
+      void (async () => {
+        let pending = missing;
+        for (let attempt = 0; Object.keys(pending).length > 0; attempt += 1) {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- retries materialize only files from the preceding failure.
+          const result = await materializeFiles(fileService, workspaceSlug, projectId, workMapId, pending);
+          if (!isCurrent()) return;
+          const materialized = Object.values(addWorkMapAssetMetadata(result.files, pending));
+          if (materialized.length > 0) api.addFiles(materialized);
+          const retryIds = new Set(
+            result.failures.filter(({ error }) => isTransientPersistenceFailure(error)).map(({ fileId }) => fileId)
+          );
+          Object.keys(pending)
+            .filter((fileId) => !retryIds.has(fileId))
+            .forEach((fileId) => materializingFileIdsRef.current.delete(fileId));
+          pending = Object.fromEntries(Object.entries(pending).filter(([fileId]) => retryIds.has(fileId)));
+          if (Object.keys(pending).length > 0) {
+            // oxlint-disable-next-line eslint/no-await-in-loop -- backoff follows the failed materialization attempt.
+            await waitForAssetRetry(attempt, signal);
+          }
+        }
+      })()
+        .catch(() => undefined)
+        .finally(() => {
+          if (generation === materializationGenerationRef.current)
+            fileIds.forEach((fileId) => materializingFileIdsRef.current.delete(fileId));
+        });
     },
-    [api, projectId, workMapId, workspaceSlug]
+    [api, collaborationEpochRef, projectId, workMapId, workspaceSlug]
   );
 
   const registerPastedFiles = useCallback((files: TWorkMapFiles) => {
@@ -165,12 +213,12 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
       const elements = restoreElements(decoded.elements, null);
       if (scene.generation !== generationRef.current || scene.collaboration_epoch !== collaborationEpochRef.current)
         cancelUploads();
-      await addMaterializedFiles(decoded.files);
-      applyElements(elements);
       generationRef.current = scene.generation;
       collaborationEpochRef.current = scene.collaboration_epoch;
       durableSceneRef.current = scene.scene_binary;
       filesRef.current = decoded.files;
+      applyElements(elements);
+      addMaterializedFiles(decoded.files, scene.collaboration_epoch);
       return decoded;
     },
     [addMaterializedFiles, applyElements, cancelUploads, collaborationEpochRef, generationRef]
@@ -181,12 +229,11 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
       if (!api) return;
       const remote = decodeScene(sceneBinary);
       const remoteElements = restoreElements(remote.elements, null) as RemoteExcalidrawElement[];
-      await addMaterializedFiles(remote.files);
       if (epoch !== collaborationEpochRef.current) return;
-      // Read the live gesture only after asynchronous file loading has finished.
       const elements = reconcileElements(api.getSceneElementsIncludingDeleted(), remoteElements, api.getAppState());
       filesRef.current = { ...filesRef.current, ...remote.files };
       applyElements(elements);
+      addMaterializedFiles(remote.files, epoch);
     },
     [addMaterializedFiles, api, applyElements]
   );
@@ -231,7 +278,7 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
                     uploadEpoch !== collaborationEpochRef.current ||
                     uploadGeneration !== generationRef.current
                   )
-                    throw new WorkMapUploadCancelledError();
+                    throw new WorkMapAssetOperationCancelledError();
                   try {
                     // oxlint-disable-next-line eslint/no-await-in-loop -- retries must preserve upload order for one file.
                     const uploadMetadata = await uploadFile(
@@ -248,15 +295,15 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
                       uploadEpoch !== collaborationEpochRef.current ||
                       uploadGeneration !== generationRef.current
                     )
-                      throw new WorkMapUploadCancelledError();
+                      throw new WorkMapAssetOperationCancelledError();
                     if (!filesRef.current[fileId]) filesRef.current = { ...filesRef.current, [fileId]: uploadMetadata };
                     file.assetId = uploadMetadata.assetId;
                     return;
                   } catch (error) {
-                    if (error instanceof WorkMapUploadCancelledError) throw error;
+                    if (error instanceof WorkMapAssetOperationCancelledError) throw error;
                     if (!isTransientPersistenceFailure(error)) throw error;
                     // oxlint-disable-next-line eslint/no-await-in-loop -- backoff follows the failed upload attempt.
-                    await waitForUploadRetry(attempt, controller.signal);
+                    await waitForAssetRetry(attempt, controller.signal);
                   }
                 }
               })();
@@ -289,20 +336,13 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
       .fetchScene(workspaceSlug, projectId, workMapId)
       .then((scene) => {
         const decoded = decodeScene(scene.scene_binary);
-        return materializeFiles(fileService, workspaceSlug, projectId, workMapId, decoded.files).then((files) => ({
-          scene,
-          decoded,
-          files: addWorkMapAssetMetadata(files, decoded.files),
-        }));
-      })
-      .then(({ scene, decoded, files }) => {
         if (cancelled) return undefined;
         generationRef.current = scene.generation;
         collaborationEpochRef.current = scene.collaboration_epoch;
         durableSceneRef.current = scene.scene_binary;
         filesRef.current = decoded.files;
         observeElements(decoded.elements);
-        setInitialData({ elements: decoded.elements, files });
+        setInitialData({ elements: decoded.elements, files: {} });
         return undefined;
       })
       .catch(() => {
@@ -310,8 +350,14 @@ export const useScene = (api: ExcalidrawImperativeAPI | null, context: TContext)
       });
     return () => {
       cancelled = true;
+      cancelMaterializations();
     };
-  }, [initialLoadAttempt, observeElements, projectId, workMapId, workspaceSlug]);
+  }, [cancelMaterializations, initialLoadAttempt, observeElements, projectId, workMapId, workspaceSlug]);
+
+  useEffect(() => {
+    if (initialData) addMaterializedFiles(filesRef.current);
+    return cancelMaterializations;
+  }, [addMaterializedFiles, cancelMaterializations, initialData]);
 
   const retryInitialLoad = useCallback(() => {
     setInitialLoadFailed(false);

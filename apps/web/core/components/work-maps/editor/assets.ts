@@ -42,22 +42,28 @@ export const materializeFiles = async (
   projectId: string,
   workMapId: string,
   files: TWorkMapFiles
-): Promise<BinaryFiles> =>
-  Object.fromEntries(
-    await Promise.all(
-      Object.entries(files).map(async ([fileId, file]) => {
-        const blob = await service.fetchWorkMapSceneAsset(workspaceSlug, projectId, workMapId, file.assetId);
-        const data: BinaryFileData = {
-          id: fileId as BinaryFileData["id"],
-          mimeType: file.mimeType,
-          created: file.created,
-          dataURL: await blobToDataUrl(blob),
-          lastRetrieved: Date.now(),
-        };
-        return [fileId, data] as const;
-      })
-    )
+): Promise<{ files: BinaryFiles; failures: Array<{ fileId: string; error: unknown }> }> => {
+  const entries = Object.entries(files);
+  const results = await Promise.allSettled(
+    entries.map(async ([fileId, file]) => {
+      const blob = await service.fetchWorkMapSceneAsset(workspaceSlug, projectId, workMapId, file.assetId);
+      const data: BinaryFileData = {
+        id: fileId as BinaryFileData["id"],
+        mimeType: file.mimeType,
+        created: file.created,
+        dataURL: await blobToDataUrl(blob),
+        lastRetrieved: Date.now(),
+      };
+      return [fileId, data] as const;
+    })
   );
+  return {
+    files: Object.fromEntries(results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []))),
+    failures: results.flatMap((result, index) =>
+      result.status === "rejected" ? [{ fileId: entries[index][0], error: result.reason as unknown }] : []
+    ),
+  };
+};
 
 export const uploadFile = async (
   service: FileService,

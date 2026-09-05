@@ -37,7 +37,7 @@ describe("Work map recovery boundary", () => {
       setItem: (key: string, value: string) => values.set(key, value),
       removeItem: (key: string) => values.delete(key),
     };
-    vi.stubGlobal("window", { localStorage });
+    vi.stubGlobal("window", { localStorage, setTimeout, clearTimeout });
     vi.stubGlobal("navigator", {});
     return values;
   };

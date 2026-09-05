@@ -503,7 +503,7 @@ export const usePersistence = (context: TContext, scene: TSceneOwners) => {
           }
           scene.generationRef.current = durable.generation;
           scene.durableSceneRef.current = durable.scene_binary;
-          // Reconcile after materialized-file awaits so edits made during recovery stay live.
+          // Reconcile against live elements so edits made during recovery stay live.
           await scene.applyRemoteScene(durable.scene_binary, durable.collaboration_epoch);
           const writer = recoveryWriterRef.current;
           if (writer?.writerId === writerId) writer.clear();

@@ -22,6 +22,65 @@ import {
 } from "./scene";
 
 describe("Work map scene boundary", () => {
+  it("keeps materialized images when a sibling asset fetch fails", async () => {
+    vi.resetModules();
+    vi.doMock("@excalidraw/excalidraw", () => ({
+      MIME_TYPES: {
+        svg: "image/svg+xml",
+        png: "image/png",
+        jpg: "image/jpeg",
+        webp: "image/webp",
+        bmp: "image/bmp",
+        ico: "image/x-icon",
+        avif: "image/avif",
+        jfif: "image/jfif",
+      },
+    }));
+    const load = vi.fn();
+    class TestFileReader {
+      result: string | null = null;
+      error: Error | null = null;
+
+      addEventListener(event: string, listener: () => void) {
+        if (event === "load") load.mockImplementation(listener);
+      }
+
+      readAsDataURL() {
+        this.result = "data:image/png;base64,AA==";
+        load();
+      }
+    }
+    vi.stubGlobal("FileReader", TestFileReader);
+    const service = {
+      fetchWorkMapSceneAsset: vi.fn((_workspaceSlug: string, _projectId: string, _workMapId: string, assetId: string) =>
+        assetId.startsWith("d0") ? Promise.resolve(new Blob(["image"])) : Promise.reject({ code: "ERR_NETWORK" })
+      ),
+    } as never;
+
+    try {
+      const { materializeFiles } = await import("./assets");
+      const result = await materializeFiles(service, "workspace", "project", "map", {
+        available: {
+          assetId: "d0f238c8-1c14-4f6c-a695-70d087bb8db0",
+          mimeType: "image/png",
+          created: 1,
+        },
+        unavailable: {
+          assetId: "f0f238c8-1c14-4f6c-a695-70d087bb8db0",
+          mimeType: "image/png",
+          created: 2,
+        },
+      });
+
+      expect(result.files.available?.dataURL).toBe("data:image/png;base64,AA==");
+      expect(result.failures).toEqual([{ fileId: "unavailable", error: { code: "ERR_NETWORK" } }]);
+    } finally {
+      vi.doUnmock("@excalidraw/excalidraw");
+      vi.resetModules();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("serializes empty native bindings consistently before and after restoration", () => {
     const element = { id: "rectangle", type: "rectangle", boundElements: null } as unknown as ExcalidrawElement;
     const restored = { ...element, boundElements: [] };
@@ -327,6 +386,147 @@ describe("Work map scene boundary", () => {
       vi.doUnmock("@/services/work-map.service");
       vi.doUnmock("./assets");
       vi.doUnmock("./scene");
+      vi.resetModules();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("applies scenes before image recovery and rejects stale materialization", async () => {
+    vi.resetModules();
+    const effects: Array<() => void | (() => void)> = [];
+    const setInitialData = vi.fn();
+    let stateIndex = 0;
+    const initialAssetId = "d0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    const remoteAssetId = "e0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    const staleAssetId = "f0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    const unmountedAssetId = "a0f238c8-1c14-4f6c-a695-70d087bb8db0";
+    // oxlint-disable-next-line eslint-plugin-unicorn/consistent-function-scoping -- test data stays local to this lifecycle.
+    const metadata = (assetId: string, created: number) => ({ assetId, mimeType: "image/png" as const, created });
+    // oxlint-disable-next-line eslint-plugin-unicorn/consistent-function-scoping -- test data stays local to this lifecycle.
+    const runtimeFile = (fileId: string, created: number) => ({
+      id: fileId,
+      mimeType: "image/png" as const,
+      created,
+      dataURL: "data:image/png;base64,AA==" as const,
+    });
+    let resolveInitial: ((value: unknown) => void) | undefined;
+    let resolveStale: ((value: unknown) => void) | undefined;
+    let resolveUnmounted: ((value: unknown) => void) | undefined;
+    let remoteAttempts = 0;
+    const materializeFilesMock = vi.fn((_service, _workspaceSlug, _projectId, _workMapId, files) => {
+      const fileId = Object.keys(files as object)[0];
+      if (fileId === "initial") return new Promise((resolve) => (resolveInitial = resolve));
+      if (fileId === "remote") {
+        remoteAttempts += 1;
+        return Promise.resolve(
+          remoteAttempts === 1
+            ? { files: {}, failures: [{ fileId, error: { code: "ERR_NETWORK" } }] }
+            : { files: { remote: runtimeFile("remote", 2) }, failures: [] }
+        );
+      }
+      if (fileId === "stale") return new Promise((resolve) => (resolveStale = resolve));
+      if (fileId === "unmounted") return new Promise((resolve) => (resolveUnmounted = resolve));
+      return Promise.resolve({ files: {}, failures: [] });
+    });
+    const initialElements = [{ id: "initial-image", type: "image", fileId: "initial" }] as never;
+    const fetchScene = vi.fn().mockResolvedValue({
+      collaboration_epoch: 0,
+      generation: 0,
+      scene_binary: encodeScene({ elements: initialElements, files: { initial: metadata(initialAssetId, 1) } }),
+    });
+    vi.doMock("react", () => ({
+      useCallback: (callback: unknown) => callback,
+      useEffect: (effect: () => void | (() => void)) => effects.push(effect),
+      useRef: (current: unknown) => ({ current }),
+      useState: (initial: unknown) => {
+        const setter = stateIndex++ === 0 ? setInitialData : vi.fn();
+        return [typeof initial === "function" ? (initial as () => unknown)() : initial, setter];
+      },
+    }));
+    vi.doMock("@excalidraw/excalidraw", () => ({
+      CaptureUpdateAction: { NEVER: "never" },
+      getSyncableElements: (elements: unknown[]) => elements,
+      reconcileElements: (_local: unknown[], remote: unknown[]) => remote,
+      restoreElements: (elements: unknown[]) => elements,
+    }));
+    vi.doMock("@/services/file.service", () => ({ FileService: vi.fn() }));
+    vi.doMock("@/services/work-map.service", () => ({
+      WorkMapService: class {
+        fetchScene = fetchScene;
+      },
+    }));
+    vi.doMock("./assets", () => ({ materializeFiles: materializeFilesMock, uploadFile: vi.fn() }));
+    vi.useFakeTimers();
+    vi.stubGlobal("window", { setTimeout, clearTimeout, requestAnimationFrame: vi.fn() });
+    const currentFiles: Record<string, unknown> = {};
+    const addFiles = vi.fn((files: Array<{ id: string }>) => files.forEach((file) => (currentFiles[file.id] = file)));
+    const updateScene = vi.fn();
+    const api = {
+      addFiles,
+      getAppState: () => ({}),
+      getFiles: () => currentFiles,
+      getSceneElementsIncludingDeleted: () => [],
+      updateScene,
+    } as never;
+
+    try {
+      const { useScene } = await import("./use-scene");
+      const scene = useScene(api, { workspaceSlug: "workspace", projectId: "project", workMapId: "map" });
+      const unmount = effects[0]?.();
+      effects[1]?.();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(setInitialData).toHaveBeenCalledWith({
+        elements: [expect.objectContaining({ id: "initial-image", type: "image", fileId: "initial" })],
+        files: {},
+      });
+      const serializedInitial = await scene.serializeScene(initialElements, {});
+      expect(decodeScene(serializedInitial).files.initial).toEqual(metadata(initialAssetId, 1));
+
+      const remoteElements = [{ id: "remote-image", type: "image", fileId: "remote" }] as never;
+      await scene.applyRemoteScene(
+        encodeScene({ elements: remoteElements, files: { remote: metadata(remoteAssetId, 2) } })
+      );
+      expect(updateScene).toHaveBeenCalledWith(
+        expect.objectContaining({
+          elements: [expect.objectContaining({ id: "remote-image", type: "image", fileId: "remote" })],
+        })
+      );
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(250);
+      expect(addFiles).toHaveBeenCalledWith([expect.objectContaining({ id: "remote", assetId: remoteAssetId })]);
+
+      const staleElements = [{ id: "stale-image", type: "image", fileId: "stale" }] as never;
+      await scene.applyRemoteScene(
+        encodeScene({ elements: staleElements, files: { stale: metadata(staleAssetId, 3) } })
+      );
+      await scene.applyAuthoritativeScene({
+        collaboration_epoch: 1,
+        generation: 1,
+        scene_binary: encodeScene({ elements: [], files: {} }),
+      });
+      resolveStale?.({ files: { stale: runtimeFile("stale", 3) }, failures: [] });
+      await Promise.resolve();
+      expect(currentFiles).not.toHaveProperty("stale");
+
+      const unmountedElements = [{ id: "unmounted-image", type: "image", fileId: "unmounted" }] as never;
+      await scene.applyRemoteScene(
+        encodeScene({ elements: unmountedElements, files: { unmounted: metadata(unmountedAssetId, 4) } }),
+        1
+      );
+      if (typeof unmount === "function") unmount();
+      resolveUnmounted?.({ files: { unmounted: runtimeFile("unmounted", 4) }, failures: [] });
+      resolveInitial?.({ files: { initial: runtimeFile("initial", 1) }, failures: [] });
+      await Promise.resolve();
+      expect(currentFiles).not.toHaveProperty("unmounted");
+      expect(currentFiles).not.toHaveProperty("initial");
+    } finally {
+      vi.doUnmock("react");
+      vi.doUnmock("@excalidraw/excalidraw");
+      vi.doUnmock("@/services/file.service");
+      vi.doUnmock("@/services/work-map.service");
+      vi.doUnmock("./assets");
       vi.resetModules();
       vi.useRealTimers();
       vi.unstubAllGlobals();

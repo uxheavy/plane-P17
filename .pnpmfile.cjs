@@ -7,7 +7,7 @@ module.exports = {
   hooks: {
     readPackage(pkg) {
       // This immutable artifact must share the host's directly pinned common package.
-      if (pkg.name === "@uxheavy/excalidraw" && pkg.version === "0.18.1-3b013224") {
+      if (pkg.name === "@uxheavy/excalidraw" && pkg.version === "0.18.1-98612272") {
         pkg.peerDependencies = { ...pkg.peerDependencies, "@excalidraw/common": pkg.version };
         delete pkg.dependencies["@excalidraw/common"];
       }

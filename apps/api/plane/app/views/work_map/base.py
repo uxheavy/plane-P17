@@ -127,7 +127,13 @@ class WorkMapViewSet(BaseViewSet):
         serializer = WorkMapCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
-            project = Project.objects.select_related("workspace").get(id=project_id, workspace__slug=slug)
+            project = (
+                Project.objects.select_related("workspace")
+                .filter(id=project_id, workspace__slug=slug, archived_at__isnull=True)
+                .first()
+            )
+            if project is None:
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
             document = Document.objects.create(
                 kind=Document.Kind.WORK_MAP,
                 workspace=project.workspace,

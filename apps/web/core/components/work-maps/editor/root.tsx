@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
-import type { ComponentProps, MouseEventHandler } from "react";
+import type { ComponentProps } from "react";
 import {
   CaptureUpdateAction,
   Excalidraw,
@@ -31,10 +31,12 @@ import type { TWorkMap, TWorkMapSource, TWorkMapSourceKind } from "@plane/types"
 import { Avatar } from "@plane/ui";
 import { resolveGeneralTheme } from "@plane/utils";
 import { useAppRouter } from "@/hooks/use-app-router";
+import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useWorkMap } from "@/hooks/store/use-work-map";
 import { useUser, useUserProfile } from "@/hooks/store/user";
 import { WorkMapService } from "@/services/work-map.service";
 import { UpdateStatus } from "@/components/common/update-status";
+import { IssuePeekOverview } from "@/components/issues/peek-overview";
 import { WorkMapSourceNode } from "../source-node";
 import { WorkMapSourcePicker } from "../source-picker";
 import { WorkMapWorkItemPicker } from "../work-item-picker";
@@ -122,6 +124,7 @@ const WorkMapEditorContent = observer(function WorkMapEditorContent({
       : resolveGeneralTheme(resolvedTheme) === "dark";
   const { currentLocale } = useTranslation();
   const store = useWorkMap();
+  const { setPeekIssue } = useIssueDetail();
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [pickerSourceKind, setPickerSourceKind] = useState<TWorkMapSourceKind | null>(null);
   const [workItemAction, setWorkItemAction] = useState<WorkMapWorkItemAction>("existing");
@@ -143,7 +146,6 @@ const WorkMapEditorContent = observer(function WorkMapEditorContent({
   const serializationPendingRef = useRef(false);
   const placingSourceRef = useRef(false);
   const selectedNodeKeyRef = useRef<string | null>(null);
-  const pointerDownNodeKeyRef = useRef<string | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const context = useMemo(
     () => ({ workspaceSlug, projectId, workMapId: workMap.id }),
@@ -513,12 +515,20 @@ const WorkMapEditorContent = observer(function WorkMapEditorContent({
           await hydrate([nodeKey]);
           return;
         }
+        if (response.action.source_kind === "work-item") {
+          setPeekIssue({
+            workspaceSlug,
+            projectId: response.action.project_id,
+            issueId: response.action.source_id,
+          });
+          return;
+        }
         router.push(getSourcePath(workspaceSlug, response.action));
       } catch {
         // Authorization is resolved only by the open endpoint; a failed check must not navigate using cached projection data.
       }
     },
-    [hydrate, projectId, router, workMap.id, workspaceSlug]
+    [hydrate, projectId, router, setPeekIssue, workMap.id, workspaceSlug]
   );
 
   const openSelectedSource = useCallback(() => {
@@ -617,19 +627,25 @@ const WorkMapEditorContent = observer(function WorkMapEditorContent({
 
   const onPointerDown = useCallback(
     (activeTool: AppState["activeTool"], pointerDownState: PointerDownState) => {
-      pointerDownNodeKeyRef.current = pointerDownState.hit.element
-        ? (getNodeKey(pointerDownState.hit.element) ?? null)
-        : null;
       if (activeTool.type !== "custom" || activeTool.customType !== "work-map-source" || !pendingSource) return;
       void placeSource(pendingSource, pointerDownState.origin);
     },
     [pendingSource, placeSource]
   );
 
-  const onDoubleClick = useCallback(() => {
-    const nodeKey = pointerDownNodeKeyRef.current;
-    if (nodeKey) void openSource(nodeKey);
-  }, [openSource]);
+  const onElementActivate = useCallback<NonNullable<ComponentProps<typeof Excalidraw>["onElementActivate"]>>(
+    (element) => {
+      const nodeKey = getNodeKey(element);
+      if (!nodeKey) return false;
+      void openSource(nodeKey);
+      return true;
+    },
+    [openSource]
+  );
+  const isElementTextEditable = useCallback<NonNullable<ComponentProps<typeof Excalidraw>["isElementTextEditable"]>>(
+    (element) => !getNodeKey(element),
+    []
+  );
 
   const initialScene = useMemo(() => (initialData ? Promise.resolve(initialData) : undefined), [initialData]);
   const connectionDataState =
@@ -690,7 +706,8 @@ const WorkMapEditorContent = observer(function WorkMapEditorContent({
       placementPointer={placementPointer}
       pendingSourceName={pendingSource?.name ?? null}
       onPointerDown={onPointerDown}
-      onDoubleClick={onDoubleClick}
+      onElementActivate={onElementActivate}
+      isElementTextEditable={isElementTextEditable}
       onPaste={onPaste}
       renderHostElement={renderHostElement}
       renderCollaboratorAvatar={renderCollaboratorAvatar}
@@ -737,10 +754,11 @@ type EditorSurfaceProps = {
   onExcalidrawAPI: (api: ExcalidrawImperativeAPI | null) => void;
   onChange: NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
   onPointerUpdate: NonNullable<ComponentProps<typeof Excalidraw>["onPointerUpdate"]>;
-  onDoubleClick: MouseEventHandler<HTMLDivElement>;
   placementPointer: { x: number; y: number; zoom: number } | null;
   pendingSourceName: string | null;
   onPointerDown: NonNullable<ComponentProps<typeof Excalidraw>["onPointerDown"]>;
+  onElementActivate: NonNullable<ComponentProps<typeof Excalidraw>["onElementActivate"]>;
+  isElementTextEditable: NonNullable<ComponentProps<typeof Excalidraw>["isElementTextEditable"]>;
   onPaste: NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>;
   renderHostElement: NonNullable<ComponentProps<typeof Excalidraw>["renderHostElement"]>;
   renderCollaboratorAvatar: NonNullable<ComponentProps<typeof Excalidraw>["renderCollaboratorAvatar"]>;
@@ -785,10 +803,11 @@ function WorkMapEditorSurface({
   onExcalidrawAPI,
   onChange,
   onPointerUpdate,
-  onDoubleClick,
   placementPointer,
   pendingSourceName,
   onPointerDown,
+  onElementActivate,
+  isElementTextEditable,
   onPaste,
   renderHostElement,
   renderCollaboratorAvatar,
@@ -870,7 +889,7 @@ function WorkMapEditorSurface({
           onClose={onClosePicker}
         />
       )}
-      <div data-testid="work-map-embed" className="work-map-editor size-full" onDoubleClick={onDoubleClick}>
+      <div data-testid="work-map-embed" className="work-map-editor size-full">
         <Excalidraw
           renderHostElement={renderHostElement}
           renderCollaboratorAvatar={renderCollaboratorAvatar}
@@ -880,6 +899,8 @@ function WorkMapEditorSurface({
           onChange={onChange}
           onPointerUpdate={onPointerUpdate}
           onPointerDown={onPointerDown}
+          onElementActivate={onElementActivate}
+          isElementTextEditable={isElementTextEditable}
           onPaste={onPaste}
           isCollaborating={connectionState === "connected"}
           shouldLoadEmbeddable={shouldLoadEmbeddable}
@@ -915,6 +936,7 @@ function WorkMapEditorSurface({
           }}
         />
       </div>
+      <IssuePeekOverview />
     </div>
   );
 }

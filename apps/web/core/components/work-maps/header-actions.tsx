@@ -15,6 +15,7 @@ import { EUserPermissionsLevel } from "@plane/constants";
 import { LockKeyhole, LockKeyholeOpen, Star } from "lucide-react";
 import { useUser } from "@/hooks/store/user";
 import { useUserPermissions } from "@/hooks/store/user";
+import { useAppRouter } from "@/hooks/use-app-router";
 import { WorkMapService } from "@/services/work-map.service";
 import { CreateUpdateWorkMapModal } from "./create-update-modal";
 import { WorkMapActionsMenu } from "./list-actions";
@@ -36,6 +37,7 @@ export const WorkMapHeaderActions = observer(function WorkMapHeaderActions({
 }: Props) {
   const { data: user } = useUser();
   const { allowPermissions } = useUserPermissions();
+  const router = useAppRouter();
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +136,7 @@ export const WorkMapHeaderActions = observer(function WorkMapHeaderActions({
           refresh={refresh}
           workMap={workMap}
           workspaceSlug={workspaceSlug}
+          onDeleted={() => router.push(`/${workspaceSlug}/projects/${projectId}/work-maps`)}
         />
       </div>
     </>

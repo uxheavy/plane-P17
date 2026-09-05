@@ -430,6 +430,29 @@ class TestWorkMapApp:
         assert document.id == work_map.pk
         assert document.document_projects.filter(project=project, deleted_at__isnull=True).exists()
 
+    def test_create_rejects_archived_project_without_creating_document_or_link(
+        self, session_client, workspace, create_user
+    ):
+        project, _ = _project(workspace, create_user, "ARC")
+        project.archived_at = timezone.now()
+        project.save(update_fields=["archived_at"])
+        document_count = Document.objects.count()
+        document_project_count = DocumentProject.objects.count()
+
+        response = session_client.post(
+            _work_maps_url(workspace, project),
+            {"name": "Blocked work map"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND, (
+            "event=work_map.create_archived_project actor=project_member operation=create "
+            "risk=archived_project_receives_new_work_map expected=404 actual="
+            f"{response.status_code} next=inspect_work_map_project_lookup"
+        )
+        assert Document.objects.count() == document_count
+        assert DocumentProject.objects.count() == document_project_count
+
     def test_scene_round_trip_and_stale_write_are_atomic(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "SCN")
         work_map = _create_work_map(session_client, workspace, project)

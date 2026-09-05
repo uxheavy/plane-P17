@@ -5,15 +5,15 @@ packages:
   - "!apps/proxy"
 
 catalog:
-  # UXHeavy internal editor package, release packages-v0.18.1-3b013224 (PR #5 tip dd2360758e62acad9f1e82731eb9b8b3c2b80f73).
+  # UXHeavy internal editor package, release packages-v0.18.1-98612272 (PR #5 tip c39ef31dafbc6a9257e0ad7456b725cd3bf6f278).
   # Release asset SHA-512 integrity values:
-  #   common: sha512-EuBnp3ZM7GnuMqpvpS167Dou4Hj80B/nMxZgIYZQ50uT3cL4nOGvuZr6KXTViVJV9elOGI34Z4TRAA11E4+xjg==
-  #   excalidraw: sha512-5ULGYseQ/RwjzhYTvP/mNCLqxnwno20Un37ddKEmerhkNUjhni8efMd4jZgvrMHQo0QwIZXnGorb0FBQD7a9zA==
+  #   common: sha512-vG5jEAga/bNFfO8auGAHAMRdY/WRgr/fYQqaT9zyJOgzTY1k2G3LvSEauKlzxVopLlBKK8TLqZtkLQUlmB6qIQ==
+  #   excalidraw: sha512-ZRyJR6FiSWj+0tovIggigDqAFzrXNRtJR1psx5KUoHV6kZ17D58wAh7A0SnYSRRAElsj/5inhTEo3irx4onRiA==
   # Release asset SHA-256 values:
-  #   common: fbfc2f27045ad3827c0595da3256918994a33d253742efbe331ec19620a82acc
-  #   excalidraw: 63ecba229207a63d78acffbcaa60dcd6c84b605e3b261976a2f89a43649f753a
-  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-3b013224/uxheavy-excalidraw-common-0.18.1-3b013224.tgz"
-  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-3b013224/uxheavy-excalidraw-0.18.1-3b013224.tgz"
+  #   common: b0155df41468d137fd2ef5a413370833e2ee6b912f8f9c5ffd7142acf01d65da
+  #   excalidraw: 0b697bddd76408df9badc378c6624143c064e7f022fd908e5f6d2967af3a289f
+  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-98612272/uxheavy-excalidraw-common-0.18.1-98612272.tgz"
+  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-98612272/uxheavy-excalidraw-0.18.1-98612272.tgz"
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
@@ -281,8 +281,8 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   # GitHub-only release artifacts reviewed above and pinned by exact SHA-256.
-  - "@uxheavy/excalidraw-common@0.18.1-3b013224"
-  - "@uxheavy/excalidraw@0.18.1-3b013224"
+  - "@uxheavy/excalidraw-common@0.18.1-98612272"
+  - "@uxheavy/excalidraw@0.18.1-98612272"
   - "@storybook/addon-docs@10.4.6"
   - "@storybook/builder-vite@10.4.6"
   - "@storybook/csf-plugin@10.4.6"

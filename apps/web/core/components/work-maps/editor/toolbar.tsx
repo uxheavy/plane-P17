@@ -6,8 +6,9 @@
 import { useMemo } from "react";
 import { useTranslation } from "@plane/i18n";
 import type { EditorShortcut, HostToolbarItem, ToolShortcutOverrides } from "@excalidraw/excalidraw/types";
+import { WorkItemsIcon } from "@plane/propel/icons";
 import type { TWorkMapSourceKind } from "@plane/types";
-import { Boxes, Eye, ListTodo } from "lucide-react";
+import { Boxes, Eye } from "lucide-react";
 import type { WorkMapWorkItemAction } from "../work-item-picker";
 
 const SOURCE_KIND_KEYS: Record<TWorkMapSourceKind, string> = {
@@ -55,7 +56,6 @@ export function useWorkMapToolbarItems({
               id: "open-selected-source",
               label: t("preview"),
               icon: <Eye />,
-              shortcuts: [{ key: "Enter" }],
               onSelect: onOpenSelectedSource,
             },
           ]
@@ -64,7 +64,7 @@ export function useWorkMapToolbarItems({
         id: "work-item",
         type: "menu" as const,
         label: t("work_items"),
-        icon: <ListTodo />,
+        icon: <WorkItemsIcon />,
         disabled: !editable,
         items: [
           {
