@@ -45,6 +45,10 @@ class WorkMapRealtimeEndpoint(BaseAPIView):
                 "project_id": project_id,
                 "work_map_id": document.id,
                 "sender_id": request.user.id,
+                "profile": {
+                    "display_name": request.user.display_name,
+                    "avatar_url": request.user.avatar_url,
+                },
                 "generation": document.work_map.generation,
                 "collaboration_epoch": document.work_map.collaboration_epoch,
                 "readable": True,

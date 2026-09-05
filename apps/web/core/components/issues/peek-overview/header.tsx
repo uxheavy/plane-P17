@@ -18,6 +18,7 @@ import { EIssuesStoreType } from "@plane/types";
 import { CustomSelect } from "@plane/ui";
 import { copyUrlToClipboard, generateWorkItemLink } from "@plane/utils";
 // hooks
+import { UpdateStatus } from "@/components/common/update-status";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
 import { useProject } from "@/hooks/store/use-project";
@@ -26,7 +27,6 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
 import { IssueSubscription } from "../issue-detail/subscription";
 import { WorkItemDetailQuickActions } from "../issue-layouts/quick-action-dropdowns";
-import { NameDescriptionUpdateStatus } from "../issue-update-status";
 import { IconButton } from "@plane/propel/icon-button";
 
 export type TPeekModes = "side-peek" | "modal" | "full-screen";
@@ -200,7 +200,7 @@ export const IssuePeekOverviewHeader = observer(function IssuePeekOverviewHeader
         )}
       </div>
       <div className="flex items-center gap-x-4">
-        <NameDescriptionUpdateStatus isSubmitting={isSubmitting} />
+        <UpdateStatus status={isSubmitting === "submitting" ? "saving" : "saved"} />
         <div className="flex items-center gap-2">
           {currentUser && !isArchived && (
             <IssueSubscription workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} />

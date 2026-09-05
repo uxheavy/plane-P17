@@ -32,10 +32,11 @@ from plane.db.models import (
 )
 from plane.settings.storage import S3Storage
 from plane.utils.path_validator import sanitize_filename
+from plane.utils.work_map_scene import try_decode_work_map_scene
 
 from ..base import BaseAPIView
 from .base import visible_work_maps
-from .scene import LEGACY_SCENE_UPGRADE_ERROR, WorkMapSceneUpgradeRequired, try_decode_work_map_scene
+from .scene import LEGACY_SCENE_UPGRADE_ERROR, WorkMapSceneUpgradeRequired
 
 
 PASTE_LEASE_DURATION = timedelta(minutes=15)
@@ -117,7 +118,9 @@ def authorized_paste_sources(*, user, workspace_id, node_keys, files, lock):
 
     bindings = {
         binding.node_key: binding
-        for binding in binding_query.filter(node_key__in=node_keys).select_related("work_map__document")
+        for binding in binding_query.filter(node_key__in=node_keys)
+        .select_related("work_map__document")
+        .order_by("work_map_id", "node_key")
     }
     if set(bindings) != set(node_keys):
         raise WorkMapPasteSourceUnavailable
@@ -147,7 +150,9 @@ def authorized_paste_sources(*, user, workspace_id, node_keys, files, lock):
             is_uploaded=True,
             is_deleted=False,
             deleted_at__isnull=True,
-        ).select_related("document__work_map")
+        )
+        .select_related("document__work_map")
+        .order_by("document_id", "id")
     }
     if set(assets) != set(requested_asset_ids):
         raise WorkMapPasteSourceUnavailable
@@ -182,7 +187,7 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
         data = serializer.validated_data
         request_hash = paste_request_hash(data)
         lease_id = uuid.uuid4()
-        storage = S3Storage(request=request)
+        storage = S3Storage()
         operation = None
 
         try:
@@ -309,10 +314,8 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
                     raise WorkMapPasteAssetCopyError
                 renew_copy_lease(operation.id, lease_id)
 
+            operation_id = operation.id
             with transaction.atomic():
-                operation = WorkMapPasteRebinding.objects.select_for_update().get(id=operation.id)
-                if operation.lease_id != lease_id or operation.status != WorkMapPasteRebinding.Status.COPYING:
-                    raise WorkMapPasteSourceUnavailable
                 visible_id = (
                     visible_work_maps(user=request.user, slug=slug, project_id=project_id)
                     .filter(id=document.id)
@@ -329,6 +332,17 @@ class WorkMapPasteRebindingEndpoint(BaseAPIView):
                 if document is None or document.is_locked or document.archived_at is not None:
                     raise WorkMapPasteSourceUnavailable
                 work_map = WorkMap.objects.select_for_update().get(pk=document.id)
+                operation = (
+                    WorkMapPasteRebinding.objects.select_for_update()
+                    .filter(
+                        id=operation_id,
+                        lease_id=lease_id,
+                        status=WorkMapPasteRebinding.Status.COPYING,
+                    )
+                    .first()
+                )
+                if operation is None:
+                    raise WorkMapPasteSourceUnavailable
                 if work_map.generation != operation.generation:
                     raise WorkMapPasteSourceUnavailable
                 if try_decode_work_map_scene(work_map.scene_binary) is None:

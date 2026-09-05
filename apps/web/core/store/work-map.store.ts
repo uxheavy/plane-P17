@@ -20,7 +20,13 @@ export interface IWorkMapStore {
   projections: Record<string, TWorkMapHydration>;
   fetchAll: (workspaceSlug: string, projectId: string) => Promise<TWorkMap[]>;
   fetchById: (workspaceSlug: string, projectId: string, workMapId: string) => Promise<TWorkMap>;
-  create: (workspaceSlug: string, projectId: string, name: string) => Promise<TWorkMap>;
+  create: (workspaceSlug: string, projectId: string, data: Pick<TWorkMap, "name" | "access">) => Promise<TWorkMap>;
+  update: (
+    workspaceSlug: string,
+    projectId: string,
+    workMapId: string,
+    data: Partial<Pick<TWorkMap, "name" | "access">>
+  ) => Promise<TWorkMap>;
   hydrate: (workspaceSlug: string, projectId: string, workMapId: string, nodeKeys: string[]) => Promise<void>;
   invalidate: (nodeKeys: string[]) => void;
 }
@@ -38,6 +44,7 @@ export class WorkMapStore implements IWorkMapStore {
       fetchAll: action,
       fetchById: action,
       create: action,
+      update: action,
       hydrate: action,
       invalidate: action,
     });
@@ -55,10 +62,28 @@ export class WorkMapStore implements IWorkMapStore {
     return map;
   };
 
-  create = async (workspaceSlug: string, projectId: string, name: string) => {
-    const map = await this.service.create(workspaceSlug, projectId, { name, access: 0 });
+  create = async (workspaceSlug: string, projectId: string, data: Pick<TWorkMap, "name" | "access">) => {
+    const map = await this.service.create(workspaceSlug, projectId, data);
     runInAction(() => (this.maps[map.id] = map));
     return map;
+  };
+
+  update = async (
+    workspaceSlug: string,
+    projectId: string,
+    workMapId: string,
+    data: Partial<Pick<TWorkMap, "name" | "access">>
+  ) => {
+    const previous = this.maps[workMapId];
+    if (previous) runInAction(() => (this.maps[workMapId] = { ...previous, ...data }));
+    try {
+      const map = await this.service.update(workspaceSlug, projectId, workMapId, data);
+      runInAction(() => (this.maps[map.id] = map));
+      return map;
+    } catch (error) {
+      if (previous) runInAction(() => (this.maps[workMapId] = previous));
+      throw error;
+    }
   };
 
   hydrate = async (workspaceSlug: string, projectId: string, workMapId: string, nodeKeys: string[]) => {

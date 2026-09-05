@@ -126,7 +126,7 @@ def get_page_versions_queryset():
 
 
 def get_work_map_versions_queryset():
-    """Get Work Map versions beyond the maximum allowed (20 per Document)."""
+    """Get Work map versions beyond the maximum allowed (20 per Document)."""
     subq = (
         DocumentVersion.all_objects.filter(work_map__isnull=False)
         .annotate(
@@ -201,7 +201,7 @@ def delete_email_notification_logs():
 
 @shared_task
 def delete_page_versions():
-    """Delete excess Page and Work Map document versions."""
+    """Delete excess Page and Work map document versions."""
     process_cleanup_task(
         queryset_func=get_page_versions_queryset,
         model=PageVersion,
@@ -210,7 +210,7 @@ def delete_page_versions():
     process_cleanup_task(
         queryset_func=get_work_map_versions_queryset,
         model=DocumentVersion,
-        task_name="Work Map Version",
+        task_name="Work map Version",
     )
 
 

@@ -30,7 +30,6 @@ from plane.bgtasks.deletion_task import hard_delete
 from plane.bgtasks.page_version_task import track_page_version
 from plane.bgtasks.work_map_asset_task import cleanup_deleted_work_map_assets, cleanup_stale_work_map_asset_copies
 from plane.bgtasks.work_map_binding_task import expire_stale_work_map_binding_placements
-from plane.app.work_map_relay import WorkMapRelayCloseReason, force_close_work_map_relay_on_commit
 from plane.db.models import (
     Cycle,
     DeployBoard,
@@ -137,60 +136,6 @@ def _source_records(workspace, project, user):
 @pytest.mark.contract
 @pytest.mark.django_db
 class TestWorkMapApp:
-    def test_relay_force_close_publishes_only_after_commit(self, django_capture_on_commit_callbacks):
-        redis_client = Mock()
-        redis_factory = Mock(return_value=redis_client)
-        work_map_id = uuid.UUID("22222222-2222-4222-8222-222222222222")
-        with (
-            patch("plane.app.work_map_relay.redis_instance", redis_factory),
-            django_capture_on_commit_callbacks(execute=True),
-        ):
-            force_close_work_map_relay_on_commit(
-                "workspace",
-                str(work_map_id),
-                WorkMapRelayCloseReason.GENERATION_CHANGED,
-            )
-            redis_client.publish.assert_not_called()
-
-        redis_factory.assert_called_once_with(socket_connect_timeout=1, socket_timeout=1)
-        redis_client.publish.assert_called_once_with(
-            "work-map:control",
-            f'{{"type":"FORCE_CLOSE","workspaceSlug":"workspace","workMapId":"{work_map_id}",'
-            '"reason":"generation_changed"}',
-        )
-
-    def test_lifecycle_mutations_schedule_relay_force_close(self, session_client, workspace, create_user):
-        project, _ = _project(workspace, create_user, "RST")
-        other_project, _ = _project(workspace, create_user, "ALT")
-        work_map = _create_work_map(session_client, workspace, project)
-        DocumentProject.objects.create(
-            document_id=work_map["id"],
-            project=other_project,
-            workspace=workspace,
-        )
-        work_map_url = _work_maps_url(workspace, project, work_map["id"])
-        lock_url = f"{work_map_url}lock/"
-        archive_url = f"{work_map_url}archive/"
-
-        with patch("plane.app.views.work_map.base.force_close_work_map_relay_on_commit") as force_close:
-            assert (
-                session_client.patch(work_map_url, {"access": Document.PRIVATE_ACCESS}, format="json").status_code
-                == 200
-            )
-            assert session_client.post(lock_url).status_code == status.HTTP_204_NO_CONTENT
-            assert session_client.delete(lock_url).status_code == status.HTTP_204_NO_CONTENT
-            assert session_client.post(archive_url).status_code == status.HTTP_200_OK
-            assert session_client.delete(archive_url).status_code == status.HTTP_204_NO_CONTENT
-            assert session_client.delete(work_map_url).status_code == status.HTTP_204_NO_CONTENT
-
-        assert force_close.call_count == 6
-        for invocation in force_close.call_args_list:
-            assert invocation.args == (
-                workspace.slug,
-                work_map["id"],
-                WorkMapRelayCloseReason.AUTHORITY_CHANGED,
-            )
-
     def test_work_map_cleanup_task_is_registered(self):
         assert "plane.bgtasks.work_map_asset_task" in settings.CELERY_IMPORTS
         assert "plane.bgtasks.work_map_binding_task" in settings.CELERY_IMPORTS
@@ -240,16 +185,16 @@ class TestWorkMapApp:
         scene_binary = base64.b64encode(b'{"elements":[],"files":{}}').decode("ascii")
 
         with patch(
-            "plane.app.views.work_map.scene.decode_work_map_scene",
+            "plane.utils.work_map_scene.decode_work_map_scene",
             side_effect=ValueError(private_detail),
         ):
             invalid_scene = session_client.patch(
                 scene_url,
-                {"generation": 0, "scene_binary": scene_binary},
+                {"collaboration_epoch": 0, "generation": 0, "scene_binary": scene_binary},
                 format="json",
             )
         with patch(
-            "plane.app.views.work_map.version.decode_work_map_scene",
+            "plane.utils.work_map_scene.decode_work_map_scene",
             side_effect=ValueError(private_detail),
         ):
             invalid_version = session_client.post(versions_url, {}, format="json")
@@ -257,7 +202,7 @@ class TestWorkMapApp:
         version = session_client.post(versions_url, {}, format="json")
         assert version.status_code == status.HTTP_201_CREATED
         with patch(
-            "plane.app.views.work_map.version.decode_work_map_scene",
+            "plane.utils.work_map_scene.decode_work_map_scene",
             side_effect=ValueError(private_detail),
         ):
             invalid_restore = session_client.post(
@@ -266,7 +211,7 @@ class TestWorkMapApp:
                 format="json",
             )
         with patch(
-            "plane.app.views.work_map.duplicate.decode_work_map_scene",
+            "plane.utils.work_map_scene.decode_work_map_scene",
             side_effect=ValueError(private_detail),
         ):
             invalid_duplicate = session_client.post(
@@ -360,12 +305,14 @@ class TestWorkMapApp:
     def test_work_map_scene_reserves_transport_headroom(self):
         accepted = WorkMapSceneSerializer(
             data={
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(b"x" * MAX_WORK_MAP_SCENE_BYTES).decode("ascii"),
             }
         )
         rejected = WorkMapSceneSerializer(
             data={
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(b"x" * (MAX_WORK_MAP_SCENE_BYTES + 1)).decode("ascii"),
             }
@@ -373,7 +320,7 @@ class TestWorkMapApp:
 
         assert accepted.is_valid(), accepted.errors
         assert not rejected.is_valid()
-        assert rejected.errors == {"scene_binary": ["Scene binary exceeds the Work Map limit."]}
+        assert rejected.errors == {"scene_binary": ["Scene binary exceeds the Work map limit."]}
 
     def test_page_asset_backfill_uses_the_shared_document_owner(self, workspace, create_user):
         project, _ = _project(workspace, create_user, "LEG")
@@ -489,12 +436,12 @@ class TestWorkMapApp:
 
         updated = session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(scene).decode("ascii")},
+            {"collaboration_epoch": 0, "generation": 0, "scene_binary": base64.b64encode(scene).decode("ascii")},
             format="json",
         )
         stale = session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(b"stale").decode("ascii")},
+            {"collaboration_epoch": 0, "generation": 0, "scene_binary": base64.b64encode(b"stale").decode("ascii")},
             format="json",
         )
         current = session_client.get(scene_url)
@@ -502,14 +449,25 @@ class TestWorkMapApp:
         assert updated.status_code == status.HTTP_200_OK
         assert updated.json()["generation"] == 1
         assert stale.status_code == status.HTTP_409_CONFLICT
-        assert current.json() == {"generation": 1, "scene_binary": base64.b64encode(scene).decode("ascii")}
+        assert current.json() == {"generation": 1, "scene_binary": base64.b64encode(scene).decode("ascii"), "collaboration_epoch": 0}
 
         work_map_url = _work_maps_url(workspace, project, work_map["id"])
         lock_url = _work_maps_url(workspace, project, work_map["id"], "lock/")
         assert session_client.post(lock_url).status_code == status.HTTP_204_NO_CONTENT
+        stale_after_lock = session_client.patch(
+            scene_url,
+            {"collaboration_epoch": 0, "generation": 1, "scene_binary": base64.b64encode(b"stale").decode("ascii")},
+            format="json",
+        )
+        assert stale_after_lock.status_code == status.HTTP_409_CONFLICT
+        current_snapshot = session_client.get(scene_url).json()
         acknowledged = session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(scene).decode("ascii")},
+            {
+                "collaboration_epoch": current_snapshot["collaboration_epoch"],
+                "generation": current_snapshot["generation"],
+                "scene_binary": current_snapshot["scene_binary"],
+            },
             format="json",
         )
         assert acknowledged.status_code == status.HTTP_200_OK
@@ -519,6 +477,18 @@ class TestWorkMapApp:
         current_work_map = WorkMap.objects.get(pk=work_map["id"])
         assert current_work_map.collaboration_epoch == 2
         assert current_work_map.generation == 1
+        post_lock_scene = b'{"elements":[{"id":"current"}],"files":{}}'
+        current_update = session_client.patch(
+            scene_url,
+            {
+                "collaboration_epoch": current_work_map.collaboration_epoch,
+                "generation": current_work_map.generation,
+                "scene_binary": base64.b64encode(post_lock_scene).decode("ascii"),
+            },
+            format="json",
+        )
+        assert current_update.status_code == status.HTTP_200_OK
+        assert current_update.json() == {"generation": 2}
 
         archive_url = _work_maps_url(workspace, project, work_map["id"], "archive/")
         archived = session_client.post(archive_url)
@@ -528,16 +498,27 @@ class TestWorkMapApp:
         assert archived.json() == archived_again.json()
         acknowledged = session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(scene).decode("ascii")},
+            {"collaboration_epoch": 0, "generation": 2, "scene_binary": base64.b64encode(scene).decode("ascii")},
+            format="json",
+        )
+        assert acknowledged.status_code == status.HTTP_409_CONFLICT
+        current_snapshot = session_client.get(scene_url).json()
+        acknowledged = session_client.patch(
+            scene_url,
+            {
+                "collaboration_epoch": current_snapshot["collaboration_epoch"],
+                "generation": current_snapshot["generation"],
+                "scene_binary": current_snapshot["scene_binary"],
+            },
             format="json",
         )
         assert acknowledged.status_code == status.HTTP_200_OK
-        assert acknowledged.json() == {"generation": 1}
+        assert acknowledged.json() == {"generation": 2}
         assert session_client.patch(work_map_url, {"name": "Blocked"}, format="json").status_code == 409
         assert session_client.delete(archive_url).status_code == status.HTTP_204_NO_CONTENT
         current_work_map.refresh_from_db()
         assert current_work_map.collaboration_epoch == 4
-        assert current_work_map.generation == 1
+        assert current_work_map.generation == 2
 
     def test_realtime_authorization_returns_the_collaboration_epoch(self, session_client, workspace, create_user):
         project, membership = _project(workspace, create_user, "LIV")
@@ -551,6 +532,11 @@ class TestWorkMapApp:
         assert authorized.status_code == status.HTTP_200_OK
         assert authorized.json()["collaboration_epoch"] == 0
         assert authorized.json()["editable"] is True
+        assert authorized.json()["profile"] == {
+            "display_name": create_user.display_name,
+            "avatar_url": create_user.avatar_url,
+        }
+        assert "id" not in authorized.json()["profile"]
         linked_authorized = session_client.get(_work_maps_url(workspace, other_project, work_map["id"], "realtime/"))
         assert linked_authorized.status_code == status.HTTP_200_OK
         assert linked_authorized.json()["project_id"] == str(other_project.id)
@@ -630,7 +616,7 @@ class TestWorkMapApp:
         assert session_client.delete(second_url).status_code == status.HTTP_409_CONFLICT
         assert session_client.post(f"{second_url}archive/").status_code == status.HTTP_200_OK
         with (
-            patch("plane.app.views.work_map.base.transaction.on_commit", side_effect=lambda callback, **_: callback()),
+            patch("plane.app.views.work_map.base.transaction.on_commit", side_effect=lambda callback: callback()),
             patch("plane.bgtasks.work_map_asset_task.cleanup_deleted_work_map_assets.delay") as schedule_cleanup,
         ):
             assert session_client.delete(second_url).status_code == status.HTTP_204_NO_CONTENT
@@ -664,7 +650,11 @@ class TestWorkMapApp:
         work_map = _create_work_map(session_client, workspace, project)
         own_scene_url = _work_maps_url(workspace, project, work_map["id"], "scene/")
         other_scene_url = _work_maps_url(workspace, other_project, work_map["id"], "scene/")
-        update = {"generation": 0, "scene_binary": base64.b64encode(b"denied").decode("ascii")}
+        update = {
+            "collaboration_epoch": 0,
+            "generation": 0,
+            "scene_binary": base64.b64encode(b"denied").decode("ascii"),
+        }
 
         assert session_client.get(other_scene_url).status_code == status.HTTP_404_NOT_FOUND
         assert session_client.patch(other_scene_url, update, format="json").status_code == status.HTTP_404_NOT_FOUND
@@ -704,8 +694,7 @@ class TestWorkMapApp:
         ).json()
         carrier = {
             "id": "protected",
-            "type": "embeddable",
-            "link": f"https://work-map.invalid/nodes/{binding['node_key']}",
+            "type": "rectangle",
             "customData": {"nodeKey": binding["node_key"]},
         }
         scene_url = _work_maps_url(workspace, map_project, work_map["id"], "scene/")
@@ -713,7 +702,11 @@ class TestWorkMapApp:
         assert (
             session_client.patch(
                 scene_url,
-                {"generation": 0, "scene_binary": base64.b64encode(initial_scene).decode("ascii")},
+                {
+                    "collaboration_epoch": 0,
+                    "generation": 0,
+                    "scene_binary": base64.b64encode(initial_scene).decode("ascii"),
+                },
                 format="json",
             ).status_code
             == status.HTTP_200_OK
@@ -733,7 +726,11 @@ class TestWorkMapApp:
 
         preserved = session_client.patch(
             scene_url,
-            {"generation": 1, "scene_binary": base64.b64encode(edited_scene).decode("ascii")},
+            {
+                "collaboration_epoch": 0,
+                "generation": 1,
+                "scene_binary": base64.b64encode(edited_scene).decode("ascii"),
+            },
             format="json",
         )
 
@@ -856,7 +853,7 @@ class TestWorkMapApp:
         assert WorkMapBinding.objects.filter(work_map_id=second_map["id"]).count() == 1
 
         scene = session_client.get(_work_maps_url(workspace, project, work_map["id"], "scene/"))
-        assert set(scene.json()) == {"generation", "scene_binary"}
+        assert set(scene.json()) == {"generation", "scene_binary", "collaboration_epoch"}
         serialized_scene = str(scene.json())
         assert not any(str(source_id) in serialized_scene for source_id in sources.values())
         assert not any(kind in serialized_scene for kind in sources)
@@ -919,8 +916,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": element_id,
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{node_key}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": node_key},
                     }
                     for element_id in ("first", "second")
@@ -931,7 +927,11 @@ class TestWorkMapApp:
         scene_url = _work_maps_url(workspace, project, work_map["id"], "scene/")
         saved = session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(two_carriers).decode("ascii")},
+            {
+                "collaboration_epoch": 0,
+                "generation": 0,
+                "scene_binary": base64.b64encode(two_carriers).decode("ascii"),
+            },
             format="json",
         )
         assert saved.status_code == status.HTTP_200_OK
@@ -952,6 +952,7 @@ class TestWorkMapApp:
         removed_duplicate = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 1,
                 "scene_binary": base64.b64encode(json.dumps(one_carrier).encode()).decode("ascii"),
             },
@@ -963,6 +964,7 @@ class TestWorkMapApp:
         removed_last = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 2,
                 "scene_binary": base64.b64encode(b'{"elements":[],"files":{}}').decode("ascii"),
             },
@@ -974,6 +976,7 @@ class TestWorkMapApp:
         restored = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 3,
                 "scene_binary": base64.b64encode(json.dumps(one_carrier).encode()).decode("ascii"),
             },
@@ -985,6 +988,7 @@ class TestWorkMapApp:
         removed_again = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 4,
                 "scene_binary": base64.b64encode(b'{"elements":[],"files":{}}').decode("ascii"),
             },
@@ -1057,8 +1061,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "kept",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{kept['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": kept["node_key"]},
                     }
                 ],
@@ -1142,8 +1145,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "source-node",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{source_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": source_binding["node_key"]},
                     },
                     {"id": "source-image", "type": "image", "fileId": "source-file"},
@@ -1160,7 +1162,11 @@ class TestWorkMapApp:
         assert (
             session_client.patch(
                 _work_maps_url(workspace, project, source["id"], "scene/"),
-                {"generation": 0, "scene_binary": base64.b64encode(source_scene).decode("ascii")},
+                {
+                    "collaboration_epoch": 0,
+                    "generation": 0,
+                    "scene_binary": base64.b64encode(source_scene).decode("ascii"),
+                },
                 format="json",
             ).status_code
             == status.HTTP_200_OK
@@ -1190,12 +1196,12 @@ class TestWorkMapApp:
         ).exists()
 
         target_scene = json.loads(source_scene)
-        target_scene["elements"][0]["link"] = f"https://work-map.invalid/nodes/{target_key}"
         target_scene["elements"][0]["customData"]["nodeKey"] = target_key
         target_scene["files"]["source-file"]["assetId"] = target_asset_id
         inserted = session_client.patch(
             _work_maps_url(workspace, project, target["id"], "scene/"),
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(json.dumps(target_scene).encode()).decode("ascii"),
             },
@@ -1334,7 +1340,11 @@ class TestWorkMapApp:
         missing_carrier_scene = json.dumps({"elements": [], "files": {}}).encode()
         session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(missing_carrier_scene).decode("ascii")},
+            {
+                "collaboration_epoch": 0,
+                "generation": 0,
+                "scene_binary": base64.b64encode(missing_carrier_scene).decode("ascii"),
+            },
             format="json",
         )
         incomplete = session_client.post(
@@ -1352,8 +1362,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "plane-node",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{source_key}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": source_key},
                     },
                     {
@@ -1371,6 +1380,7 @@ class TestWorkMapApp:
         rejected_leak = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 1,
                 "scene_binary": base64.b64encode(json.dumps(leaked_scene).encode()).decode("ascii"),
             },
@@ -1379,7 +1389,11 @@ class TestWorkMapApp:
         assert rejected_leak.status_code == status.HTTP_409_CONFLICT
         session_client.patch(
             scene_url,
-            {"generation": 1, "scene_binary": base64.b64encode(source_scene).decode("ascii")},
+            {
+                "collaboration_epoch": 0,
+                "generation": 1,
+                "scene_binary": base64.b64encode(source_scene).decode("ascii"),
+            },
             format="json",
         )
         client_scene = session_client.post(duplicate_url, {"scene_binary": "bypass"}, format="json")
@@ -1402,7 +1416,7 @@ class TestWorkMapApp:
         assert duplicate.generation == 0
         assert duplicate_binding.node_key == uuid.UUID(target_key)
         assert target_key != source_key
-        assert duplicate_scene["elements"][0]["link"] == f"https://work-map.invalid/nodes/{target_key}"
+        assert duplicate_scene["elements"][0].get("link") is None
         assert "enabledOrigin" not in duplicate_scene["elements"][1]["customData"]
         assert duplicate_binding.source_kind == "work-item"
         assert duplicate_binding.source_id == issue.id
@@ -1478,6 +1492,7 @@ class TestWorkMapApp:
         assert FileAsset.objects.filter(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).count() == asset_count
         assert DocumentProject.objects.count() == link_count
 
+    @pytest.mark.django_db(transaction=True)
     def test_version_restore_replaces_scene_and_bindings_in_one_generation(
         self, session_client, workspace, create_user
     ):
@@ -1511,8 +1526,7 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "first",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{first_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": first_binding["node_key"]},
                     }
                 ],
@@ -1522,6 +1536,7 @@ class TestWorkMapApp:
         session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(first_scene).decode("ascii"),
             },
@@ -1541,7 +1556,11 @@ class TestWorkMapApp:
         asset_scene = b'{"elements":[],"files":{"asset-id":{}}}'
         invalid_asset_scene = session_client.patch(
             scene_url,
-            {"generation": 1, "scene_binary": base64.b64encode(asset_scene).decode("ascii")},
+            {
+                "collaboration_epoch": 0,
+                "generation": 1,
+                "scene_binary": base64.b64encode(asset_scene).decode("ascii"),
+            },
             format="json",
         )
         assert invalid_asset_scene.status_code == status.HTTP_409_CONFLICT
@@ -1562,14 +1581,12 @@ class TestWorkMapApp:
                 "elements": [
                     {
                         "id": "first",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{first_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": first_binding["node_key"]},
                     },
                     {
                         "id": "second",
-                        "type": "embeddable",
-                        "link": f"https://work-map.invalid/nodes/{second_binding['node_key']}",
+                        "type": "rectangle",
                         "customData": {"nodeKey": second_binding["node_key"]},
                     },
                 ],
@@ -1579,24 +1596,22 @@ class TestWorkMapApp:
         session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 1,
                 "scene_binary": base64.b64encode(second_scene).decode("ascii"),
             },
             format="json",
         )
         restore_url = f"{versions_url}{version.json()['id']}/restore/"
-        stale = session_client.post(restore_url, {"generation": 1}, format="json")
+        with patch("plane.app.views.work_map.version.redis_instance") as stale_redis:
+            stale = session_client.post(restore_url, {"generation": 1}, format="json")
         assert stale.status_code == status.HTTP_409_CONFLICT
+        stale_redis.assert_not_called()
         assert bytes(WorkMap.objects.get(pk=work_map["id"]).scene_binary) == second_scene
         assert WorkMapBinding.objects.filter(work_map_id=work_map["id"]).count() == 2
 
-        with patch("plane.app.views.work_map.version.force_close_work_map_relay_on_commit") as force_close:
+        with patch("plane.app.views.work_map.version.redis_instance") as restore_redis:
             restored = session_client.post(restore_url, {"generation": 2}, format="json")
-        force_close.assert_called_once_with(
-            workspace.slug,
-            work_map["id"],
-            WorkMapRelayCloseReason.GENERATION_CHANGED,
-        )
         current = WorkMap.objects.get(pk=work_map["id"])
         current_binding = current.bindings.get()
         assert restored.status_code == status.HTTP_200_OK
@@ -1604,9 +1619,24 @@ class TestWorkMapApp:
         assert bytes(current.scene_binary) == first_scene
         assert current.generation == 3
         assert current.collaboration_epoch == 1
+        snapshot = session_client.get(scene_url).json()
+        assert snapshot["collaboration_epoch"] == 1
+        assert snapshot["generation"] == 3
+        assert snapshot["scene_binary"] == base64.b64encode(first_scene).decode("ascii")
         assert current_binding.node_key == uuid.UUID(first_binding["node_key"])
         assert current_binding.source_id == first_issue.id
         assert WorkMapVersion.objects.filter(document_version__document=current.document).count() == 1
+        restore_redis.assert_called_once_with()
+        restore_redis.return_value.publish.assert_called_once()
+        channel, message = restore_redis.return_value.publish.call_args.args
+        assert channel == "hocuspocus:admin"
+        payload = json.loads(message)
+        assert payload["command"] == "force_close"
+        assert payload["docId"] == str(work_map["id"])
+        assert payload["reason"] == "admin_request"
+        assert payload["code"] == 4000
+        assert payload["originServer"] == "plane-api"
+        assert payload["timestamp"]
 
     def test_work_map_version_retention_hard_deletes_the_oldest_snapshot(self, session_client, workspace, create_user):
         project, _ = _project(workspace, create_user, "RET")
@@ -1770,6 +1800,7 @@ class TestWorkMapApp:
             rejected_asset = session_client.patch(
                 scene_url,
                 {
+                    "collaboration_epoch": 0,
                     "generation": 0,
                     "scene_binary": base64.b64encode(json.dumps(unavailable_scene).encode()).decode("ascii"),
                 },
@@ -1784,6 +1815,7 @@ class TestWorkMapApp:
         rejected_leak = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(json.dumps(leaked_file_metadata).encode()).decode("ascii"),
             },
@@ -1792,7 +1824,11 @@ class TestWorkMapApp:
         assert rejected_leak.status_code == status.HTTP_409_CONFLICT
         saved = session_client.patch(
             scene_url,
-            {"generation": 0, "scene_binary": base64.b64encode(scene).decode("ascii")},
+            {
+                "collaboration_epoch": 0,
+                "generation": 0,
+                "scene_binary": base64.b64encode(scene).decode("ascii"),
+            },
             format="json",
         )
         assert saved.status_code == status.HTTP_200_OK
@@ -2033,6 +2069,26 @@ class TestWorkMapApp:
             )
             assert discovered.status_code == status.HTTP_200_OK
             assert [result["source_id"] for result in discovered.json()["results"]] == [str(source.id)]
+            assert discovered.json()["results"][0]["project_id"] == str(source_project.id)
+            assert discovered.json()["results"][0]["project_name"] == source_project.name
+            picker_results = session_client.get(
+                f"{base}sources/",
+                {"source_kind": source_kind, "result_format": "issue-search"},
+            )
+            if source_kind == "work-item":
+                assert picker_results.status_code == status.HTTP_200_OK
+                result = next(item for item in picker_results.json()["results"] if item["id"] == str(source.id))
+                assert result["project__identifier"] == source_project.identifier
+                assert result["name"] == source.name
+                assert result["state__color"] == source.state.color
+            else:
+                assert picker_results.status_code == status.HTTP_400_BAD_REQUEST
+            filtered = session_client.get(
+                f"{base}sources/",
+                {"source_kind": source_kind, "query": "", "project_id": str(source_project.id)},
+            )
+            assert filtered.status_code == status.HTTP_200_OK
+            assert all(result["project_id"] == str(source_project.id) for result in filtered.json()["results"])
             bound = session_client.post(
                 f"{base}bindings/",
                 {
@@ -2054,6 +2110,11 @@ class TestWorkMapApp:
 
         source_membership.is_active = False
         source_membership.save(update_fields=["is_active"])
+        denied_picker = session_client.get(
+            f"{base}sources/", {"source_kind": "work-item", "result_format": "issue-search"}
+        )
+        assert denied_picker.status_code == status.HTTP_200_OK
+        assert denied_picker.json()["results"] == []
         denied = session_client.post(f"{base}bindings/hydrate/", {"node_keys": node_keys}, format="json")
         assert denied.json()["results"] == [{"node_key": node_key, "available": False} for node_key in node_keys]
 

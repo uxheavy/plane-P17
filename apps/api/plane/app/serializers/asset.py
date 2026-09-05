@@ -7,23 +7,9 @@ from rest_framework import serializers
 
 from plane.db.models import FileAsset
 from plane.utils.path_validator import sanitize_filename
+from plane.utils.work_map_scene import WORK_MAP_SCENE_ASSET_MIME_TYPES
 
 from .base import BaseSerializer
-
-
-# Work Map image capabilities must remain identical to Excalidraw's exported
-# IMAGE_MIME_TYPES; Plane-backed nodes add behavior without reducing native nodes.
-WORK_MAP_SCENE_ASSET_MIME_TYPES = (
-    "image/avif",
-    "image/bmp",
-    "image/gif",
-    "image/jpeg",
-    "image/jfif",
-    "image/png",
-    "image/svg+xml",
-    "image/webp",
-    "image/x-icon",
-)
 
 
 class FileAssetSerializer(BaseSerializer):

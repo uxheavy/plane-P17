@@ -3,12 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-/**
- * Copyright (c) 2023-present Plane Software, Inc. and contributors
- * SPDX-License-Identifier: AGPL-3.0-only
- * See the LICENSE file for details.
- */
-
 import type { TIssue } from "./issues/issue";
 import type { TStateGroups } from "./state";
 import type { TFileSignedURLResponse } from "./file";
@@ -21,6 +15,8 @@ export type TWorkMap = {
   owned_by: string;
   access: 0 | 1;
   archived_at: string | null;
+  collaboration_epoch: number;
+  is_favorite: boolean;
   is_locked: boolean;
   sort_order: number;
   generation: number;
@@ -29,6 +25,7 @@ export type TWorkMap = {
 };
 
 export type TWorkMapScene = {
+  collaboration_epoch: number;
   generation: number;
   scene_binary: string;
 };
@@ -68,6 +65,7 @@ type TWorkMapSourceBase = {
   source_kind: TWorkMapSourceKind;
   source_id: string;
   project_id: string;
+  project_name: string;
   name: string;
 };
 

@@ -19,13 +19,10 @@ from plane.app.permissions.document import visible_documents
 from plane.app.serializers import WorkMapSceneAssetCreateSerializer, WorkMapSceneAssetSerializer
 from plane.db.models import Document, FileAsset, WorkMap, WorkMapSceneAssetPlacement
 from plane.settings.storage import S3Storage
+from plane.utils.work_map_scene import try_decode_work_map_scene, work_map_scene_assets
 
 from ..base import BaseAPIView
-from ..work_map.scene import (
-    LEGACY_SCENE_UPGRADE_ERROR,
-    try_decode_work_map_scene,
-    work_map_scene_assets,
-)
+from ..work_map.scene import LEGACY_SCENE_UPGRADE_ERROR
 
 
 def visible_work_map(request, slug, project_id, work_map_id):
@@ -112,7 +109,7 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
         if asset is None:
             return Response({"error": "Asset not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        metadata = S3Storage(request=request).get_object_metadata(asset.asset.name)
+        metadata = S3Storage().get_object_metadata(asset.asset.name)
         if metadata is None:
             return Response({"error": "Uploaded asset not found"}, status=status.HTTP_409_CONFLICT)
         with transaction.atomic():
@@ -211,7 +208,7 @@ class WorkMapSceneAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def delete(self, request, slug, project_id, work_map_id, asset_id):
-        storage = S3Storage(request=request)
+        storage = S3Storage()
         deletion_marker = timezone.now()
         with transaction.atomic():
             visible_id = (

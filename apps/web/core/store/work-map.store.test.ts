@@ -22,11 +22,12 @@ const available = (nodeKey: string): TWorkMapHydration => ({
     source_kind: "page",
     source_id: `${nodeKey}-source`,
     project_id: "project-id",
+    project_name: "Project",
     name: nodeKey,
   },
 });
 
-describe("Work Map source hydration", () => {
+describe("Work map source hydration", () => {
   it("settles fast projections without waiting for a delayed sibling", async () => {
     const store = new WorkMapStore();
     let releaseSlow: (() => void) | undefined;

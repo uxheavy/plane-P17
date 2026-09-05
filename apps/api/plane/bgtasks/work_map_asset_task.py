@@ -13,7 +13,6 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from plane.app.views.work_map.scene import try_decode_work_map_scene, work_map_scene_assets
 from plane.db.models import (
     DocumentVersionAsset,
     FileAsset,
@@ -23,6 +22,7 @@ from plane.db.models import (
     WorkMapSceneAssetPlacement,
 )
 from plane.settings.storage import S3Storage
+from plane.utils.work_map_scene import try_decode_work_map_scene, work_map_scene_assets
 
 
 WORK_MAP_ASSET_COPY_LEASE = timedelta(minutes=15)

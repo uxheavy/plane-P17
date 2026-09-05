@@ -21,6 +21,7 @@ import { CommandPaletteStore } from "@/store/base-command-palette.store";
 import { WorkspaceRootStore } from "@/store/workspace";
 import type { IWorkMapStore } from "@/store/work-map.store";
 import { WorkMapStore } from "@/store/work-map.store";
+import { revokeRecoveryWriters } from "@/services/work-map-recovery.service";
 import type { ITimelineStore } from "./timeline/timeline.store";
 import { TimeLineStore } from "./timeline/timeline.store";
 // stores
@@ -142,6 +143,8 @@ export class CoreRootStore {
   }
 
   resetOnSignOut() {
+    const accountId = this.user.data?.id;
+    if (accountId) revokeRecoveryWriters(accountId);
     // handling the system theme when user logged out from the app
     localStorage.setItem("theme", "system");
     void setLanguage(FALLBACK_LANGUAGE);

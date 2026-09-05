@@ -67,16 +67,16 @@ export const uploadFile = async (
   fileId: string,
   file: BinaryFileData
 ): Promise<TWorkMapFile> => {
-  if (!isWorkMapImageMimeType(file.mimeType)) throw new Error("Unsupported Work Map image type");
+  if (!isWorkMapImageMimeType(file.mimeType)) throw new Error("Unsupported Work map image type");
   const blob = await fetch(file.dataURL).then((response) => {
-    if (!response.ok) throw new Error("Unable to read Work Map image");
+    if (!response.ok) throw new Error("Unable to read Work map image");
     return response.blob();
   });
   const upload = new File([blob], `${fileId}.${extensionByMimeType[file.mimeType]}`, {
     type: file.mimeType,
   });
   const asset = await service.uploadWorkMapSceneAsset(workspaceSlug, projectId, workMapId, upload);
-  if (!isWorkMapImageMimeType(asset.mime_type)) throw new Error("Unsupported Work Map image type");
+  if (!isWorkMapImageMimeType(asset.mime_type)) throw new Error("Unsupported Work map image type");
   return {
     assetId: asset.asset_id,
     mimeType: asset.mime_type,

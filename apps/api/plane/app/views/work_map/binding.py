@@ -15,12 +15,12 @@ from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.work_map import can_read_work_map_source
 from plane.app.serializers import WorkMapBindingCancelSerializer, WorkMapBindingCreateSerializer
 from plane.db.models import Document, WorkMap, WorkMapBinding, WorkMapBindingPlacement
+from plane.utils.work_map_scene import parse_work_map_node_key, try_decode_work_map_scene
 
 from ..base import BaseAPIView
 from .base import visible_work_maps
 
 
-WORK_MAP_NODE_LINK_PREFIX = "https://work-map.invalid/nodes/"
 PROTECTED_SOURCE_FIELDS = {"sourceId", "sourceKind", "source_id", "source_kind"}
 
 
@@ -31,24 +31,18 @@ def protected_binding_keys(scene):
             raise ValueError("Scene element is invalid")
         custom_data = element.get("customData")
         node_key_value = custom_data.get("nodeKey") if isinstance(custom_data, dict) else None
-        link = element.get("link")
-        has_node_link = isinstance(link, str) and link.startswith(WORK_MAP_NODE_LINK_PREFIX)
         if node_key_value is None:
-            if has_node_link:
-                raise ValueError("Plane carrier has no protected binding key")
             continue
         if set(custom_data) != {"nodeKey"}:
             raise ValueError("Plane carrier contains protected source metadata")
         if PROTECTED_SOURCE_FIELDS.intersection(element):
             raise ValueError("Plane carrier contains protected source metadata")
-        if element.get("type") != "embeddable" or not has_node_link:
+        if element.get("type") != "rectangle" or element.get("link") is not None:
             raise ValueError("Protected binding key is outside a Plane carrier")
         try:
-            node_key = uuid.UUID(str(node_key_value))
+            node_key = parse_work_map_node_key(node_key_value)
         except ValueError:
             raise ValueError("Plane carrier binding key is invalid")
-        if link != f"{WORK_MAP_NODE_LINK_PREFIX}{node_key}":
-            raise ValueError("Plane carrier binding link is invalid")
         carrier_keys.add(node_key)
     return carrier_keys
 
@@ -88,7 +82,7 @@ class WorkMapBindingEndpoint(BaseAPIView):
                         {"error": "Work map generation is stale", "generation": work_map.generation},
                         status=status.HTTP_409_CONFLICT,
                     )
-                from .scene import LEGACY_SCENE_UPGRADE_ERROR, try_decode_work_map_scene
+                from .scene import LEGACY_SCENE_UPGRADE_ERROR
 
                 if try_decode_work_map_scene(work_map.scene_binary) is None:
                     return Response({"error": LEGACY_SCENE_UPGRADE_ERROR}, status=status.HTTP_409_CONFLICT)
@@ -207,7 +201,7 @@ class WorkMapBindingEndpoint(BaseAPIView):
             if placement is None or placement.deleted_at is not None:
                 return Response(status=status.HTTP_204_NO_CONTENT)
             binding = WorkMapBinding.all_objects.select_for_update().get(id=placement.binding_id)
-            from .scene import LEGACY_SCENE_UPGRADE_ERROR, try_decode_work_map_scene
+            from .scene import LEGACY_SCENE_UPGRADE_ERROR
 
             scene = try_decode_work_map_scene(work_map.scene_binary)
             if scene is None:

@@ -10,12 +10,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CaptureUpdateAction, UserIdleState } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import type { Collaborator, ExcalidrawImperativeAPI, SocketId } from "@excalidraw/excalidraw/types";
 import { throttle } from "lodash-es";
 import {
   createPointerUpdateFrame,
   expireCollaborators,
+  projectCollaborator,
   type TAwarenessFrame,
   type TCollaboratorLease,
 } from "./awareness";
@@ -43,7 +44,8 @@ export const useAwareness = (
   enabled: boolean,
   connected: boolean,
   api: ExcalidrawImperativeAPI | null,
-  sendFrame: (frame: unknown) => void
+  sendFrame: (frame: unknown) => void,
+  userId: string
 ): TAwareness => {
   const collaboratorsRef = useRef(new Map<SocketId, TCollaboratorLease>());
   const [readback, setReadback] = useState({ count: 0, ids: "", pointerIds: "", selectionIds: "" });
@@ -84,30 +86,13 @@ export const useAwareness = (
   const applyAwareness = useCallback(
     (frame: TAwarenessFrame) => {
       const socketId = frame.connectionId as SocketId;
+      if (frame.senderId === userId) return;
       const current = collaboratorsRef.current.get(socketId)?.collaborator;
-      const identity = { id: frame.senderId, socketId, username: current?.username ?? "Collaborator" };
-      const collaborator: Collaborator =
-        frame.type === "POINTER_UPDATE"
-          ? {
-              ...current,
-              ...identity,
-              pointer: frame.payload.pointer,
-              button: frame.payload.button,
-              selectedElementIds: frame.payload.selectedElementIds,
-            }
-          : {
-              ...current,
-              ...identity,
-              userState: {
-                active: UserIdleState.ACTIVE,
-                idle: UserIdleState.IDLE,
-                away: UserIdleState.AWAY,
-              }[frame.payload.state],
-            };
+      const collaborator = projectCollaborator(frame, current);
       collaboratorsRef.current.set(socketId, { collaborator, lastSeen: Date.now() });
       publishCollaborators();
     },
-    [publishCollaborators]
+    [publishCollaborators, userId]
   );
 
   const onPointerUpdate = useMemo(

@@ -10,15 +10,20 @@
  */
 
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import type { TWorkMapFile, TWorkMapFiles } from "@plane/types";
+import type { BinaryFileData, BinaryFiles } from "@excalidraw/excalidraw/types";
+import type { TWorkMapFile, TWorkMapFiles, TWorkMapScene } from "@plane/types";
 
 export type TStoredScene = {
   elements: readonly ExcalidrawElement[];
   files: TWorkMapFiles;
 };
 
+export type TSceneAuthority = Pick<TWorkMapScene, "generation" | "collaboration_epoch">;
+
+export type TWorkMapRuntimeFile = BinaryFileData & { assetId?: string };
+export type TWorkMapRuntimeFiles = Record<string, TWorkMapRuntimeFile>;
+
 const NODE_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const NODE_CARRIER_URL_PREFIX = "https://work-map.invalid/nodes/";
 const ASSET_ID_PATTERN = NODE_KEY_PATTERN;
 const IMAGE_MIME_TYPES = new Set<TWorkMapFile["mimeType"]>([
   "image/svg+xml",
@@ -32,19 +37,54 @@ const IMAGE_MIME_TYPES = new Set<TWorkMapFile["mimeType"]>([
   "image/jfif",
 ]);
 
-export const getNodeKey = (element: Pick<ExcalidrawElement, "type" | "customData">): string | undefined => {
-  const nodeKey = element.type === "embeddable" ? element.customData?.nodeKey : undefined;
+export const isWorkMapImageMimeType = (value: string): value is TWorkMapFile["mimeType"] =>
+  IMAGE_MIME_TYPES.has(value as TWorkMapFile["mimeType"]);
+
+const getCustomDataNodeKey = (element: Pick<ExcalidrawElement, "customData">): string | undefined => {
+  const nodeKey = element.customData?.nodeKey;
   return typeof nodeKey === "string" && NODE_KEY_PATTERN.test(nodeKey) ? nodeKey : undefined;
 };
 
-export const createNodeCarrierLink = (nodeKey: string): string => {
-  if (!NODE_KEY_PATTERN.test(nodeKey)) throw new Error("Invalid Work Map node key");
-  return `${NODE_CARRIER_URL_PREFIX}${nodeKey}`;
+export const getWorkMapFileMetadata = (file: TWorkMapRuntimeFile): TWorkMapFile | undefined => {
+  if (
+    typeof file.assetId !== "string" ||
+    !ASSET_ID_PATTERN.test(file.assetId) ||
+    !isWorkMapImageMimeType(file.mimeType) ||
+    !Number.isInteger(file.created) ||
+    file.created < 0
+  ) {
+    return undefined;
+  }
+  return { assetId: file.assetId, mimeType: file.mimeType, created: file.created };
 };
 
-export const isNodeCarrierLink = (link: string): boolean => {
-  if (!link.startsWith(NODE_CARRIER_URL_PREFIX)) return false;
-  return NODE_KEY_PATTERN.test(link.slice(NODE_CARRIER_URL_PREFIX.length));
+export const addWorkMapAssetMetadata = (files: BinaryFiles, metadata: TWorkMapFiles): TWorkMapRuntimeFiles =>
+  Object.fromEntries(
+    Object.entries(files).map(([fileId, file]) => {
+      const workMapFile = metadata[fileId];
+      return [fileId, workMapFile ? { ...file, assetId: workMapFile.assetId } : file];
+    })
+  );
+
+export const getNodeKey = (element: Pick<ExcalidrawElement, "type" | "customData">): string | undefined => {
+  return element.type === "rectangle" ? getCustomDataNodeKey(element) : undefined;
+};
+
+const NODE_CARRIER_HIT_AREA = "rgba(0, 0, 0, 0.001)";
+
+export const normalizeNodeCarrier = (element: ExcalidrawElement): ExcalidrawElement => {
+  if (element.type !== "rectangle" && element.type !== "embeddable") return element;
+  const nodeKey = getCustomDataNodeKey(element);
+  if (!nodeKey) return element;
+  const { link: _link, ...withoutLink } = element;
+  return {
+    ...withoutLink,
+    type: "rectangle",
+    // Excalidraw only hit-tests the interior of a filled shape. The host card
+    // covers this imperceptible fill while preserving native whole-card selection.
+    backgroundColor: NODE_CARRIER_HIT_AREA,
+    customData: { nodeKey },
+  } as unknown as ExcalidrawElement;
 };
 
 export const isAllowedEmbedUrl = (link: string): boolean => {
@@ -57,10 +97,10 @@ export const isAllowedEmbedUrl = (link: string): boolean => {
 };
 
 export const encodeScene = (scene: TStoredScene): string => {
-  const elements = scene.elements.map((element) => {
-    const nodeKey = getNodeKey(element);
-    return nodeKey ? { ...element, link: createNodeCarrierLink(nodeKey), customData: { nodeKey } } : element;
-  });
+  // Native elements use null; restoration uses []. Keep equivalent bindings byte-stable for save acknowledgements.
+  const elements = scene.elements.map((element) =>
+    normalizeNodeCarrier({ ...element, boundElements: element.boundElements ?? [] })
+  );
   const files = Object.fromEntries(
     Object.entries(scene.files).map(([fileId, file]) => [
       fileId,
@@ -80,16 +120,16 @@ export const decodeScene = (value: string): TStoredScene => {
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
   if (!parsed || typeof parsed !== "object" || !("elements" in parsed) || !Array.isArray(parsed.elements)) {
-    throw new Error("Invalid Work Map scene");
+    throw new Error("Invalid Work map scene");
   }
   const rawFiles = "files" in parsed ? parsed.files : {};
-  if (!rawFiles || typeof rawFiles !== "object" || Array.isArray(rawFiles)) throw new Error("Invalid Work Map files");
+  if (!rawFiles || typeof rawFiles !== "object" || Array.isArray(rawFiles)) throw new Error("Invalid Work map files");
   const files = Object.fromEntries(
     Object.entries(rawFiles).map(([fileId, file]) => {
-      if (!fileId || !file || typeof file !== "object" || Array.isArray(file)) throw new Error("Invalid Work Map file");
+      if (!fileId || !file || typeof file !== "object" || Array.isArray(file)) throw new Error("Invalid Work map file");
       const keys = Object.keys(file);
       if (keys.length !== 3 || !keys.includes("assetId") || !keys.includes("mimeType") || !keys.includes("created"))
-        throw new Error("Invalid Work Map file");
+        throw new Error("Invalid Work map file");
       const { assetId, mimeType, created } = file as Record<string, unknown>;
       if (
         typeof assetId !== "string" ||
@@ -100,11 +140,11 @@ export const decodeScene = (value: string): TStoredScene => {
         !Number.isInteger(created) ||
         created < 0
       )
-        throw new Error("Invalid Work Map file");
+        throw new Error("Invalid Work map file");
       return [fileId, { assetId, mimeType: mimeType as TWorkMapFile["mimeType"], created }];
     })
   );
-  return { elements: parsed.elements as ExcalidrawElement[], files };
+  return { elements: (parsed.elements as ExcalidrawElement[]).map(normalizeNodeCarrier), files };
 };
 
 export const isGenerationConflict = (error: unknown): boolean =>
@@ -112,3 +152,19 @@ export const isGenerationConflict = (error: unknown): boolean =>
   typeof error === "object" &&
   "response" in error &&
   (error.response as { status?: number } | undefined)?.status === 409;
+
+export const isSceneSerializationCancelled = (error: unknown): boolean =>
+  error instanceof Error && error.name === "AbortError";
+
+const TRANSIENT_NETWORK_CODES = new Set(["ERR_NETWORK", "ECONNABORTED", "ETIMEDOUT"]);
+
+export const isTransientPersistenceFailure = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  if (error instanceof TypeError) return true;
+  const response = "response" in error ? error.response : undefined;
+  const status =
+    response && typeof response === "object" && "status" in response ? (response.status as unknown) : undefined;
+  if (typeof status === "number") return status >= 500;
+  const code = "code" in error ? error.code : undefined;
+  return typeof code === "string" ? TRANSIENT_NETWORK_CODES.has(code) : "request" in error;
+};

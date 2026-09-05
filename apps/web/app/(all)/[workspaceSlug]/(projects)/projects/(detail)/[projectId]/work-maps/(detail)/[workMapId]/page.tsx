@@ -21,12 +21,12 @@ function ProjectWorkMapPage({ params }: Route.ComponentProps) {
   const store = useWorkMap();
   const { error } = useSWR(`PROJECT_WORK_MAP_${workMapId}`, () => store.fetchById(workspaceSlug, projectId, workMapId));
   const workMap = store.maps[workMapId];
-  if (error) return <div className="grid size-full place-items-center text-14">Work Map not found</div>;
+  if (error) return <div className="grid size-full place-items-center text-14">Work map not found</div>;
   if (!workMap)
-    return <div className="grid size-full place-items-center text-13 text-secondary">Loading Work Map…</div>;
+    return <div className="grid size-full place-items-center text-13 text-secondary">Loading Work map…</div>;
   return (
     <>
-      <PageHead title={workMap.name || "Work Map"} />
+      <PageHead title={workMap.name || "Work map"} />
       <WorkMapEditor key={workMap.id} workspaceSlug={workspaceSlug} projectId={projectId} workMap={workMap} />
     </>
   );

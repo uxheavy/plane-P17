@@ -12,7 +12,7 @@ from rest_framework.response import Response
 # Module imports
 from .base import BaseAPIView
 from plane.db.models import Issue, ProjectMember, IssueRelation
-from plane.utils.issue_search import search_issues
+from plane.utils.issue_search import ISSUE_SEARCH_FIELDS, search_issues
 
 
 class IssueSearchEndpoint(BaseAPIView):
@@ -144,18 +144,6 @@ class IssueSearchEndpoint(BaseAPIView):
             issues = issues.filter(created_by=self.request.user)
 
         return Response(
-            issues.values(
-                "name",
-                "id",
-                "start_date",
-                "sequence_id",
-                "project__name",
-                "project__identifier",
-                "project_id",
-                "workspace__slug",
-                "state__name",
-                "state__group",
-                "state__color",
-            )[:100],
+            issues.values(*ISSUE_SEARCH_FIELDS)[:100],
             status=status.HTTP_200_OK,
         )

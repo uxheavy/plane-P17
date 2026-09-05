@@ -77,6 +77,7 @@ class TestWorkMapLegacySceneApp:
         updated = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(updated_scene).decode("ascii"),
             },
@@ -85,6 +86,7 @@ class TestWorkMapLegacySceneApp:
         retry = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(updated_scene).decode("ascii"),
             },
@@ -93,6 +95,7 @@ class TestWorkMapLegacySceneApp:
 
         assert current.status_code == status.HTTP_200_OK
         assert current.json() == {
+            "collaboration_epoch": 0,
             "generation": 0,
             "scene_binary": base64.b64encode(legacy_scene).decode("ascii"),
         }
@@ -114,6 +117,7 @@ class TestWorkMapLegacySceneApp:
         updated = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(structured_scene).decode("ascii"),
             },
@@ -122,6 +126,7 @@ class TestWorkMapLegacySceneApp:
         rejected = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 1,
                 "scene_binary": base64.b64encode(b"legacy scene").decode("ascii"),
             },
@@ -150,6 +155,7 @@ class TestWorkMapLegacySceneApp:
         changed = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(changed_scene).decode("ascii"),
             },

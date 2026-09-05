@@ -194,7 +194,7 @@ export const coreRoutes: RouteConfigEntry[] = [
             ),
           ]),
 
-          // Work Map Detail
+          // Work map Detail
           layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/work-maps/(detail)/layout.tsx", [
             route(
               ":workspaceSlug/projects/:projectId/work-maps/:workMapId",
@@ -202,7 +202,7 @@ export const coreRoutes: RouteConfigEntry[] = [
             ),
           ]),
 
-          // Work Maps List
+          // Work maps List
           layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/work-maps/(list)/layout.tsx", [
             route(
               ":workspaceSlug/projects/:projectId/work-maps",

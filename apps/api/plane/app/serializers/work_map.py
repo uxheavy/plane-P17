@@ -23,6 +23,7 @@ class WorkMapUpdateSerializer(serializers.Serializer):
 
 
 class WorkMapSceneSerializer(serializers.Serializer):
+    collaboration_epoch = serializers.IntegerField(min_value=0)
     generation = serializers.IntegerField(min_value=0)
     scene_binary = serializers.CharField(allow_blank=True)
 
@@ -32,7 +33,7 @@ class WorkMapSceneSerializer(serializers.Serializer):
         except (binascii.Error, ValueError):
             raise serializers.ValidationError("Scene binary must be valid base64.")
         if len(scene_binary) > MAX_WORK_MAP_SCENE_BYTES:
-            raise serializers.ValidationError("Scene binary exceeds the Work Map limit.")
+            raise serializers.ValidationError("Scene binary exceeds the Work map limit.")
         return scene_binary
 
 
@@ -46,6 +47,13 @@ class WorkMapBindingCreateSerializer(serializers.Serializer):
 class WorkMapSourceDiscoverySerializer(serializers.Serializer):
     source_kind = serializers.ChoiceField(choices=WorkMapBinding.SourceKind.values)
     query = serializers.CharField(required=False, allow_blank=True, max_length=255, default="")
+    project_id = serializers.UUIDField(required=False)
+    result_format = serializers.ChoiceField(choices=["source", "issue-search"], default="source")
+
+    def validate(self, attrs):
+        if attrs["result_format"] == "issue-search" and attrs["source_kind"] != "work-item":
+            raise serializers.ValidationError("Issue search results require work-item sources.")
+        return attrs
 
 
 class WorkMapBindingHydrationSerializer(serializers.Serializer):

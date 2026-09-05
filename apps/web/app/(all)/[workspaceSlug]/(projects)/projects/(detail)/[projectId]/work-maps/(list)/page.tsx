@@ -21,7 +21,7 @@ export default function ProjectWorkMapsPage({ params }: Route.ComponentProps) {
   useSWR(`PROJECT_WORK_MAPS_${projectId}`, () => store.fetchAll(workspaceSlug, projectId));
   return (
     <>
-      <PageHead title="Work Maps" />
+      <PageHead title="Work maps" />
       <WorkMapList workspaceSlug={workspaceSlug} projectId={projectId} />
     </>
   );

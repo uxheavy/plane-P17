@@ -10,66 +10,81 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentProps } from "react";
-import { CaptureUpdateAction, Excalidraw, convertToExcalidrawElements } from "@excalidraw/excalidraw";
-import type {
-  ExcalidrawElement,
-  ExcalidrawEmbeddableElement,
-  OrderedExcalidrawElement,
-} from "@excalidraw/excalidraw/element/types";
+import { observer } from "mobx-react";
+import type { ComponentProps, MouseEventHandler } from "react";
+import {
+  CaptureUpdateAction,
+  Excalidraw,
+  convertToExcalidrawElements,
+  sceneCoordsToViewportCoords,
+} from "@excalidraw/excalidraw";
+import type { ExcalidrawElement, OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { PointerDownState } from "@excalidraw/excalidraw/types";
 // oxlint-disable-next-line import/no-unassigned-import -- Excalidraw owns its editor styles.
 import "@excalidraw/excalidraw/index.css";
-import type { TWorkMap, TWorkMapSource } from "@plane/types";
+// oxlint-disable-next-line import/no-unassigned-import -- Plane supplies tokens to the native editor UI.
+import "./theme.css";
+import type { TLanguage } from "@plane/i18n";
+import { useTranslation } from "@plane/i18n";
+import type { TWorkMap, TWorkMapSource, TWorkMapSourceKind } from "@plane/types";
+import { Avatar } from "@plane/ui";
+import { resolveGeneralTheme } from "@plane/utils";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { useWorkMap } from "@/hooks/store/use-work-map";
-import { useUser } from "@/hooks/store/user";
+import { useUser, useUserProfile } from "@/hooks/store/user";
 import { WorkMapService } from "@/services/work-map.service";
+import { UpdateStatus } from "@/components/common/update-status";
 import { WorkMapSourceNode } from "../source-node";
 import { WorkMapSourcePicker } from "../source-picker";
+import { WorkMapWorkItemPicker } from "../work-item-picker";
+import type { WorkMapPlacementSource, WorkMapWorkItemAction } from "../work-item-picker";
 import { RecoveryPanel } from "./recovery-panel";
-import { PendingScenePanel } from "./pending-scene-panel";
 import { rebindProtectedPaste } from "./paste";
-import { createNodeCarrierLink, getNodeKey } from "./scene";
+import {
+  getNodeKey,
+  getWorkMapFileMetadata,
+  isGenerationConflict,
+  isSceneSerializationCancelled,
+  isTransientPersistenceFailure,
+  normalizeNodeCarrier,
+  type TSceneAuthority,
+  type TWorkMapRuntimeFile,
+} from "./scene";
 import { getSourcePath } from "./source-navigation";
 import { getCurrentInvalidatedNodeKeys } from "./source-invalidation";
 import { useCollaboration } from "./use-collaboration";
 import { isEmbeddableLinkAllowed } from "./embeddable-load";
 import { useEmbeddableLoading } from "./use-embeddable-loading";
 import { usePersistence } from "./use-persistence";
-import type { TRecoveryState } from "./use-persistence";
+import type { TPersistenceStatus, TRecoveryEntry } from "./use-persistence";
 import { useScene } from "./use-scene";
+import { useWorkMapToolbarItems, WORK_MAP_TOOL_SHORTCUTS } from "./toolbar";
+import { useTheme } from "next-themes";
 
 const service = new WorkMapService();
 
-type WorkMapPasteData = Parameters<NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>>[0];
-
-const useWorkMapPaste = (
-  api: ExcalidrawImperativeAPI | null,
-  workspaceSlug: string,
-  projectId: string,
-  workMapId: string,
-  generationRef: { current: number }
-) =>
-  useCallback(
-    async (data: WorkMapPasteData) => {
-      try {
-        return rebindProtectedPaste(data, api?.getSceneElementsIncludingDeleted() ?? [], async (sourceNodeKeys) => {
-          const result = await service.rebindPaste(
-            workspaceSlug,
-            projectId,
-            workMapId,
-            generationRef.current,
-            sourceNodeKeys
-          );
-          return result.node_keys;
-        });
-      } catch {
-        return false;
-      }
-    },
-    [api, generationRef, projectId, workMapId, workspaceSlug]
-  );
+const EXCALIDRAW_LOCALE_CODES: Record<TLanguage, NonNullable<ComponentProps<typeof Excalidraw>["langCode"]>> = {
+  en: "en",
+  fr: "fr-FR",
+  es: "es-ES",
+  ja: "ja-JP",
+  "zh-CN": "zh-CN",
+  "zh-TW": "zh-TW",
+  ru: "ru-RU",
+  it: "it-IT",
+  cs: "cs-CZ",
+  sk: "sk-SK",
+  de: "de-DE",
+  ua: "uk-UA",
+  pl: "pl-PL",
+  ko: "ko-KR",
+  "pt-BR": "pt-BR",
+  id: "id-ID",
+  ro: "ro-RO",
+  "tr-TR": "tr-TR",
+  "vi-VN": "vi-VN",
+};
 
 type Props = {
   workspaceSlug: string;
@@ -92,16 +107,44 @@ export function WorkMapEditor({ workspaceSlug, projectId, workMap }: Props) {
 
 type EditorContentProps = Props & { userId: string };
 
-function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: EditorContentProps) {
+const WorkMapEditorContent = observer(function WorkMapEditorContent({
+  workspaceSlug,
+  projectId,
+  workMap,
+  userId,
+}: EditorContentProps) {
   const router = useAppRouter();
+  const { resolvedTheme } = useTheme();
+  const { data: userProfile } = useUserProfile();
+  const isDarkTheme =
+    resolvedTheme === "custom"
+      ? Boolean(userProfile?.theme?.darkPalette)
+      : resolveGeneralTheme(resolvedTheme) === "dark";
+  const { currentLocale } = useTranslation();
   const store = useWorkMap();
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSourceKind, setPickerSourceKind] = useState<TWorkMapSourceKind | null>(null);
+  const [workItemAction, setWorkItemAction] = useState<WorkMapWorkItemAction>("existing");
+  const [pendingSources, setPendingSources] = useState<WorkMapPlacementSource[]>([]);
+  const pendingSource = pendingSources[0] ?? null;
+  useEffect(() => {
+    if (!pendingSource) api?.setActiveTool({ type: "selection" });
+  }, [api, pendingSource]);
+  const [placementPointer, setPlacementPointer] = useState<{ x: number; y: number; zoom: number } | null>(null);
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(null);
+  const lastKnownPermissionRef = useRef(false);
   const [pendingScene, setPendingScene] = useState<{
     elements: readonly OrderedExcalidrawElement[];
     files: BinaryFiles;
+    authority: TSceneAuthority;
+    blocking: boolean;
   } | null>(null);
   const changeSequenceRef = useRef(0);
+  const serializationPendingRef = useRef(false);
+  const placingSourceRef = useRef(false);
+  const selectedNodeKeyRef = useRef<string | null>(null);
+  const pointerDownNodeKeyRef = useRef<string | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const context = useMemo(
     () => ({ workspaceSlug, projectId, workMapId: workMap.id }),
     [projectId, workMap.id, workspaceSlug]
@@ -114,13 +157,16 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
     elementCount,
     liveNodeCount,
     generationRef,
+    collaborationEpochRef,
     durableSceneRef,
     observeElements,
     isProgrammaticChange,
+    registerPastedFiles,
     serializeScene,
+    uploadsInProgress,
+    cancelUploads,
     applyAuthoritativeScene,
     applyRemoteScene,
-    applyStoredScene,
   } = scene;
   const nodeKeysRef = useRef(nodeKeys);
   useEffect(() => {
@@ -129,16 +175,35 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
   const persistenceSceneOwners = useMemo(
     () => ({
       generationRef,
+      collaborationEpochRef,
       durableSceneRef,
+      hasPendingSerialization: () => serializationPendingRef.current,
       getAppState: () => api?.getAppState(),
-      applyStoredScene,
+      applyRemoteScene,
       applyAuthoritativeScene,
     }),
-    [api, applyAuthoritativeScene, applyStoredScene, durableSceneRef, generationRef]
+    [
+      api,
+      applyAuthoritativeScene,
+      applyRemoteScene,
+      collaborationEpochRef,
+      durableSceneRef,
+      generationRef,
+      serializationPendingRef,
+    ]
   );
   const persistence = usePersistence({ ...context, userId }, persistenceSceneOwners);
-  const { persistenceFailed, recoveryRecord, recoveryState, queue, evaluateRecovery, retryRecovery, discardRecovery } =
-    persistence;
+  const {
+    persistenceFailed,
+    recoveryStorageFailed,
+    recoveryEntries,
+    queue,
+    evaluateRecovery,
+    discardRecovery,
+    retryRecoveryStorage,
+    hasPendingDraft,
+    resumePendingDraft,
+  } = persistence;
   const resynchronize = useCallback(async () => {
     const authoritative = await service.fetchScene(workspaceSlug, projectId, workMap.id);
     await applyAuthoritativeScene(authoritative);
@@ -171,22 +236,39 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
     () => ({
       generationRef,
       resynchronize,
+      hasPendingDraft,
+      resumePendingDraft,
       applyRemoteScene,
       invalidateSources,
       failCloseSources,
     }),
-    [applyRemoteScene, failCloseSources, generationRef, invalidateSources, resynchronize]
+    [
+      applyRemoteScene,
+      failCloseSources,
+      generationRef,
+      hasPendingDraft,
+      invalidateSources,
+      resynchronize,
+      resumePendingDraft,
+    ]
   );
+  const documentEditable = !workMap.is_locked && !workMap.archived_at;
   const onAuthorized = useCallback(
-    (authorizedEditable: boolean) => evaluateRecovery(authorizedEditable && !workMap.is_locked && !workMap.archived_at),
-    [evaluateRecovery, workMap.archived_at, workMap.is_locked]
+    (authorizedEditable: boolean) => {
+      const canEdit = authorizedEditable && documentEditable;
+      lastKnownPermissionRef.current = canEdit;
+      if (!canEdit) cancelUploads();
+      evaluateRecovery(canEdit);
+    },
+    [cancelUploads, documentEditable, evaluateRecovery]
   );
   const collaboration = useCollaboration(
     !!api && !!initialData && !!userId,
     context,
     collaborationSceneOwners,
     onAuthorized,
-    api
+    api,
+    userId
   );
   const {
     connectionState,
@@ -199,15 +281,106 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
     selectionSenderIds,
   } = collaboration;
 
-  const documentEditable = !workMap.is_locked && !workMap.archived_at;
-  const authorizedEditable = documentEditable && relayEditable && connectionState === "connected";
-  const editable = authorizedEditable && !persistenceFailed && !pendingScene;
-  const { shouldLoadEmbeddable, onEmbeddableLoadRequest } = useEmbeddableLoading(api, editable, workMap.id);
+  const broadcastReady = connectionState === "connected" && relayEditable;
+  const canvasEditable =
+    documentEditable && lastKnownPermissionRef.current && !persistenceFailed && !(pendingScene?.blocking ?? false);
+  const serverMutationAllowed = canvasEditable && broadcastReady;
+  const { shouldLoadEmbeddable, onEmbeddableLoadRequest } = useEmbeddableLoading(api, canvasEditable);
 
-  const onPaste = useWorkMapPaste(api, workspaceSlug, projectId, workMap.id, generationRef);
+  const selectSourceKind = useCallback(
+    (sourceKind: TWorkMapSourceKind) => {
+      if (!serverMutationAllowed) return;
+      returnFocusRef.current =
+        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+          ? document.activeElement
+          : null;
+      api?.setActiveTool({ type: "selection" });
+      setPendingSources([]);
+      setPickerSourceKind(sourceKind);
+    },
+    [api, serverMutationAllowed]
+  );
+  const selectWorkItemAction = useCallback(
+    (action: WorkMapWorkItemAction) => {
+      setWorkItemAction(action);
+      selectSourceKind("work-item");
+    },
+    [selectSourceKind]
+  );
+  const returnFocus = useCallback(() => {
+    queueMicrotask(() => returnFocusRef.current?.focus());
+  }, []);
+  const closeSourcePicker = useCallback(() => {
+    setPickerSourceKind(null);
+    returnFocus();
+  }, [returnFocus]);
+  const cancelSourceTool = useCallback(() => {
+    setPickerSourceKind(null);
+    setPendingSources([]);
+    setPlacementPointer(null);
+    api?.setActiveTool({ type: "selection" });
+    returnFocus();
+  }, [api, returnFocus]);
+  const langCode = EXCALIDRAW_LOCALE_CODES[currentLocale];
+
+  const onPaste = useCallback(
+    async (data: Parameters<NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>>[0]) => {
+      const hasUnownedFiles = Object.values(data.files ?? {}).some(
+        (file) => !getWorkMapFileMetadata(file as TWorkMapRuntimeFile)
+      );
+      if (!serverMutationAllowed && hasUnownedFiles) return false;
+      try {
+        const rebound = await rebindProtectedPaste(
+          data,
+          api?.getSceneElementsIncludingDeleted() ?? [],
+          (sourceNodeKeys, sourceFiles) => {
+            if (!serverMutationAllowed) throw new Error("Work map paste rebinding is unavailable offline");
+            return service.rebindPaste(
+              workspaceSlug,
+              projectId,
+              workMap.id,
+              generationRef.current,
+              sourceNodeKeys,
+              Object.entries(sourceFiles).map(([fileId, file]) => ({ file_id: fileId, asset_id: file.assetId }))
+            );
+          },
+          api?.getFiles() ?? {}
+        );
+        if (rebound !== false && rebound.files) {
+          registerPastedFiles(
+            Object.fromEntries(
+              Object.entries(rebound.files).flatMap(([fileId, file]) => {
+                const metadata = getWorkMapFileMetadata(file as TWorkMapRuntimeFile);
+                return metadata ? [[fileId, metadata]] : [];
+              })
+            )
+          );
+        }
+        return rebound;
+      } catch {
+        return false;
+      }
+    },
+    [api, generationRef, projectId, registerPastedFiles, serverMutationAllowed, workMap.id, workspaceSlug]
+  );
+
+  const handlePointerUpdate = useCallback(
+    (payload: Parameters<NonNullable<ComponentProps<typeof Excalidraw>["onPointerUpdate"]>>[0]) => {
+      onPointerUpdate(payload);
+      if (!pendingSource || !api) return;
+      const appState = api.getAppState();
+      const viewport = sceneCoordsToViewportCoords({ sceneX: payload.pointer.x, sceneY: payload.pointer.y }, appState);
+      setPlacementPointer({
+        x: viewport.x - appState.offsetLeft,
+        y: viewport.y - appState.offsetTop,
+        zoom: appState.zoom.value,
+      });
+    },
+    [api, onPointerUpdate, pendingSource]
+  );
 
   useEffect(() => {
-    void hydrate();
+    void hydrate(nodeKeys);
     const onFocus = () => void hydrate();
     const onOnline = () => void hydrate();
     window.addEventListener("focus", onFocus);
@@ -216,36 +389,83 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
     };
-  }, [connectionState, hydrate]);
+  }, [connectionState, hydrate, nodeKeys]);
 
   const onChange = useCallback(
-    (elements: readonly OrderedExcalidrawElement[], _appState: AppState, files: BinaryFiles) => {
+    (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
       observeElements(elements);
-      if (!editable || isProgrammaticChange(elements)) return;
+      const selectedIds = Object.keys(appState.selectedElementIds);
+      const selectedElement =
+        selectedIds.length === 1 ? elements.find((element) => element.id === selectedIds[0]) : undefined;
+      const nextSelectedNodeKey =
+        selectedElement && !selectedElement.isDeleted ? (getNodeKey(selectedElement) ?? null) : null;
+      selectedNodeKeyRef.current = nextSelectedNodeKey;
+      setSelectedNodeKey((current) => (current === nextSelectedNodeKey ? current : nextSelectedNodeKey));
+      if (!canvasEditable || isProgrammaticChange(elements)) return;
       const sequence = ++changeSequenceRef.current;
+      const authority: TSceneAuthority = {
+        generation: generationRef.current,
+        collaboration_epoch: collaborationEpochRef.current,
+      };
+      serializationPendingRef.current = true;
       void serializeScene(elements, files)
         .then((sceneBinary) => {
-          if (sequence !== changeSequenceRef.current || sceneBinary === durableSceneRef.current) return undefined;
-          sendScene(sceneBinary);
-          queue(sceneBinary);
+          if (sequence !== changeSequenceRef.current) return undefined;
+          if (sceneBinary === durableSceneRef.current) {
+            setPendingScene(null);
+            return undefined;
+          }
+          const outcome = queue(sceneBinary, authority);
+          if (outcome === "queued") sendScene(sceneBinary);
+          if (outcome === "blocked") setPendingScene({ elements, files, authority, blocking: true });
+          else setPendingScene(null);
           return undefined;
         })
-        .catch(() => setPendingScene({ elements, files }));
+        .catch((error) => {
+          if (sequence === changeSequenceRef.current && !isSceneSerializationCancelled(error))
+            setPendingScene({ elements, files, authority, blocking: !isTransientPersistenceFailure(error) });
+        })
+        .finally(() => {
+          if (sequence === changeSequenceRef.current) serializationPendingRef.current = false;
+        });
     },
-    [durableSceneRef, editable, isProgrammaticChange, observeElements, queue, sendScene, serializeScene]
+    [
+      collaborationEpochRef,
+      durableSceneRef,
+      canvasEditable,
+      generationRef,
+      isProgrammaticChange,
+      observeElements,
+      queue,
+      sendScene,
+      serializeScene,
+    ]
   );
 
   const retryPendingScene = useCallback(async () => {
-    if (!pendingScene || !authorizedEditable) return;
+    if (!pendingScene || !broadcastReady) return;
+    const sequence = changeSequenceRef.current;
     try {
       const sceneBinary = await serializeScene(pendingScene.elements, pendingScene.files);
-      sendScene(sceneBinary);
-      queue(sceneBinary);
-      setPendingScene(null);
-    } catch {
-      // Keep the exact in-memory update frozen and available for another explicit retry.
+      if (sequence !== changeSequenceRef.current) return;
+      const outcome = queue(sceneBinary, pendingScene.authority);
+      if (outcome === "blocked") {
+        setPendingScene((current) =>
+          current === pendingScene && !current.blocking ? { ...current, blocking: true } : current
+        );
+        return;
+      }
+      if (outcome === "queued") sendScene(sceneBinary);
+      setPendingScene((current) => (current === pendingScene ? null : current));
+    } catch (error) {
+      setPendingScene((current) => {
+        if (current !== pendingScene) return current;
+        if (isSceneSerializationCancelled(error)) return current;
+        const blocking = !isTransientPersistenceFailure(error);
+        return current.blocking === blocking ? current : { ...current, blocking };
+      });
     }
-  }, [authorizedEditable, pendingScene, queue, sendScene, serializeScene]);
+  }, [broadcastReady, pendingScene, queue, sendScene, serializeScene]);
 
   const discardPendingScene = useCallback(async () => {
     try {
@@ -257,16 +477,33 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
   }, [resynchronize]);
 
   useEffect(() => {
-    if (!api || !editable) return;
+    if (!api || !canvasEditable) return;
     const interval = window.setInterval(() => {
       const elements = api.getSceneElementsIncludingDeleted();
       const files = api.getFiles();
+      const sequence = ++changeSequenceRef.current;
+      const authority: TSceneAuthority = {
+        generation: generationRef.current,
+        collaboration_epoch: collaborationEpochRef.current,
+      };
+      serializationPendingRef.current = true;
       void serializeScene(elements, files)
-        .then(sendScene)
-        .catch(() => setPendingScene({ elements, files }));
+        .then((sceneBinary) => {
+          if (sequence !== changeSequenceRef.current) return undefined;
+          if (authority.collaboration_epoch === collaborationEpochRef.current) sendScene(sceneBinary);
+          return undefined;
+        })
+        .catch((error) => {
+          if (sequence === changeSequenceRef.current)
+            if (!isSceneSerializationCancelled(error))
+              setPendingScene({ elements, files, authority, blocking: !isTransientPersistenceFailure(error) });
+        })
+        .finally(() => {
+          if (sequence === changeSequenceRef.current) serializationPendingRef.current = false;
+        });
     }, 20_000);
     return () => window.clearInterval(interval);
-  }, [api, editable, sendScene, serializeScene]);
+  }, [api, canvasEditable, collaborationEpochRef, generationRef, sendScene, serializeScene]);
 
   const openSource = useCallback(
     async (nodeKey: string) => {
@@ -284,45 +521,119 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
     [hydrate, projectId, router, workMap.id, workspaceSlug]
   );
 
-  const renderEmbeddable = useCallback(
-    (element: ExcalidrawEmbeddableElement) => {
-      const nodeKey = getNodeKey(element);
-      if (!nodeKey) return null;
-      return <WorkMapSourceNode nodeKey={nodeKey} onOpen={() => void openSource(nodeKey)} />;
-    },
-    [openSource]
-  );
+  const openSelectedSource = useCallback(() => {
+    const nodeKey = selectedNodeKeyRef.current;
+    if (nodeKey) void openSource(nodeKey);
+  }, [openSource]);
 
-  const addSource = useCallback(
-    async (source: TWorkMapSource) => {
-      if (!api || !editable) return;
+  const hostToolbarItems = useWorkMapToolbarItems({
+    editable: serverMutationAllowed,
+    sourceKind: pickerSourceKind ?? pendingSource?.source_kind ?? null,
+    selectedNodeKey,
+    onSelectSourceKind: selectSourceKind,
+    onSelectWorkItemAction: selectWorkItemAction,
+    onOpenSelectedSource: openSelectedSource,
+    onCancelSourceTool: cancelSourceTool,
+  });
+
+  const renderHostElement = useCallback<NonNullable<ComponentProps<typeof Excalidraw>["renderHostElement"]>>(
+    (element) => {
+      const nodeKey = getNodeKey(element);
+      return nodeKey ? <WorkMapSourceNode nodeKey={nodeKey} /> : null;
+    },
+    []
+  );
+  const renderCollaboratorAvatar = useCallback<
+    NonNullable<ComponentProps<typeof Excalidraw>["renderCollaboratorAvatar"]>
+  >(({ name, src, size }) => <Avatar name={name} src={src} size={size} shape="circle" showTooltip={false} />, []);
+
+  const placeSource = useCallback(
+    async (source: WorkMapPlacementSource, origin: PointerDownState["origin"]) => {
+      if (!api || !serverMutationAllowed || placingSourceRef.current) return;
+      placingSourceRef.current = true;
       try {
-        const binding = await service.bindSource(workspaceSlug, projectId, workMap.id, source);
+        const placementId = crypto.randomUUID();
+        let binding: Awaited<ReturnType<typeof service.bindSource>> | undefined;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            binding = await service.bindSource(
+              workspaceSlug,
+              projectId,
+              workMap.id,
+              generationRef.current,
+              placementId,
+              source
+            );
+            break;
+          } catch (error) {
+            if (!isGenerationConflict(error) || attempt === 2) throw error;
+            const responseGeneration =
+              error && typeof error === "object" && "response" in error
+                ? (error.response as { data?: { generation?: unknown } } | undefined)?.data?.generation
+                : undefined;
+            if (typeof responseGeneration !== "number" || !Number.isInteger(responseGeneration)) throw error;
+            generationRef.current = responseGeneration;
+          }
+        }
+        if (!binding) return;
         const [base] = convertToExcalidrawElements([
-          { type: "rectangle", x: 120, y: 120, width: 288, height: 132, backgroundColor: "transparent" },
+          {
+            type: "rectangle",
+            x: origin.x - 144,
+            y: origin.y - 66,
+            width: 288,
+            height: 132,
+            backgroundColor: "transparent",
+          },
         ]);
-        const carrier = {
+        const carrier = normalizeNodeCarrier({
           ...base,
-          type: "embeddable",
-          link: createNodeCarrierLink(binding.node_key),
           customData: { nodeKey: binding.node_key },
-        } as ExcalidrawEmbeddableElement;
+        });
         api.updateScene({
           elements: [...api.getSceneElements(), carrier],
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         });
-        setPickerOpen(false);
+        setPendingSources((current) => (current[0] === source ? current.slice(1) : current));
+        setPlacementPointer(null);
         await hydrate([binding.node_key]);
       } catch {
         // Binding creation is authoritative; a failed request must not insert an unbound carrier.
+      } finally {
+        placingSourceRef.current = false;
       }
     },
-    [api, editable, hydrate, projectId, workMap.id, workspaceSlug]
+    [api, generationRef, hydrate, projectId, serverMutationAllowed, workMap.id, workspaceSlug]
   );
+
+  const beginSourcePlacement = useCallback(
+    (sources: WorkMapPlacementSource[]) => {
+      if (!api || !serverMutationAllowed || sources.length === 0) return;
+      setPickerSourceKind(null);
+      setPendingSources(sources);
+    },
+    [api, serverMutationAllowed]
+  );
+
+  const onPointerDown = useCallback(
+    (activeTool: AppState["activeTool"], pointerDownState: PointerDownState) => {
+      pointerDownNodeKeyRef.current = pointerDownState.hit.element
+        ? (getNodeKey(pointerDownState.hit.element) ?? null)
+        : null;
+      if (activeTool.type !== "custom" || activeTool.customType !== "work-map-source" || !pendingSource) return;
+      void placeSource(pendingSource, pointerDownState.origin);
+    },
+    [pendingSource, placeSource]
+  );
+
+  const onDoubleClick = useCallback(() => {
+    const nodeKey = pointerDownNodeKeyRef.current;
+    if (nodeKey) void openSource(nodeKey);
+  }, [openSource]);
 
   const initialScene = useMemo(() => (initialData ? Promise.resolve(initialData) : undefined), [initialData]);
   const connectionDataState =
-    persistenceFailed || pendingScene
+    persistenceFailed || pendingScene?.blocking
       ? "persistence-failed"
       : !documentEditable || (connectionState === "connected" && !relayEditable)
         ? "read-only"
@@ -333,14 +644,14 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
   if (initialLoadFailed)
     return (
       <div className="grid size-full place-items-center gap-2 text-13 text-danger-primary">
-        <p>Work Map could not load. Check your connection and retry.</p>
+        <p>Work map could not load. Check your connection and retry.</p>
         <button type="button" className="rounded border border-subtle px-3 py-1.5" onClick={scene.retryInitialLoad}>
           Retry
         </button>
       </div>
     );
-  if (!initialScene)
-    return <div className="grid size-full place-items-center text-13 text-secondary">Loading Work Map…</div>;
+  if (!initialScene || !initialData)
+    return <div className="grid size-full place-items-center text-13 text-secondary">Loading Work map…</div>;
 
   return (
     <WorkMapEditorSurface
@@ -348,71 +659,97 @@ function WorkMapEditorContent({ workspaceSlug, projectId, workMap, userId }: Edi
       projectId={projectId}
       workMapId={workMap.id}
       initialScene={initialScene}
-      editable={editable}
+      initialElements={initialData.elements}
+      editable={canvasEditable}
+      serverMutationAllowed={serverMutationAllowed}
       connectionState={connectionState}
       connectionDataState={connectionDataState}
-      pickerOpen={pickerOpen}
-      recoveryRecord={!!recoveryRecord}
-      recoveryState={recoveryState}
-      pendingScene={!!pendingScene}
+      persistenceStatus={persistence.persistenceStatus}
+      pickerSourceKind={pickerSourceKind}
+      workItemAction={workItemAction}
+      recoveryEntries={recoveryEntries}
+      recoveryStorageFailed={recoveryStorageFailed}
+      pendingScene={Boolean(pendingScene)}
       elementCount={elementCount}
       liveNodeCount={liveNodeCount}
+      uploadsInProgress={uploadsInProgress}
       collaboratorCount={collaboratorCount}
       collaboratorIds={collaboratorIds}
       pointerSenderIds={pointerSenderIds}
       selectionSenderIds={selectionSenderIds}
-      onTogglePicker={() => setPickerOpen((open) => !open)}
-      onAddEmbed={() => api?.setActiveTool({ type: "embeddable" })}
-      onRetryRecovery={() => void retryRecovery(authorizedEditable)}
-      onDiscardRecovery={discardRecovery}
-      onRetryPending={() => void retryPendingScene()}
-      onDiscardPending={() => void discardPendingScene()}
-      onSelectSource={(source) => void addSource(source)}
-      onClosePicker={() => setPickerOpen(false)}
+      onDiscardRecovery={(writerId) => void discardRecovery(writerId)}
+      onRetryRecoveryStorage={retryRecoveryStorage}
+      onRetryPendingScene={() => void retryPendingScene()}
+      onDiscardPendingScene={() => void discardPendingScene()}
+      onSelectSource={(source) => beginSourcePlacement([source])}
+      onSelectWorkItems={beginSourcePlacement}
+      onClosePicker={closeSourcePicker}
       onExcalidrawAPI={setApi}
       onChange={onChange}
-      onPointerUpdate={onPointerUpdate}
+      onPointerUpdate={handlePointerUpdate}
+      placementPointer={placementPointer}
+      pendingSourceName={pendingSource?.name ?? null}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
       onPaste={onPaste}
-      renderEmbeddable={renderEmbeddable}
+      renderHostElement={renderHostElement}
+      renderCollaboratorAvatar={renderCollaboratorAvatar}
       shouldLoadEmbeddable={shouldLoadEmbeddable}
       onEmbeddableLoadRequest={onEmbeddableLoadRequest}
+      hostToolbarItems={hostToolbarItems}
+      toolShortcutOverrides={WORK_MAP_TOOL_SHORTCUTS}
+      langCode={langCode}
+      theme={isDarkTheme ? "dark" : "light"}
     />
   );
-}
+});
 
 type EditorSurfaceProps = {
   workspaceSlug: string;
   projectId: string;
   workMapId: string;
   initialScene: Promise<{ elements: readonly ExcalidrawElement[]; files: BinaryFiles }>;
+  initialElements: readonly ExcalidrawElement[];
   editable: boolean;
+  serverMutationAllowed: boolean;
   connectionState: string;
   connectionDataState: string;
-  pickerOpen: boolean;
-  recoveryRecord: boolean;
-  recoveryState: TRecoveryState | null;
+  persistenceStatus: TPersistenceStatus;
+  pickerSourceKind: TWorkMapSourceKind | null;
+  workItemAction: WorkMapWorkItemAction;
+  recoveryEntries: readonly TRecoveryEntry[];
+  recoveryStorageFailed: boolean;
   pendingScene: boolean;
   elementCount: number;
   liveNodeCount: number;
+  uploadsInProgress: boolean;
   collaboratorCount: number;
   collaboratorIds: string;
   pointerSenderIds: string;
   selectionSenderIds: string;
-  onTogglePicker: () => void;
-  onAddEmbed: () => void;
-  onRetryRecovery: () => void;
-  onDiscardRecovery: () => void;
-  onRetryPending: () => void;
-  onDiscardPending: () => void;
+  onDiscardRecovery: (writerId: string) => void;
+  onRetryRecoveryStorage: () => void;
+  onRetryPendingScene: () => void;
+  onDiscardPendingScene: () => void;
   onSelectSource: (source: TWorkMapSource) => void;
+  onSelectWorkItems: (sources: WorkMapPlacementSource[]) => void;
   onClosePicker: () => void;
-  onExcalidrawAPI: NonNullable<ComponentProps<typeof Excalidraw>["onExcalidrawAPI"]>;
+  onExcalidrawAPI: (api: ExcalidrawImperativeAPI | null) => void;
   onChange: NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
   onPointerUpdate: NonNullable<ComponentProps<typeof Excalidraw>["onPointerUpdate"]>;
+  onDoubleClick: MouseEventHandler<HTMLDivElement>;
+  placementPointer: { x: number; y: number; zoom: number } | null;
+  pendingSourceName: string | null;
+  onPointerDown: NonNullable<ComponentProps<typeof Excalidraw>["onPointerDown"]>;
   onPaste: NonNullable<ComponentProps<typeof Excalidraw>["onPaste"]>;
-  renderEmbeddable: NonNullable<ComponentProps<typeof Excalidraw>["renderEmbeddable"]>;
+  renderHostElement: NonNullable<ComponentProps<typeof Excalidraw>["renderHostElement"]>;
+  renderCollaboratorAvatar: NonNullable<ComponentProps<typeof Excalidraw>["renderCollaboratorAvatar"]>;
   shouldLoadEmbeddable: NonNullable<ComponentProps<typeof Excalidraw>["shouldLoadEmbeddable"]>;
   onEmbeddableLoadRequest: NonNullable<ComponentProps<typeof Excalidraw>["onEmbeddableLoadRequest"]>;
+  hostToolbarItems: NonNullable<ComponentProps<typeof Excalidraw>["hostToolbarItems"]>;
+  toolShortcutOverrides: NonNullable<ComponentProps<typeof Excalidraw>["toolShortcutOverrides"]>;
+  langCode: NonNullable<ComponentProps<typeof Excalidraw>["langCode"]>;
+  theme: "light" | "dark";
 };
 
 function WorkMapEditorSurface({
@@ -420,35 +757,57 @@ function WorkMapEditorSurface({
   projectId,
   workMapId,
   initialScene,
+  initialElements,
   editable,
+  serverMutationAllowed,
   connectionState,
   connectionDataState,
-  pickerOpen,
-  recoveryRecord,
-  recoveryState,
+  persistenceStatus,
+  pickerSourceKind,
+  workItemAction,
+  recoveryEntries,
+  recoveryStorageFailed,
   pendingScene,
   elementCount,
   liveNodeCount,
+  uploadsInProgress,
   collaboratorCount,
   collaboratorIds,
   pointerSenderIds,
   selectionSenderIds,
-  onTogglePicker,
-  onAddEmbed,
-  onRetryRecovery,
   onDiscardRecovery,
-  onRetryPending,
-  onDiscardPending,
+  onRetryRecoveryStorage,
+  onRetryPendingScene,
+  onDiscardPendingScene,
   onSelectSource,
+  onSelectWorkItems,
   onClosePicker,
   onExcalidrawAPI,
   onChange,
   onPointerUpdate,
+  onDoubleClick,
+  placementPointer,
+  pendingSourceName,
+  onPointerDown,
   onPaste,
-  renderEmbeddable,
+  renderHostElement,
+  renderCollaboratorAvatar,
   shouldLoadEmbeddable,
   onEmbeddableLoadRequest,
+  hostToolbarItems,
+  toolShortcutOverrides,
+  langCode,
+  theme,
 }: EditorSurfaceProps) {
+  const { t } = useTranslation();
+  const hasRecoveryAction = pendingScene || recoveryStorageFailed || recoveryEntries.length > 0;
+  const updateStatus = hasRecoveryAction
+    ? null
+    : uploadsInProgress || persistenceStatus === "pending" || persistenceStatus === "saving"
+      ? "saving"
+      : persistenceStatus === "error"
+        ? "error"
+        : "saved";
   return (
     <div
       data-testid="work-map-canvas"
@@ -456,41 +815,7 @@ function WorkMapEditorSurface({
       data-live-node-count={liveNodeCount}
       className="relative size-full overflow-hidden bg-surface-1"
     >
-      <div className="absolute top-3 left-3 z-10 flex gap-2">
-        <button
-          type="button"
-          data-testid="work-map-add-source"
-          disabled={!editable}
-          className="rounded-md bg-accent-primary px-3 py-2 text-12 font-medium text-on-color disabled:opacity-50"
-          onClick={onTogglePicker}
-        >
-          Add Plane source
-        </button>
-        <button
-          type="button"
-          data-testid="work-map-add-embed"
-          disabled={!editable}
-          className="rounded-md border border-subtle bg-surface-1 px-3 py-2 text-12 font-medium disabled:opacity-50"
-          onClick={onAddEmbed}
-        >
-          Add URL embed
-        </button>
-        <span
-          data-testid="work-map-connection-state"
-          data-state={connectionDataState}
-          className="rounded-md bg-surface-1 px-3 py-2 text-12 text-secondary"
-        >
-          {connectionDataState.replace("-", " ")}
-        </span>
-        {connectionDataState === "read-only" && (
-          <span
-            data-testid="work-map-read-only"
-            className="rounded-md bg-warning-subtle px-3 py-2 text-12 text-warning-primary"
-          >
-            Read only
-          </span>
-        )}
-      </div>
+      <span data-testid="work-map-connection-state" data-state={connectionDataState} aria-hidden="true" />
       <span
         data-testid="work-map-collaboration"
         data-state={collaboratorCount > 0 ? "active" : "empty"}
@@ -500,33 +825,94 @@ function WorkMapEditorSurface({
         data-selection-sender-ids={selectionSenderIds}
         className="sr-only"
       />
-      {recoveryRecord && recoveryState && (
-        <RecoveryPanel state={recoveryState} onRetry={onRetryRecovery} onDiscard={onDiscardRecovery} />
+      {placementPointer && pendingSourceName && (
+        <div
+          data-testid="work-map-placement-ghost"
+          aria-hidden="true"
+          className="border-accent-primary pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-dashed bg-accent-primary/10"
+          style={{
+            left: placementPointer.x,
+            top: placementPointer.y,
+            width: 288 * placementPointer.zoom,
+            height: 132 * placementPointer.zoom,
+          }}
+        >
+          <span className="sr-only">{pendingSourceName}</span>
+        </div>
       )}
-      {pendingScene && <PendingScenePanel onRetry={onRetryPending} onDiscard={onDiscardPending} />}
-      {pickerOpen && (
-        <WorkMapSourcePicker
+      <RecoveryPanel
+        entries={recoveryEntries}
+        onDiscard={onDiscardRecovery}
+        pendingScene={pendingScene}
+        onRetryPendingScene={onRetryPendingScene}
+        onDiscardPendingScene={onDiscardPendingScene}
+        storageFailed={recoveryStorageFailed}
+        onRetryStorage={onRetryRecoveryStorage}
+      />
+      {serverMutationAllowed && pickerSourceKind === "work-item" && (
+        <WorkMapWorkItemPicker
           workspaceSlug={workspaceSlug}
           projectId={projectId}
           workMapId={workMapId}
+          action={workItemAction}
+          onSelect={onSelectWorkItems}
+          onClose={onClosePicker}
+        />
+      )}
+      {serverMutationAllowed && pickerSourceKind && pickerSourceKind !== "work-item" && (
+        <WorkMapSourcePicker
+          key={pickerSourceKind}
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          workMapId={workMapId}
+          initialSourceKind={pickerSourceKind}
           onSelect={onSelectSource}
           onClose={onClosePicker}
         />
       )}
-      <div data-testid="work-map-embed" className="size-full">
+      <div data-testid="work-map-embed" className="work-map-editor size-full" onDoubleClick={onDoubleClick}>
         <Excalidraw
+          renderHostElement={renderHostElement}
+          renderCollaboratorAvatar={renderCollaboratorAvatar}
           onExcalidrawAPI={onExcalidrawAPI}
           initialData={initialScene}
+          initialState={{ viewport: { target: initialElements, fit: "scale-down", offsets: { ui: true } } }}
           onChange={onChange}
           onPointerUpdate={onPointerUpdate}
+          onPointerDown={onPointerDown}
           onPaste={onPaste}
           isCollaborating={connectionState === "connected"}
-          renderEmbeddable={renderEmbeddable}
           shouldLoadEmbeddable={shouldLoadEmbeddable}
           onEmbeddableLoadRequest={onEmbeddableLoadRequest}
           validateEmbeddable={isEmbeddableLinkAllowed}
           viewModeEnabled={!editable}
-          UIOptions={{ canvasActions: { export: false, loadScene: false, saveToActiveFile: false } }}
+          activeTool={
+            editable && pendingSourceName !== null ? { type: "custom", customType: "work-map-source" } : undefined
+          }
+          hostToolbarItems={hostToolbarItems}
+          toolShortcutOverrides={toolShortcutOverrides}
+          langCode={langCode}
+          viewportStatusFrame={
+            updateStatus
+              ? {
+                  border: false,
+                  label: {
+                    background: "transparent",
+                    label: (
+                      <UpdateStatus status={updateStatus} errorLabel={t("common.work_map.recovery.save_failed")} />
+                    ),
+                  },
+                }
+              : null
+          }
+          theme={theme}
+          aiEnabled={false}
+          UIOptions={{
+            tools: { image: serverMutationAllowed },
+            library: false,
+            canvasActions: { export: false, saveAsImage: false, loadScene: false, saveToActiveFile: false },
+            socialLinks: false,
+          }}
         />
       </div>
     </div>

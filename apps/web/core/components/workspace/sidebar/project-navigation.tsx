@@ -15,7 +15,7 @@ import {
   IntakeIcon,
   ModuleIcon,
   PageIcon,
-  TreeMapIcon,
+  WorkMapIcon,
   ViewsIcon,
   WorkItemsIcon,
 } from "@plane/propel/icons";
@@ -121,9 +121,9 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
       {
         i18n_key: "sidebar.work_maps",
         key: "work_maps",
-        name: "Work Maps",
+        name: "Work maps",
         href: `/${workspaceSlug}/projects/${projectId}/work-maps`,
-        icon: TreeMapIcon,
+        icon: WorkMapIcon,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: true,
         sortOrder: 5,

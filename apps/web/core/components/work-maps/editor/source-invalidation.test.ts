@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { getCurrentInvalidatedNodeKeys, parseSourceInvalidationFrame } from "./source-invalidation";
 
-describe("Work Map source invalidation boundary", () => {
+describe("Work map source invalidation boundary", () => {
   it("deduplicates the closed opaque-key frame", () => {
     expect(
       parseSourceInvalidationFrame({

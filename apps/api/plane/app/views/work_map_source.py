@@ -12,7 +12,8 @@ from plane.app.serializers import (
     WorkMapBindingOpenSerializer,
     WorkMapSourceDiscoverySerializer,
 )
-from plane.db.models import WorkMapBinding
+from plane.db.models import Issue, WorkMapBinding
+from plane.utils.issue_search import ISSUE_SEARCH_FIELDS
 
 from .base import BaseAPIView
 from .work_map.base import visible_work_maps
@@ -23,6 +24,7 @@ def _source_projection(source_kind, source, project):
         "source_kind": source_kind,
         "source_id": source.id,
         "project_id": project.id,
+        "project_name": project.name,
         "name": source.issue.name if source_kind == "intake-item" else source.name,
     }
     if source_kind == "work-item":
@@ -102,8 +104,12 @@ class WorkMapSourceDiscoveryEndpoint(BaseAPIView):
             workspace_id=document.workspace_id,
             source_kind=data["source_kind"],
             query=data["query"],
+            project_id=data.get("project_id"),
             limit=20,
         )
+        if data["result_format"] == "issue-search":
+            results = Issue.issue_objects.filter(id__in=[source.id for source, _ in sources]).order_by("name", "id")
+            return Response({"results": results.values(*ISSUE_SEARCH_FIELDS)}, status=status.HTTP_200_OK)
         return Response(
             {"results": [_source_projection(data["source_kind"], source, project) for source, project in sources]},
             status=status.HTTP_200_OK,

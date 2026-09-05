@@ -13,7 +13,7 @@ import {
   ModuleIcon,
   PageIcon,
   ProjectIcon,
-  TreeMapIcon,
+  WorkMapIcon,
   ViewsIcon,
 } from "@plane/propel/icons";
 import type { ISvgIcons } from "@plane/propel/icons";
@@ -25,8 +25,8 @@ const ICON_MAP: Record<string, React.FC<ISvgIcons> | LucideIcon> = {
   view: ViewsIcon,
   module: ModuleIcon,
   cycle: CycleIcon,
+  work_map: WorkMapIcon,
   folder: FavoriteFolderIcon,
-  work_map: TreeMapIcon,
 };
 
 type Props = {

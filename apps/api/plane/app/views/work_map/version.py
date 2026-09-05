@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import json
 import uuid
 
 from django.db import transaction
@@ -15,7 +16,6 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.work_map import can_read_work_map_source
 from plane.app.serializers import WorkMapVersionRestoreSerializer, WorkMapVersionSerializer
-from plane.app.work_map_relay import WorkMapRelayCloseReason, force_close_work_map_relay_on_commit
 from plane.db.models import (
     Document,
     DocumentVersion,
@@ -24,14 +24,15 @@ from plane.db.models import (
     WorkMapBinding,
     WorkMapVersion,
 )
+from plane.settings.redis import redis_instance
+from plane.utils.exception_logger import log_exception
+from plane.utils.work_map_scene import try_decode_work_map_scene
 
 from ..base import BaseAPIView
 from .base import visible_work_maps
 from .binding import validate_protected_binding_carriers
 from .scene import (
     LEGACY_SCENE_UPGRADE_ERROR,
-    decode_work_map_scene,
-    try_decode_work_map_scene,
     validate_work_map_scene_assets,
     work_map_has_semantic_state,
 )
@@ -76,7 +77,7 @@ class WorkMapVersionEndpoint(BaseAPIView):
                 return Response({"error": "Work map is not editable"}, status=status.HTTP_409_CONFLICT)
             work_map = WorkMap.objects.select_for_update().get(document=document)
             try:
-                scene = try_decode_work_map_scene(work_map.scene_binary, decoder=decode_work_map_scene)
+                scene = try_decode_work_map_scene(work_map.scene_binary)
             except ValueError:
                 return Response({"error": "Work map version cannot be created"}, status=status.HTTP_409_CONFLICT)
             if scene is None:
@@ -157,8 +158,8 @@ class WorkMapVersionRestoreEndpoint(BaseAPIView):
                 return Response({"error": "Work map version not found"}, status=status.HTTP_404_NOT_FOUND)
 
             try:
-                version_scene = try_decode_work_map_scene(version.scene_binary, decoder=decode_work_map_scene)
-                current_scene = try_decode_work_map_scene(work_map.scene_binary, decoder=decode_work_map_scene)
+                version_scene = try_decode_work_map_scene(version.scene_binary)
+                current_scene = try_decode_work_map_scene(work_map.scene_binary)
             except ValueError:
                 return Response({"error": "Work map version cannot be restored"}, status=status.HTTP_409_CONFLICT)
             if version_scene is None:
@@ -245,11 +246,26 @@ class WorkMapVersionRestoreEndpoint(BaseAPIView):
             work_map.save(update_fields=["scene_binary", "generation", "collaboration_epoch"])
             document.updated_by = request.user
             document.save(update_fields=["updated_by", "updated_at"])
-            force_close_work_map_relay_on_commit(
-                slug,
-                str(work_map.pk),
-                WorkMapRelayCloseReason.GENERATION_CHANGED,
-            )
+
+            def publish_restore_invalidation():
+                try:
+                    redis_instance().publish(
+                        "hocuspocus:admin",
+                        json.dumps(
+                            {
+                                "command": "force_close",
+                                "docId": str(work_map.pk),
+                                "reason": "admin_request",
+                                "code": 4000,
+                                "originServer": "plane-api",
+                                "timestamp": timezone.now().isoformat(),
+                            }
+                        ),
+                    )
+                except Exception as error:
+                    log_exception(error)
+
+            transaction.on_commit(publish_restore_invalidation, robust=True)
 
         return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
 

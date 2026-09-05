@@ -15,10 +15,11 @@ import {
   createPointerUpdateFrame,
   expireCollaborators,
   parseAwarenessFrame,
+  projectCollaborator,
   type TCollaboratorLease,
 } from "./awareness";
 
-describe("Work Map awareness boundary", () => {
+describe("Work map awareness boundary", () => {
   it("projects only relay-owned pointer fields from the native payload", () => {
     const nativeUpdate = {
       pointer: { x: 10, y: 20, tool: "pointer" as const },
@@ -40,6 +41,7 @@ describe("Work Map awareness boundary", () => {
       type: "POINTER_UPDATE",
       senderId: "user-id",
       connectionId: "connection-id",
+      profile: { display_name: "Ada", avatar_url: "https://cdn.example/ada.png" },
       payload: {
         pointer: { x: 10, y: 20, tool: "pointer" },
         button: "up",
@@ -55,11 +57,38 @@ describe("Work Map awareness boundary", () => {
         type: "POINTER_UPDATE",
         senderId: "user-id",
         connectionId: "connection-id",
+        profile: { display_name: "Ada", avatar_url: null },
         payload: {
           pointer: { x: 10, y: 20, tool: "pointer" },
           button: "up",
           selectedElementIds: { element: false },
         },
+      })
+    ).toThrow("Invalid awareness frame");
+  });
+
+  it("projects the server profile and rejects claimed profile identity", () => {
+    const frame = parseAwarenessFrame({
+      type: "PRESENCE_UPDATE",
+      senderId: "user-id",
+      connectionId: "connection-id",
+      profile: { display_name: "Ada", avatar_url: "https://cdn.example/ada.png" },
+      payload: { state: "active" },
+    });
+    if (!frame) throw new Error("Expected awareness frame");
+    expect(projectCollaborator(frame)).toMatchObject({
+      id: "user-id",
+      socketId: "connection-id",
+      username: "Ada",
+      avatarUrl: "https://cdn.example/ada.png",
+    });
+    expect(() =>
+      parseAwarenessFrame({
+        type: "PRESENCE_UPDATE",
+        senderId: "user-id",
+        connectionId: "connection-id",
+        profile: { display_name: "Ada", avatar_url: null, id: "claimed-user" },
+        payload: { state: "active" },
       })
     ).toThrow("Invalid awareness frame");
   });

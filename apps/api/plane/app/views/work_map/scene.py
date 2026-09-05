@@ -6,8 +6,6 @@
 # See the LICENSE file for details.
 
 import base64
-import json
-import uuid
 
 from django.db import transaction
 from django.db.models import F
@@ -18,7 +16,6 @@ from rest_framework.response import Response
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.permissions.work_map import can_read_work_map_source
 from plane.app.serializers import WorkMapSceneSerializer
-from plane.app.serializers.asset import WORK_MAP_SCENE_ASSET_MIME_TYPES
 from plane.db.models import (
     Document,
     FileAsset,
@@ -26,6 +23,10 @@ from plane.db.models import (
     WorkMapBinding,
     WorkMapBindingPlacement,
     WorkMapSceneAssetPlacement,
+)
+from plane.utils.work_map_scene import (
+    try_decode_work_map_scene,
+    work_map_scene_assets,
 )
 
 from ..base import BaseAPIView
@@ -40,36 +41,6 @@ class WorkMapSceneUpgradeRequired(Exception):
     pass
 
 
-class WorkMapSceneOpaque(ValueError):
-    """The bytes do not use the lifecycle scene representation."""
-
-
-def decode_work_map_scene(scene_binary):
-    if not scene_binary:
-        return {"elements": [], "files": {}}
-
-    try:
-        scene = json.loads(bytes(scene_binary).decode("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        raise WorkMapSceneOpaque("Scene is not valid Work Map JSON")
-    if (
-        not isinstance(scene, dict)
-        or not isinstance(scene.get("elements"), list)
-        or not isinstance(scene.get("files"), dict)
-    ):
-        raise WorkMapSceneOpaque("Scene is not a Work Map document")
-    return scene
-
-
-def try_decode_work_map_scene(scene_binary, *, decoder=None):
-    """Decode structured scene data without changing the opaque scene contract."""
-    decoder = decode_work_map_scene if decoder is None else decoder
-    try:
-        return decoder(scene_binary)
-    except WorkMapSceneOpaque:
-        return None
-
-
 def work_map_has_semantic_state(work_map, document_id):
     return (
         work_map.bindings.filter(deleted_at__isnull=True).exists()
@@ -81,35 +52,6 @@ def work_map_has_semantic_state(work_map, document_id):
             deleted_at__isnull=True,
         ).exists()
     )
-
-
-def work_map_scene_assets(scene):
-    assets = {}
-    for file_id, metadata in scene["files"].items():
-        if not isinstance(file_id, str) or not file_id or not isinstance(metadata, dict):
-            raise ValueError("Scene file metadata is invalid")
-        if set(metadata) != {"assetId", "mimeType", "created"}:
-            raise ValueError("Scene file metadata contains unsupported fields")
-        try:
-            asset_id = uuid.UUID(str(metadata["assetId"]))
-        except (TypeError, ValueError):
-            raise ValueError("Scene file asset identifier is invalid")
-        if metadata["mimeType"] not in WORK_MAP_SCENE_ASSET_MIME_TYPES:
-            raise ValueError("Scene file MIME type is unsupported")
-        if isinstance(metadata["created"], bool) or not isinstance(metadata["created"], int) or metadata["created"] < 0:
-            raise ValueError("Scene file creation time is invalid")
-        assets[file_id] = asset_id
-
-    for element in scene["elements"]:
-        if not isinstance(element, dict):
-            raise ValueError("Scene element is invalid")
-        if (
-            element.get("type") == "image"
-            and not element.get("isDeleted", False)
-            and element.get("fileId") not in scene["files"]
-        ):
-            raise ValueError("Image element file is unavailable")
-    return assets
 
 
 def validate_work_map_scene_assets(scene, document_id, *, lock=False):
@@ -140,13 +82,23 @@ def validate_work_map_scene_assets(scene, document_id, *, lock=False):
 class WorkMapSceneEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, work_map_id):
-        document = visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
+        document = (
+            visible_work_maps(
+                user=request.user,
+                slug=slug,
+                project_id=project_id,
+                include_scene_binary=True,
+            )
+            .filter(id=work_map_id)
+            .first()
+        )
         if document is None:
             return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(
             {
                 "generation": document.work_map.generation,
                 "scene_binary": base64.b64encode(bytes(document.work_map.scene_binary)).decode("ascii"),
+                "collaboration_epoch": document.work_map.collaboration_epoch,
             },
             status=status.HTTP_200_OK,
         )
@@ -167,6 +119,15 @@ class WorkMapSceneEndpoint(BaseAPIView):
                 return Response({"error": "Work map not found"}, status=status.HTTP_404_NOT_FOUND)
             work_map = WorkMap.objects.select_for_update().get(document=document)
             candidate_scene_binary = serializer.validated_data["scene_binary"]
+            if serializer.validated_data["collaboration_epoch"] != work_map.collaboration_epoch:
+                return Response(
+                    {
+                        "error": "Work map collaboration epoch is stale",
+                        "generation": work_map.generation,
+                        "collaboration_epoch": work_map.collaboration_epoch,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
             if bytes(candidate_scene_binary) == bytes(work_map.scene_binary):
                 return Response({"generation": work_map.generation}, status=status.HTTP_200_OK)
             if document.is_locked or document.archived_at is not None:

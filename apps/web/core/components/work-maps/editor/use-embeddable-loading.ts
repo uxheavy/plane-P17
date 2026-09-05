@@ -20,7 +20,7 @@ import {
   shouldLoadEmbeddableContent,
 } from "./embeddable-load";
 
-export const useEmbeddableLoading = (api: ExcalidrawImperativeAPI | null, editable: boolean, workMapId: string) => {
+export const useEmbeddableLoading = (api: ExcalidrawImperativeAPI | null, editable: boolean) => {
   const viewerEnablementRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -28,14 +28,13 @@ export const useEmbeddableLoading = (api: ExcalidrawImperativeAPI | null, editab
   }, [editable]);
 
   const shouldLoadEmbeddable = useCallback(
-    (element: ExcalidrawEmbeddableElement) =>
-      shouldLoadEmbeddableContent(workMapId, element, viewerEnablementRef.current),
-    [workMapId]
+    (element: ExcalidrawEmbeddableElement) => shouldLoadEmbeddableContent(element, viewerEnablementRef.current),
+    []
   );
 
   const onEmbeddableLoadRequest = useCallback(
     (element: ExcalidrawEmbeddableElement) => {
-      const viewerKey = getViewerEmbeddableKey(workMapId, element);
+      const viewerKey = getViewerEmbeddableKey(element);
       if (!viewerKey) return;
 
       if (!editable) {
@@ -59,7 +58,7 @@ export const useEmbeddableLoading = (api: ExcalidrawImperativeAPI | null, editab
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       });
     },
-    [api, editable, workMapId]
+    [api, editable]
   );
 
   return { shouldLoadEmbeddable, onEmbeddableLoadRequest };

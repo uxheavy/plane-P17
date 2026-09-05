@@ -29,7 +29,7 @@ import { ControlLink, CustomMenu, Row } from "@plane/ui";
 import { copyUrlToClipboard, findHowManyDaysLeft, generateWorkItemLink } from "@plane/utils";
 // components
 import { CreateUpdateIssueModal } from "@/components/issues/issue-modal/modal";
-import { NameDescriptionUpdateStatus } from "@/components/issues/issue-update-status";
+import { UpdateStatus } from "@/components/common/update-status";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectInbox } from "@/hooks/store/use-project-inbox";
@@ -300,7 +300,7 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
           )}
           <InboxIssueStatus inboxIssue={inboxIssue} iconSize={12} />
           <div className="flex w-full items-center justify-end">
-            <NameDescriptionUpdateStatus isSubmitting={isSubmitting} />
+            <UpdateStatus status={isSubmitting === "submitting" ? "saving" : "saved"} />
           </div>
         </div>
 

@@ -29,15 +29,14 @@ from plane.db.models import (
 )
 from plane.settings.storage import S3Storage
 from plane.utils.path_validator import sanitize_filename
+from plane.utils.work_map_scene import try_decode_work_map_scene
 
 from ..base import BaseAPIView
 from .base import serialize_work_map, visible_work_maps
-from .binding import WORK_MAP_NODE_LINK_PREFIX, validate_protected_binding_carriers
+from .binding import validate_protected_binding_carriers
 from .scene import (
     LEGACY_SCENE_UPGRADE_ERROR,
     WorkMapSceneUpgradeRequired,
-    decode_work_map_scene,
-    try_decode_work_map_scene,
     validate_work_map_scene_assets,
     work_map_has_semantic_state,
 )
@@ -117,7 +116,7 @@ def duplicate_scene(scene_binary, bindings, key_map=None):
             raise ValueError("Scene has protected bindings but no content")
         return None, {}
 
-    scene = try_decode_work_map_scene(scene_binary, decoder=decode_work_map_scene)
+    scene = try_decode_work_map_scene(scene_binary)
     if scene is None:
         if bindings:
             raise WorkMapSceneUpgradeRequired
@@ -135,7 +134,6 @@ def duplicate_scene(scene_binary, bindings, key_map=None):
         source_key = uuid.UUID(str(node_key_value))
         target_key = uuid.UUID(str(key_map.setdefault(str(source_key), str(uuid.uuid4()))))
         custom_data["nodeKey"] = str(target_key)
-        element["link"] = f"{WORK_MAP_NODE_LINK_PREFIX}{target_key}"
 
     return scene, key_map
 
@@ -255,7 +253,7 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
             )
 
         lease_id = uuid.uuid4()
-        storage = S3Storage(request=request)
+        storage = S3Storage()
         operation = None
         try:
             with transaction.atomic():
@@ -302,7 +300,7 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                     )
                 bindings = binding_snapshot(source_work_map, lock=True)
                 source_scene_binary = bytes(source_work_map.scene_binary)
-                source_scene = try_decode_work_map_scene(source_scene_binary, decoder=decode_work_map_scene)
+                source_scene = try_decode_work_map_scene(source_scene_binary)
                 if source_scene is None:
                     if work_map_has_semantic_state(source_work_map, source.id):
                         raise WorkMapSceneUpgradeRequired
@@ -390,10 +388,7 @@ class WorkMapDuplicateEndpoint(BaseAPIView):
                 if current is None:
                     raise WorkMapSourceChanged
                 current_work_map = WorkMap.objects.select_for_update().get(document=current)
-                current_scene = try_decode_work_map_scene(
-                    current_work_map.scene_binary,
-                    decoder=decode_work_map_scene,
-                )
+                current_scene = try_decode_work_map_scene(current_work_map.scene_binary)
                 if current_scene is None:
                     if work_map_has_semantic_state(current_work_map, current.id):
                         raise WorkMapSceneUpgradeRequired

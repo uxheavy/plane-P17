@@ -5,20 +5,21 @@ packages:
   - "!apps/proxy"
 
 catalog:
-  # UX Heavy Work Map seams, tag target 583b3c3c69320b4bf4d78d1de947ff8f44119d8a.
+  # UXHeavy internal editor package, release packages-v0.18.1-fc7ed605 (PR #5 tip 075b6366).
+  # Release asset SHA-512 integrity values:
+  #   common: sha512-iHPSQqBkaxeTnqRUdW9xQjs+F0EzzqseWgQquV8MUNTQ+Npcl5WFZ3+bmQ8YvBnY7zl1If4gTJi10DHQnbvfMA==
+  #   excalidraw: sha512-uLav7+iS4zqdyHR6rK2X4Pwhggqu5Py20oDbiCrs2AU2GjoA7CV7bd7AodgrHvL/jLtn5v9GNNDlNsgf6L9heQ==
   # Release asset SHA-256 values:
-  #   common: 5bf5604bdbcff34216c89e39526650885610ee95c38c8517347e1f00a1979375
-  #   excalidraw: 719ec132475cb5734437f6f76a23bddd2ea3f60bb389d5069cd3196666c64742
-  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.0-583b3c3c/uxheavy-excalidraw-common-0.18.0-583b3c3c.tgz"
-  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.0-583b3c3c/uxheavy-excalidraw-0.18.0-583b3c3c.tgz"
+  #   common: 65dbf8bb918bca58251e5c25c86671f3d6cc47e60d5a655b23bfe4861be2804e
+  #   excalidraw: 7237acde8c26204deeeffac7598f9bc13d42c30b09365adc1f84206fe3107e61
+  "@excalidraw/common": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-fc7ed605/uxheavy-excalidraw-common-0.18.1-fc7ed605.tgz"
+  "@excalidraw/excalidraw": "https://github.com/uxheavy/excalidraw-P17/releases/download/packages-v0.18.1-fc7ed605/uxheavy-excalidraw-0.18.1-fc7ed605.tgz"
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"
   "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "1.4.0"
   "@atlaskit/pragmatic-drag-and-drop-hitbox": "1.1.0"
   "@base-ui-components/react": "1.0.0-beta.3"
   "@bprogress/core": "^1.3.4"
   "@chromatic-com/storybook": "5.2.1"
-  "@effect/platform": "^0.94.0"
-  "@effect/platform-node": "^0.104.0"
   "@floating-ui/dom": "^1.7.1"
   "@floating-ui/react": "^0.27.20"
   "@fontsource-variable/inter": "5.2.8"
@@ -108,7 +109,7 @@ catalog:
   "cors": "^2.8.5"
   "date-fns": "^4.1.0"
   "dotenv": "16.4.7"
-  "effect": "3.20.0"
+  "effect": "4.0.0-beta.107"
   "emoji-picker-react": "^4.5.16"
   "emoji-regex": "^10.3.0"
   "export-to-csv": "^1.4.0"
@@ -280,8 +281,8 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   # GitHub-only release artifacts reviewed above and pinned by exact SHA-256.
-  - "@uxheavy/excalidraw-common@0.18.0-583b3c3c"
-  - "@uxheavy/excalidraw@0.18.0-583b3c3c"
+  - "@uxheavy/excalidraw-common@0.18.1-fc7ed605"
+  - "@uxheavy/excalidraw@0.18.1-fc7ed605"
   - "@storybook/addon-docs@10.4.6"
   - "@storybook/builder-vite@10.4.6"
   - "@storybook/csf-plugin@10.4.6"

@@ -11,22 +11,23 @@
 
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { Map } from "lucide-react";
-import { Button } from "@plane/propel/button";
+import { useTranslation } from "@plane/i18n";
+import { WorkMapIcon } from "@plane/propel/icons";
 import { Breadcrumbs, Header } from "@plane/ui";
 import { CommonProjectBreadcrumbs } from "@/components/breadcrumbs/common";
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { WorkMapHeaderActions } from "@/components/work-maps/header-actions";
 import { useWorkMap } from "@/hooks/store/use-work-map";
-import { useAppRouter } from "@/hooks/use-app-router";
-import { WorkMapService } from "@/services/work-map.service";
-
-const service = new WorkMapService();
 
 export const WorkMapDetailsHeader = observer(function WorkMapDetailsHeader() {
+  const { t } = useTranslation();
   const { workspaceSlug, projectId, workMapId } = useParams();
-  const router = useAppRouter();
-  const { maps } = useWorkMap();
+  const store = useWorkMap();
+  const { maps } = store;
   const workMap = maps[workMapId?.toString() ?? ""];
+  const resolvedWorkspaceSlug = workspaceSlug?.toString() ?? "";
+  const resolvedProjectId = projectId?.toString() ?? "";
+  const resolvedWorkMapId = workMapId?.toString() ?? "";
   return (
     <Header>
       <Header.LeftItem>
@@ -35,31 +36,23 @@ export const WorkMapDetailsHeader = observer(function WorkMapDetailsHeader() {
           <Breadcrumbs.Item
             component={
               <BreadcrumbLink
-                label="Work Maps"
+                label={t("sidebar.work_maps")}
                 href={`/${workspaceSlug}/projects/${projectId}/work-maps`}
-                icon={<Map className="size-4 text-tertiary" />}
+                icon={<WorkMapIcon className="size-4 text-tertiary" />}
               />
             }
           />
-          <Breadcrumbs.Item isLast component={<BreadcrumbLink isLast label={workMap?.name || "Work Map"} href="#" />} />
+          <Breadcrumbs.Item isLast component={<BreadcrumbLink isLast label={workMap?.name || "Work map"} />} />
         </Breadcrumbs>
       </Header.LeftItem>
       {workMap && (
         <Header.RightItem>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              const duplicate = await service.duplicate(
-                workspaceSlug?.toString() ?? "",
-                projectId?.toString() ?? "",
-                workMap.id
-              );
-              router.push(`/${workspaceSlug}/projects/${projectId}/work-maps/${duplicate.id}`);
-            }}
-          >
-            Duplicate
-          </Button>
+          <WorkMapHeaderActions
+            workspaceSlug={resolvedWorkspaceSlug}
+            projectId={resolvedProjectId}
+            workMap={workMap}
+            refresh={() => store.fetchById(resolvedWorkspaceSlug, resolvedProjectId, resolvedWorkMapId)}
+          />
         </Header.RightItem>
       )}
     </Header>

@@ -6,3 +6,4 @@
 
 export * from "./list-item";
 export * from "./list-root";
+export * from "./search-input";

@@ -9,7 +9,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type MutableRefObject } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { LIVE_BASE_PATH, LIVE_BASE_URL } from "@plane/constants";
 import { parseAwarenessFrame } from "./awareness";
@@ -42,6 +42,8 @@ type TContext = {
 type TSceneOwners = {
   generationRef: MutableRefObject<number>;
   resynchronize: () => Promise<void>;
+  hasPendingDraft: () => boolean;
+  resumePendingDraft: () => Promise<void>;
   applyRemoteScene: (sceneBinary: string) => Promise<void>;
   invalidateSources: (nodeKeys: string[]) => Promise<void>;
   failCloseSources: () => void;
@@ -52,9 +54,11 @@ export const useCollaboration = (
   context: TContext,
   scene: TSceneOwners,
   onAuthorized: (editable: boolean) => void,
-  api: ExcalidrawImperativeAPI | null
+  api: ExcalidrawImperativeAPI | null,
+  userId: string
 ) => {
   const { workspaceSlug, projectId, workMapId } = context;
+  const notifyAuthorized = useEffectEvent(onAuthorized);
   const [connectionState, setConnectionState] = useState<TConnectionState>("connecting");
   const [relayEditable, setRelayEditable] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
@@ -63,15 +67,12 @@ export const useCollaboration = (
     connectionStateRef.current = state;
     setConnectionState(state);
   }, []);
-  const assignSocket = useCallback((socket: WebSocket | null) => {
-    socketRef.current = socket;
-  }, []);
 
   const sendFrame = useCallback((frame: unknown) => {
     if (socketRef.current?.readyState !== WebSocket.OPEN) return;
     socketRef.current.send(JSON.stringify(frame));
   }, []);
-  const awareness = useAwareness(enabled, connectionState === "connected", api, sendFrame);
+  const awareness = useAwareness(enabled, connectionState === "connected", api, sendFrame, userId);
   const { applyAwareness, clearCollaborators, ...awarenessState } = awareness;
 
   useEffect(() => {
@@ -82,15 +83,16 @@ export const useCollaboration = (
     const queuedRemoteScenes: string[] = [];
     let ready = false;
     let readyBarrierStarted = false;
+    let holdRemoteScenes = false;
     let remoteApply = Promise.resolve();
 
     const scheduleReconnect = (code: number) => {
-      if (disposed || code === 1000 || code === 4400 || code === 4403) return;
+      if (disposed || code === 1000 || code === 4400 || code === 4401 || code === 4403) return;
       if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
       const delay = 500 * 2 ** reconnectAttempts;
       reconnectAttempts += 1;
       reconnectTimer = window.setTimeout(() => {
-        if (code !== 4409) {
+        if (code !== 4409 || scene.hasPendingDraft()) {
           connect();
           return;
         }
@@ -105,13 +107,14 @@ export const useCollaboration = (
       if (disposed) return;
       ready = false;
       readyBarrierStarted = false;
+      holdRemoteScenes = false;
       queuedRemoteScenes.length = 0;
       remoteApply = Promise.resolve();
       setRelayEditable(false);
       updateConnectionState("connecting");
       const socket = new WebSocket(relayUrl(workspaceSlug, projectId, workMapId, scene.generationRef.current));
       activeSocket = socket;
-      assignSocket(socket);
+      socketRef.current = socket;
 
       const closeForTransportFailure = () => {
         setRelayEditable(false);
@@ -146,18 +149,27 @@ export const useCollaboration = (
           readyBarrierStarted = true;
           void (async () => {
             try {
-              await scene.resynchronize();
-              while (queuedRemoteScenes.length > 0) {
-                const sceneBinary = queuedRemoteScenes.shift();
-                // oxlint-disable-next-line eslint/no-await-in-loop -- whole-scene reconciliation must preserve relay order.
-                if (sceneBinary) await scene.applyRemoteScene(sceneBinary);
+              const hasPendingDraft = scene.hasPendingDraft();
+              if (hasPendingDraft && message.editable) await scene.resumePendingDraft();
+              else if (!hasPendingDraft) await scene.resynchronize();
+              if (scene.hasPendingDraft()) {
+                // A failed authority check keeps the local draft non-replayable; queued frames belong to the newer room.
+                holdRemoteScenes = true;
+                queuedRemoteScenes.length = 0;
+              } else {
+                holdRemoteScenes = false;
+                while (queuedRemoteScenes.length > 0) {
+                  const sceneBinary = queuedRemoteScenes.shift();
+                  // oxlint-disable-next-line eslint/no-await-in-loop -- whole-scene reconciliation must preserve relay order.
+                  if (sceneBinary) await scene.applyRemoteScene(sceneBinary);
+                }
               }
               if (disposed || socket !== activeSocket || socket.readyState !== WebSocket.OPEN) return;
               ready = true;
               reconnectAttempts = 0;
               setRelayEditable(message.editable as boolean);
               updateConnectionState("connected");
-              onAuthorized(message.editable as boolean);
+              notifyAuthorized(message.editable as boolean);
             } catch {
               closeForTransportFailure();
             }
@@ -177,6 +189,10 @@ export const useCollaboration = (
             }
             queuedRemoteScenes.push(message.payload);
             return;
+          }
+          if (holdRemoteScenes) {
+            if (scene.hasPendingDraft()) return;
+            holdRemoteScenes = false;
           }
           const sceneBinary = message.payload;
           remoteApply = remoteApply.then(() => scene.applyRemoteScene(sceneBinary)).catch(closeForTransportFailure);
@@ -209,9 +225,10 @@ export const useCollaboration = (
       socket.addEventListener("close", (event) => {
         if (socket !== activeSocket) return;
         activeSocket = null;
-        assignSocket(null);
+        socketRef.current = null;
         setRelayEditable(false);
         updateConnectionState("disconnected");
+        if (event.code === 4401 || event.code === 4403) notifyAuthorized(false);
         if (event.code === 1011) scene.failCloseSources();
         clearCollaborators();
         scheduleReconnect(event.code);
@@ -237,22 +254,11 @@ export const useCollaboration = (
       window.removeEventListener("online", reconnectOnResume);
       const socket = activeSocket;
       activeSocket = null;
-      assignSocket(null);
+      socketRef.current = null;
       clearCollaborators();
       if (socket) socket.close(1000, "Editor closed");
     };
-  }, [
-    applyAwareness,
-    assignSocket,
-    clearCollaborators,
-    enabled,
-    onAuthorized,
-    projectId,
-    scene,
-    updateConnectionState,
-    workMapId,
-    workspaceSlug,
-  ]);
+  }, [applyAwareness, clearCollaborators, enabled, projectId, scene, updateConnectionState, workMapId, workspaceSlug]);
 
   const sendScene = useCallback(
     (sceneBinary: string) => sendFrame({ type: "SCENE_UPDATE", payload: sceneBinary }),

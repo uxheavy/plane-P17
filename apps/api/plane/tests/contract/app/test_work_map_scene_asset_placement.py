@@ -195,6 +195,7 @@ class TestWorkMapSceneAssetPlacement:
         saved = session_client.patch(
             _work_map_url(workspace, project, work_map_data["id"], "scene/"),
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(json.dumps(scene).encode()).decode("ascii"),
             },
@@ -244,6 +245,7 @@ class TestWorkMapSceneAssetPlacement:
         inserted = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 0,
                 "scene_binary": base64.b64encode(json.dumps({"elements": [image], "files": files}).encode()).decode(
                     "ascii"
@@ -256,6 +258,7 @@ class TestWorkMapSceneAssetPlacement:
         tombstoned = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 1,
                 "scene_binary": base64.b64encode(
                     json.dumps({"elements": [{**image, "isDeleted": True}], "files": files}).encode()
@@ -268,6 +271,7 @@ class TestWorkMapSceneAssetPlacement:
         metadata_released = session_client.patch(
             scene_url,
             {
+                "collaboration_epoch": 0,
                 "generation": 2,
                 "scene_binary": base64.b64encode(
                     json.dumps({"elements": [{**image, "isDeleted": True}], "files": {}}).encode()
