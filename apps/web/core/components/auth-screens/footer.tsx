@@ -6,6 +6,7 @@
 
 import React from "react";
 import { AccentureLogo, DolbyLogo, SonyLogo, ZerodhaLogo } from "@plane/propel/icons";
+import { PlaneVersionNumber } from "@/components/global/version-number";
 
 const BRAND_LOGOS: {
   id: string;
@@ -39,6 +40,9 @@ export function AuthFooter() {
             {brand.icon}
           </div>
         ))}
+      </div>
+      <div className="text-11 whitespace-nowrap text-tertiary">
+        <PlaneVersionNumber />
       </div>
     </div>
   );
