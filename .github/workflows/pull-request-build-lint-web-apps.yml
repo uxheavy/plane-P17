@@ -211,3 +211,6 @@ jobs:
 
       - name: Run check:types
         run: pnpm turbo run check:types --affected
+
+      - name: Run web tests
+        run: pnpm --filter=web test
