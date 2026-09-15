@@ -1,0 +1,45 @@
+set -eu
+
+remote_name=${1:-origin}
+preview_ref="refs/remotes/${remote_name}/preview"
+prod_ref=""
+prod_sha=""
+base_sha=""
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$remote_ref" = "refs/heads/prod" ] || continue
+  if [ "$local_sha" = "$zero" ]; then
+    echo "pre-push: refusing to delete prod" >&2
+    exit 1
+  fi
+  prod_ref=$local_ref
+  prod_sha=$local_sha
+  base_sha=$remote_sha
+done
+
+[ -n "$prod_sha" ] || exit 0
+
+if [ "$prod_ref" != "refs/heads/prod" ] || [ "$(git rev-parse HEAD)" != "$prod_sha" ]; then
+  echo "pre-push: push the checked-out prod branch, not another ref" >&2
+  exit 1
+fi
+
+if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+  echo "pre-push: commit or remove working-tree changes before pushing prod" >&2
+  exit 1
+fi
+
+git fetch --quiet "$remote_name" "+refs/heads/preview:${preview_ref}"
+
+if ! git merge-base --is-ancestor "$preview_ref" "$prod_sha"; then
+  echo "pre-push: prod must contain the current ${remote_name}/preview branch" >&2
+  exit 1
+fi
+
+if [ "$base_sha" = "$zero" ]; then
+  base_sha=$(git rev-parse "$prod_sha^")
+fi
+
+TURBO_SCM_BASE=$base_sha TURBO_SCM_HEAD=$prod_sha pnpm turbo run check:format check:lint check:types --affected
+pnpm turbo run test --filter=web
