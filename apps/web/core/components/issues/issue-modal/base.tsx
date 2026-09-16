@@ -11,7 +11,13 @@ import { useParams } from "next/navigation";
 // Plane imports
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { TBaseIssue, TIssue } from "@plane/types";
+import type {
+  TBaseIssue,
+  TIssue,
+  TIssueCreateResponse,
+  TIssueCreationOrigin,
+  TIssueCreationRequest,
+} from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
 // hooks
@@ -33,6 +39,10 @@ import { IssueFormRoot } from "./form";
 import type { IssueFormProps } from "./form";
 import type { IssuesModalProps } from "./modal";
 
+type TIssueCreatePayload = Partial<TIssue> & {
+  creation_origin?: TIssueCreationOrigin | TIssueCreationRequest;
+};
+
 export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueModalBase(props: IssuesModalProps) {
   const {
     data,
@@ -40,6 +50,11 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     onClose,
     beforeFormSubmit,
     onSubmit,
+    createRequestMetadata,
+    draftCreationOrigin,
+    deferCloseUntilSubmit = false,
+    deferredSubmitContent,
+    isSubmitContinuationPending = false,
     withDraftIssueWrapper = true,
     storeType: issueStoreFromProps,
     isDraft = false,
@@ -66,6 +81,9 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   const [description, setDescription] = useState<string | undefined>(undefined);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const continuationPendingRef = useRef(false);
+  const createPayloadRef = useRef<TIssueCreatePayload | null>(null);
+  const createdIssueRef = useRef<TIssueCreateResponse | null>(null);
   // store hooks
   const { t } = useTranslation();
   const { workspaceSlug, projectId: routerProjectId, cycleId, moduleId, workItem } = useParams();
@@ -124,11 +142,11 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.project_id, data?.id, data?.sourceIssueId, projectId, isOpen, activeProjectId]);
 
-  const addIssueToCycle = async (issue: TIssue, cycleId: string) => {
+  const addIssueToCycle = async (issue: TIssue, cycleIdentifier: string) => {
     if (!workspaceSlug || !issue.project_id) return;
 
-    await issues.addIssueToCycle(workspaceSlug.toString(), issue.project_id, cycleId, [issue.id]);
-    fetchCycleDetails(workspaceSlug.toString(), issue.project_id, cycleId);
+    await issues.addIssueToCycle(workspaceSlug.toString(), issue.project_id, cycleIdentifier, [issue.id]);
+    fetchCycleDetails(workspaceSlug.toString(), issue.project_id, cycleIdentifier);
   };
 
   const addIssueToModule = async (issue: TIssue, moduleIds: string[]) => {
@@ -137,7 +155,8 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     await Promise.all([
       issues.changeModulesInIssue(workspaceSlug.toString(), issue.project_id, issue.id, moduleIds, []),
       ...moduleIds.map(
-        (moduleId) => issue.project_id && fetchModuleDetails(workspaceSlug.toString(), issue.project_id, moduleId)
+        (moduleIdentifier) =>
+          issue.project_id && fetchModuleDetails(workspaceSlug.toString(), issue.project_id, moduleIdentifier)
       ),
     ]);
   };
@@ -147,8 +166,10 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   };
 
   const handleClose = (saveAsDraft?: boolean) => {
+    if (continuationPendingRef.current) return;
     if (changesMade && saveAsDraft && !data) {
-      handleCreateIssue(changesMade, true);
+      const draftOrigin = draftCreationOrigin ?? createRequestMetadata?.creation_origin.origin;
+      handleCreateIssue(draftOrigin ? { ...changesMade, creation_origin: draftOrigin } : changesMade, true);
     }
 
     setActiveProjectId(null);
@@ -158,13 +179,13 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   };
 
   const handleCreateIssue = async (
-    payload: Partial<TIssue>,
+    payload: TIssueCreatePayload,
     is_draft_issue: boolean = false
   ): Promise<TIssue | undefined> => {
     if (!workspaceSlug || !payload.project_id) return;
 
     try {
-      let response: TIssue | undefined;
+      let response: TIssueCreateResponse | undefined;
       // if draft issue, use draft issue store to create issue
       if (is_draft_issue) {
         response = (await draftIssues.createIssue(workspaceSlug.toString(), payload)) as TIssue;
@@ -181,6 +202,8 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
       else if (createIssue) {
         response = await createIssue(payload.project_id, payload);
       }
+
+      if (deferCloseUntilSubmit && !is_draft_issue && response) createdIssueRef.current = response;
 
       // update uploaded assets' status
       if (uploadedAssetIds.length > 0) {
@@ -245,10 +268,12 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
           />
         ),
       });
-      if (!createMore) handleClose();
+      if (!createMore && !deferCloseUntilSubmit) handleClose();
       if (createMore && issueTitleRef) issueTitleRef?.current?.focus();
-      setDescription("<p></p>");
-      setChangesMade(null);
+      if (!deferCloseUntilSubmit) {
+        setDescription("<p></p>");
+        setChangesMade(null);
+      }
       return response;
     } catch (error: any) {
       setToast({
@@ -260,20 +285,20 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     }
   };
 
-  const handleCycleChange = async (data: Partial<TIssue> | undefined, payload: Partial<TIssue>) => {
-    if (!workspaceSlug || !data?.project_id || !data?.id) return;
+  const handleCycleChange = async (issueData: Partial<TIssue> | undefined, payload: Partial<TIssue>) => {
+    if (!workspaceSlug || !issueData?.project_id || !issueData?.id) return;
     // return if user is not trying to change the cycle, i.e
     // - cycle_id is not present in payload
     // - cycle_id is the same as the current cycle id
-    if (!("cycle_id" in payload) || isEqual(data?.cycle_id, payload.cycle_id)) return;
+    if (!("cycle_id" in payload) || isEqual(issueData?.cycle_id, payload.cycle_id)) return;
 
     const slug = workspaceSlug.toString();
 
     // Removing the cycle
-    const currentCycleId = data?.cycle_id;
+    const currentCycleId = issueData?.cycle_id;
     if (currentCycleId && payload.cycle_id === null) {
-      await issues.removeIssueFromCycle(slug, data.project_id, currentCycleId, data.id);
-      fetchCycleDetails(slug, data.project_id, currentCycleId).catch((error) => {
+      await issues.removeIssueFromCycle(slug, issueData.project_id, currentCycleId, issueData.id);
+      fetchCycleDetails(slug, issueData.project_id, currentCycleId).catch((error) => {
         console.error(error);
       });
     }
@@ -281,12 +306,12 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // Adding the cycle
     const newCycleId = payload.cycle_id;
     if (newCycleId && newCycleId !== "" && (payload.cycle_id !== cycleId || storeType !== EIssuesStoreType.CYCLE)) {
-      await addIssueToCycle(data as TBaseIssue, newCycleId);
+      await addIssueToCycle(issueData as TBaseIssue, newCycleId);
     }
   };
 
-  const handleModuleChange = async (data: Partial<TIssue>, payload: Partial<TIssue>) => {
-    if (!workspaceSlug || !data?.project_id || !data?.id) return;
+  const handleModuleChange = async (issueData: Partial<TIssue>, payload: Partial<TIssue>) => {
+    if (!workspaceSlug || !issueData?.project_id || !issueData?.id) return;
     // return if user is not trying to change the module, i.e
     // - module_ids is not present in payload
     // - module_ids is not an array
@@ -294,27 +319,27 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     if (
       !("module_ids" in payload) ||
       !Array.isArray(payload.module_ids) ||
-      isEqual(data?.module_ids, payload.module_ids)
+      isEqual(issueData?.module_ids, payload.module_ids)
     )
       return;
 
-    const updatedModuleIds = xor(data.module_ids, payload.module_ids);
+    const updatedModuleIds = xor(issueData.module_ids, payload.module_ids);
     const modulesToAdd: string[] = [];
     const modulesToRemove: string[] = [];
 
-    for (const moduleId of updatedModuleIds) {
-      if (data.module_ids?.includes(moduleId)) {
-        modulesToRemove.push(moduleId);
+    for (const moduleIdentifier of updatedModuleIds) {
+      if (issueData.module_ids?.includes(moduleIdentifier)) {
+        modulesToRemove.push(moduleIdentifier);
       } else {
-        modulesToAdd.push(moduleId);
+        modulesToAdd.push(moduleIdentifier);
       }
     }
     // update modules if there are modules to add or remove
     if (modulesToAdd.length > 0 || modulesToRemove.length > 0) {
       await issues.changeModulesInIssue(
         workspaceSlug.toString(),
-        data.project_id,
-        data.id,
+        issueData.project_id,
+        issueData.id,
         modulesToAdd,
         modulesToRemove
       );
@@ -369,14 +394,43 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     // remove sourceIssueId from payload since it is not needed
     if (data?.sourceIssueId) delete data.sourceIssueId;
 
-    let response: TIssue | undefined = undefined;
+    const isCreate = !data?.id;
+    const draftOrigin = draftCreationOrigin ?? createRequestMetadata?.creation_origin.origin;
+    const createPayload: TIssueCreatePayload = isCreate
+      ? {
+          ...payload,
+          ...(is_draft_issue ? (draftOrigin ? { creation_origin: draftOrigin } : {}) : createRequestMetadata),
+        }
+      : payload;
+    const isDeferredCreate = deferCloseUntilSubmit && isCreate;
+    if (isDeferredCreate) {
+      continuationPendingRef.current = true;
+      if (!createPayloadRef.current) {
+        createPayloadRef.current = createPayload;
+      }
+    }
 
+    let response: TIssue | undefined;
     try {
       if (beforeFormSubmit) await beforeFormSubmit();
-      if (!data?.id) response = await handleCreateIssue(payload, is_draft_issue);
-      else response = await handleUpdateIssue(payload);
-    } finally {
+      if (!data?.id) {
+        if (isDeferredCreate && createdIssueRef.current) {
+          response = createdIssueRef.current;
+        } else {
+          response = await handleCreateIssue(
+            isDeferredCreate ? (createPayloadRef.current ?? createPayload) : createPayload,
+            is_draft_issue
+          );
+        }
+      } else response = await handleUpdateIssue(payload);
+
       if (response != undefined && onSubmit) await onSubmit(response);
+      if (isDeferredCreate && response) {
+        continuationPendingRef.current = false;
+        handleClose();
+      }
+    } finally {
+      if (isDeferredCreate) continuationPendingRef.current = false;
     }
   };
 
@@ -391,6 +445,8 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
 
   const commonIssueModalProps: IssueFormProps = {
     issueTitleRef: issueTitleRef,
+    createRequestMetadata,
+    draftCreationOrigin,
     data: {
       ...data,
       description_html: description,
@@ -410,20 +466,25 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
     isDuplicateModalOpen: isDuplicateModalOpen,
     handleDuplicateIssueModal: handleDuplicateIssueModal,
     isProjectSelectionDisabled: isProjectSelectionDisabled,
+    showActionButtons: !isSubmitContinuationPending,
   };
 
   return (
     <ModalCore
+      handleClose={deferCloseUntilSubmit ? handleClose : undefined}
       isOpen={isOpen}
       position={EModalPosition.TOP}
       width={isDuplicateModalOpen ? EModalWidth.VIXL : EModalWidth.XXXXL}
       className="rounded-lg !bg-transparent shadow-none transition-[width] ease-linear"
     >
-      {withDraftIssueWrapper ? (
-        <DraftIssueLayout {...commonIssueModalProps} changesMade={changesMade} onChange={handleFormChange} />
-      ) : (
-        <IssueFormRoot {...commonIssueModalProps} />
-      )}
+      {deferredSubmitContent}
+      <div inert={isSubmitContinuationPending}>
+        {withDraftIssueWrapper ? (
+          <DraftIssueLayout {...commonIssueModalProps} changesMade={changesMade} onChange={handleFormChange} />
+        ) : (
+          <IssueFormRoot {...commonIssueModalProps} />
+        )}
+      </div>
     </ModalCore>
   );
 });

@@ -61,3 +61,25 @@ class DocumentVersion(BaseModel):
     class Meta:
         db_table = "document_versions"
         ordering = ("-created_at",)
+
+
+class DocumentVersionAsset(BaseModel):
+    document_version = models.ForeignKey(
+        "db.DocumentVersion",
+        on_delete=models.CASCADE,
+        related_name="asset_links",
+    )
+    asset = models.ForeignKey(
+        "db.FileAsset",
+        on_delete=models.RESTRICT,
+        related_name="document_version_links",
+    )
+
+    class Meta:
+        db_table = "document_version_assets"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document_version", "asset"],
+                name="document_version_asset_unique_edge",
+            )
+        ]

@@ -8,11 +8,13 @@ import json
 # Django imports
 from django.utils import timezone
 from django.core import serializers
+from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q, UUIDField, Value, Subquery, OuterRef
 from django.db.models.functions import Coalesce
+from django.db import transaction
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
 
@@ -22,6 +24,12 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.app.permissions import allow_permission, ROLE
+from plane.app.permissions.project import can_write_projects
+from plane.api.services import (
+    WorkItemCreationIntentConflict,
+    WorkItemCreationIntents,
+    WorkItemCreationOriginDenied,
+)
 from plane.app.serializers import (
     IssueCreateSerializer,
     DraftIssueCreateSerializer,
@@ -31,11 +39,15 @@ from plane.app.serializers import (
 from plane.db.models import (
     Issue,
     DraftIssue,
+    Cycle,
     CycleIssue,
+    Module,
     ModuleIssue,
     DraftIssueCycle,
     Workspace,
+    Project,
     FileAsset,
+    WorkItemCreationIntent,
 )
 from .. import BaseViewSet
 from plane.bgtasks.issue_activities_task import issue_activity
@@ -111,16 +123,54 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def create(self, request, slug):
         workspace = Workspace.objects.get(slug=slug)
+        data = request.data.copy()
+        creation_origin = None
+        has_creation_origin = "creation_origin" in request.data and request.data.get("creation_origin") is not None
+        if has_creation_origin:
+            project_id = request.data.get("project_id")
+            try:
+                project = Project.objects.filter(pk=project_id, workspace=workspace).first()
+            except (TypeError, ValueError, ValidationError):
+                return Response(
+                    {"error": "Project is required for creation_origin."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if project is None:
+                return Response(
+                    {"error": "Project is required for creation_origin."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not can_write_projects(user=request.user, workspace_id=workspace.id, project_ids=[project.id]):
+                return Response(
+                    {"error": "You don't have the required permissions."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            data.pop("creation_origin", None)
+            try:
+                with transaction.atomic():
+                    creation_origin = WorkItemCreationIntents.validate_origin(
+                        origin=request.data.get("creation_origin"),
+                        actor=request.user,
+                        project=project,
+                        slug=slug,
+                    )
+            except WorkItemCreationOriginDenied as error:
+                return Response({"error": str(error)}, status=status.HTTP_403_FORBIDDEN)
+            except WorkItemCreationIntentConflict as error:
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = DraftIssueCreateSerializer(
-            data=request.data,
+            data=data,
             context={
                 "workspace_id": workspace.id,
                 "project_id": request.data.get("project_id", None),
             },
         )
         if serializer.is_valid():
-            serializer.save()
+            if has_creation_origin:
+                serializer.save(creation_origin=creation_origin)
+            else:
+                serializer.save()
             issue = (
                 self.get_queryset()
                 .filter(pk=serializer.data.get("id"))
@@ -146,6 +196,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
                     "updated_by",
                     "type_id",
                     "description_html",
+                    "creation_origin",
                 )
                 .first()
             )
@@ -204,12 +255,48 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def create_draft_to_issue(self, request, slug, draft_id):
-        draft_issue = self.get_queryset().filter(pk=draft_id).first()
+        draft_issue = self.get_queryset().filter(pk=draft_id, created_by=request.user).first()
+
+        if not draft_issue:
+            intent = (
+                WorkItemCreationIntent.objects.filter(
+                    id=draft_id,
+                    created_by=request.user,
+                    project__workspace__slug=slug,
+                    issue__isnull=False,
+                )
+                .select_related("project", "issue")
+                .first()
+            )
+            if intent is not None:
+                return self._convert_origin_backed_draft_to_issue(
+                    request=request,
+                    slug=slug,
+                    draft_issue=None,
+                    intent=intent,
+                )
+            return Response(
+                {"error": "The required object does not exist."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         if not draft_issue.project_id:
             return Response(
                 {"error": "Project is required to create an issue."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not self._draft_records_match_project(request=request, project_id=draft_issue.project_id):
+            return Response(
+                {"error": "Cycle and module references must belong to the draft project."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if draft_issue.creation_origin is not None:
+            return self._convert_origin_backed_draft_to_issue(
+                request=request,
+                slug=slug,
+                draft_issue=draft_issue,
+                intent=None,
             )
 
         serializer = IssueCreateSerializer(
@@ -223,7 +310,6 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
         if serializer.is_valid():
             serializer.save()
-
             issue_activity.delay(
                 type="issue.activity.created",
                 requested_data=json.dumps(self.request.data, cls=DjangoJSONEncoder),
@@ -235,77 +321,239 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
                 notification=True,
                 origin=base_host(request=request, is_app=True),
             )
+            self._attach_draft_records(
+                request=request,
+                draft_issue=draft_issue,
+                issue_id=serializer.data.get("id", None),
+            )
+            draft_issue.delete()
 
-            if request.data.get("cycle_id", None):
-                created_records = CycleIssue.objects.create(
-                    cycle_id=request.data.get("cycle_id", None),
-                    issue_id=serializer.data.get("id", None),
-                    project_id=draft_issue.project_id,
-                    workspace_id=draft_issue.workspace_id,
-                    created_by_id=draft_issue.created_by_id,
-                    updated_by_id=draft_issue.updated_by_id,
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def _convert_origin_backed_draft_to_issue(self, *, request, slug, draft_issue, intent):
+        project = draft_issue.project if draft_issue is not None else intent.project
+        if not can_write_projects(user=request.user, workspace_id=project.workspace_id, project_ids=[project.id]):
+            return Response(
+                {"error": "You don't have the required permissions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not self._draft_records_match_project(request=request, project_id=project.id):
+            return Response(
+                {"error": "Cycle and module references must belong to the draft project."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        origin = (
+            draft_issue.creation_origin
+            if draft_issue is not None
+            else WorkItemCreationIntents.origin_for_intent(intent)
+        )
+        issue_payload = request.data.copy()
+        issue_payload.pop("creation_origin", None)
+
+        try:
+            with transaction.atomic():
+                origin = WorkItemCreationIntents.validate_origin(
+                    origin=origin,
+                    actor=request.user,
+                    project=project,
+                    slug=slug,
+                    check_generation=draft_issue is not None,
                 )
-                # Capture Issue Activity
-                issue_activity.delay(
+        except WorkItemCreationOriginDenied as error:
+            return Response({"error": str(error)}, status=status.HTTP_403_FORBIDDEN)
+        except WorkItemCreationIntentConflict as error:
+            return Response({"error": str(error)}, status=status.HTTP_409_CONFLICT)
+
+        serializer = IssueCreateSerializer(
+            data=issue_payload,
+            context={
+                "project_id": project.id,
+                "workspace_id": project.workspace_id,
+                "default_assignee_id": project.default_assignee_id,
+            },
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        intent_id = draft_issue.id if draft_issue is not None else intent.id
+        payload_hash = WorkItemCreationIntents.payload_hash(issue_payload, origin)
+        try:
+            with transaction.atomic():
+                intent, created = WorkItemCreationIntents.reserve(
+                    intent_id=intent_id,
+                    origin=origin,
+                    actor=request.user,
+                    project=project,
+                    payload_hash=payload_hash,
+                    slug=slug,
+                )
+                if not created:
+                    if intent.origin_kind == "conversation":
+                        WorkItemCreationIntents.ensure_conversation_source_link(
+                            request=request,
+                            slug=slug,
+                            intent=intent,
+                        )
+                    replay_serializer = IssueCreateSerializer(
+                        intent.issue,
+                        data=issue_payload,
+                        context={
+                            "project_id": project.id,
+                            "workspace_id": project.workspace_id,
+                            "default_assignee_id": project.default_assignee_id,
+                        },
+                    )
+                    if not replay_serializer.is_valid():
+                        return Response(replay_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                    if draft_issue is not None:
+                        draft_issue.delete()
+                    response_data = replay_serializer.data
+                    response_status = status.HTTP_200_OK
+                else:
+                    issue_instance = serializer.save(
+                        created_by_id=request.user.id,
+                        updated_by_id=request.user.id,
+                    )
+                    intent.issue_id = issue_instance.id
+                    intent.save(update_fields=["issue", "updated_at"])
+                    WorkItemCreationIntents.complete(
+                        intent=intent,
+                        issue=issue_instance,
+                        origin=origin,
+                        actor=request.user,
+                        project=project,
+                        slug=slug,
+                    )
+                    if intent.origin_kind == "conversation":
+                        WorkItemCreationIntents.ensure_conversation_source_link(
+                            request=request,
+                            slug=slug,
+                            intent=intent,
+                        )
+                    if draft_issue is not None:
+                        self._attach_draft_records(
+                            request=request,
+                            draft_issue=draft_issue,
+                            issue_id=issue_instance.id,
+                        )
+                        draft_issue.delete()
+                    response_data = serializer.data
+                    response_status = status.HTTP_201_CREATED
+
+                    transaction.on_commit(
+                        lambda: issue_activity.delay(
+                            type="issue.activity.created",
+                            requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
+                            actor_id=str(request.user.id),
+                            issue_id=str(issue_instance.id),
+                            project_id=str(project.id),
+                            current_instance=None,
+                            epoch=int(timezone.now().timestamp()),
+                            notification=True,
+                            origin=base_host(request=request, is_app=True),
+                        )
+                    )
+        except WorkItemCreationOriginDenied as error:
+            return Response({"error": str(error)}, status=status.HTTP_403_FORBIDDEN)
+        except WorkItemCreationIntentConflict as error:
+            return Response({"error": str(error)}, status=status.HTTP_409_CONFLICT)
+
+        return Response(response_data, status=response_status)
+
+    @staticmethod
+    def _attach_draft_records(*, request, draft_issue, issue_id):
+        if request.data.get("cycle_id"):
+            created_record = CycleIssue.objects.create(
+                cycle_id=request.data.get("cycle_id"),
+                issue_id=issue_id,
+                project_id=draft_issue.project_id,
+                workspace_id=draft_issue.workspace_id,
+                created_by_id=draft_issue.created_by_id,
+                updated_by_id=draft_issue.updated_by_id,
+            )
+            transaction.on_commit(
+                lambda: issue_activity.delay(
                     type="cycle.activity.created",
                     requested_data=None,
-                    actor_id=str(self.request.user.id),
+                    actor_id=str(request.user.id),
                     issue_id=None,
-                    project_id=str(self.kwargs.get("project_id", None)),
+                    project_id=str(draft_issue.project_id),
                     current_instance=json.dumps(
                         {
                             "updated_cycle_issues": None,
-                            "created_cycle_issues": serializers.serialize("json", [created_records]),
+                            "created_cycle_issues": serializers.serialize("json", [created_record]),
                         }
                     ),
                     epoch=int(timezone.now().timestamp()),
                     notification=True,
                     origin=base_host(request=request, is_app=True),
                 )
+            )
 
-            if request.data.get("module_ids", []):
-                # bulk create the module
-                ModuleIssue.objects.bulk_create(
-                    [
-                        ModuleIssue(
-                            module_id=module,
-                            issue_id=serializer.data.get("id", None),
-                            workspace_id=draft_issue.workspace_id,
-                            project_id=draft_issue.project_id,
-                            created_by_id=draft_issue.created_by_id,
-                            updated_by_id=draft_issue.updated_by_id,
-                        )
-                        for module in request.data.get("module_ids", [])
-                    ],
-                    batch_size=10,
-                )
-                # Update the activity
-                _ = [
-                    issue_activity.delay(
+        module_ids = request.data.get("module_ids", [])
+        if module_ids:
+            ModuleIssue.objects.bulk_create(
+                [
+                    ModuleIssue(
+                        module_id=module,
+                        issue_id=issue_id,
+                        workspace_id=draft_issue.workspace_id,
+                        project_id=draft_issue.project_id,
+                        created_by_id=draft_issue.created_by_id,
+                        updated_by_id=draft_issue.updated_by_id,
+                    )
+                    for module in module_ids
+                ],
+                batch_size=10,
+            )
+            for module in module_ids:
+                transaction.on_commit(
+                    lambda module=module: issue_activity.delay(
                         type="module.activity.created",
                         requested_data=json.dumps({"module_id": str(module)}),
                         actor_id=str(request.user.id),
-                        issue_id=serializer.data.get("id", None),
+                        issue_id=str(issue_id),
                         project_id=draft_issue.project_id,
                         current_instance=None,
                         epoch=int(timezone.now().timestamp()),
                         notification=True,
                         origin=base_host(request=request, is_app=True),
                     )
-                    for module in request.data.get("module_ids", [])
-                ]
+                )
 
-            # Update file assets
-            file_assets = FileAsset.objects.filter(draft_issue_id=draft_id)
-            file_assets.update(
-                issue_id=serializer.data.get("id", None),
-                entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
-                draft_issue_id=None,
-            )
+        FileAsset.objects.filter(draft_issue_id=draft_issue.id).update(
+            issue_id=issue_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_DESCRIPTION,
+            draft_issue_id=None,
+        )
 
-            # delete the draft issue
-            draft_issue.delete()
+    @staticmethod
+    def _draft_records_match_project(*, request, project_id):
+        cycle_id = request.data.get("cycle_id")
+        if cycle_id:
+            try:
+                if not Cycle.objects.filter(id=cycle_id, project_id=project_id, deleted_at__isnull=True).exists():
+                    return False
+            except (TypeError, ValueError, ValidationError):
+                return False
 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        module_ids = request.data.get("module_ids", [])
+        if not module_ids:
+            return True
+        if not isinstance(module_ids, list):
+            return False
+        try:
+            requested_module_ids = {str(module_id) for module_id in module_ids}
+            project_module_ids = {
+                str(module_id)
+                for module_id in Module.objects.filter(
+                    id__in=module_ids,
+                    project_id=project_id,
+                    deleted_at__isnull=True,
+                ).values_list("id", flat=True)
+            }
+        except (TypeError, ValueError, ValidationError):
+            return False
+        return requested_module_ids == project_module_ids and len(requested_module_ids) == len(module_ids)

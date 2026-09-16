@@ -5,11 +5,13 @@
 # Python imports
 import copy
 import json
+import uuid
 
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.db.models import (
     Count,
     Exists,
@@ -39,6 +41,11 @@ from plane.app.serializers import (
     IssueListDetailSerializer,
     IssueSerializer,
     ProjectUserPropertySerializer,
+)
+from plane.api.services import (
+    WorkItemCreationIntentConflict,
+    WorkItemCreationIntents,
+    WorkItemCreationOriginDenied,
 )
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.bgtasks.issue_description_version_task import issue_description_version_task
@@ -403,10 +410,36 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
-        project = Project.objects.get(pk=project_id)
+        project = Project.objects.get(pk=project_id, workspace__slug=slug)
+        if "intent_id" in request.data or "source_message_id" in request.data:
+            return Response(
+                {"error": "creation_origin is required for origin-backed creation"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        intent_id = None
+        creation_origin = None
+        if "creation_origin" in request.data:
+            request_origin = request.data.get("creation_origin")
+            if not isinstance(request_origin, dict) or not request_origin.get("intent_id"):
+                return Response(
+                    {"error": "creation_origin must include intent_id and origin"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                intent_id = uuid.UUID(str(request_origin["intent_id"]))
+                creation_origin = WorkItemCreationIntents.normalize_origin(request_origin.get("origin"))
+            except (TypeError, ValueError, AttributeError):
+                return Response(
+                    {"error": "creation_origin identifiers are invalid"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        issue_payload = request.data.copy()
+        if intent_id is not None:
+            issue_payload.pop("creation_origin", None)
 
         serializer = IssueCreateSerializer(
-            data=request.data,
+            data=issue_payload,
             context={
                 "project_id": project_id,
                 "workspace_id": project.workspace_id,
@@ -414,65 +447,157 @@ class IssueViewSet(BaseViewSet):
             },
         )
 
-        if serializer.is_valid():
-            serializer.save()
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            # Track the issue
+        if intent_id is not None:
+            try:
+                with transaction.atomic():
+                    intent, created = WorkItemCreationIntents.reserve(
+                        intent_id=intent_id,
+                        origin=creation_origin,
+                        actor=request.user,
+                        project=project,
+                        payload_hash=WorkItemCreationIntents.payload_hash(issue_payload, creation_origin),
+                        slug=slug,
+                    )
+                    if not created:
+                        if intent.origin_kind == "conversation":
+                            WorkItemCreationIntents.ensure_conversation_source_link(
+                                request=request,
+                                slug=slug,
+                                intent=intent,
+                            )
+                        return self._render_create_response(
+                            request=request,
+                            slug=slug,
+                            project_id=project_id,
+                            issue_id=intent.issue_id,
+                            status_code=status.HTTP_200_OK,
+                            dispatch_effects=False,
+                            creation={
+                                "intent_id": str(intent.id),
+                                "replayed": True,
+                                "origin": WorkItemCreationIntents.projection(intent),
+                            },
+                        )
+                    issue_instance = serializer.save(
+                        created_by_id=request.user.id,
+                        updated_by_id=request.user.id,
+                    )
+                    intent.issue_id = issue_instance.id
+                    intent.save(update_fields=["issue", "updated_at"])
+                    origin_projection = WorkItemCreationIntents.complete(
+                        intent=intent,
+                        issue=issue_instance,
+                        origin=creation_origin,
+                        actor=request.user,
+                        project=project,
+                        slug=slug,
+                    )
+                    if intent.origin_kind == "conversation":
+                        WorkItemCreationIntents.ensure_conversation_source_link(
+                            request=request,
+                            slug=slug,
+                            intent=intent,
+                        )
+            except WorkItemCreationOriginDenied as error:
+                return Response({"error": str(error)}, status=status.HTTP_403_FORBIDDEN)
+            except WorkItemCreationIntentConflict as error:
+                return Response(
+                    {"error": str(error)},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            return self._render_create_response(
+                request=request,
+                slug=slug,
+                project_id=project_id,
+                issue_id=issue_instance.id,
+                status_code=status.HTTP_201_CREATED,
+                dispatch_effects=True,
+                creation={
+                    "intent_id": str(intent.id),
+                    "replayed": False,
+                    "origin": origin_projection,
+                },
+            )
+
+        issue_instance = serializer.save(created_by_id=request.user.id, updated_by_id=request.user.id)
+        return self._render_create_response(
+            request=request,
+            slug=slug,
+            project_id=project_id,
+            issue_id=issue_instance.id,
+            status_code=status.HTTP_201_CREATED,
+            dispatch_effects=True,
+        )
+
+    def _render_create_response(
+        self,
+        *,
+        request,
+        slug,
+        project_id,
+        issue_id,
+        status_code,
+        dispatch_effects,
+        creation=None,
+    ):
+        if dispatch_effects:
             issue_activity.delay(
                 type="issue.activity.created",
                 requested_data=json.dumps(self.request.data, cls=DjangoJSONEncoder),
                 actor_id=str(request.user.id),
-                issue_id=str(serializer.data.get("id", None)),
+                issue_id=str(issue_id),
                 project_id=str(project_id),
                 current_instance=None,
                 epoch=int(timezone.now().timestamp()),
                 notification=True,
                 origin=base_host(request=request, is_app=True),
             )
-            queryset = self.get_queryset()
-            queryset = self.apply_annotations(queryset)
-            issue = (
-                issue_queryset_grouper(
-                    queryset=queryset.filter(pk=serializer.data["id"]),
-                    group_by=None,
-                    sub_group_by=None,
-                )
-                .values(
-                    "id",
-                    "name",
-                    "state_id",
-                    "sort_order",
-                    "completed_at",
-                    "estimate_point",
-                    "priority",
-                    "start_date",
-                    "target_date",
-                    "sequence_id",
-                    "project_id",
-                    "parent_id",
-                    "cycle_id",
-                    "module_ids",
-                    "label_ids",
-                    "assignee_ids",
-                    "sub_issues_count",
-                    "created_at",
-                    "updated_at",
-                    "created_by",
-                    "updated_by",
-                    "attachment_count",
-                    "link_count",
-                    "is_draft",
-                    "archived_at",
-                    "deleted_at",
-                )
-                .first()
+        queryset = self.apply_annotations(self.get_queryset())
+        issue = (
+            issue_queryset_grouper(
+                queryset=queryset.filter(pk=issue_id),
+                group_by=None,
+                sub_group_by=None,
             )
-            datetime_fields = ["created_at", "updated_at"]
-            issue = user_timezone_converter(issue, datetime_fields, request.user.user_timezone)
-            # Send the model activity
+            .values(
+                "id",
+                "name",
+                "state_id",
+                "sort_order",
+                "completed_at",
+                "estimate_point",
+                "priority",
+                "start_date",
+                "target_date",
+                "sequence_id",
+                "project_id",
+                "parent_id",
+                "cycle_id",
+                "module_ids",
+                "label_ids",
+                "assignee_ids",
+                "sub_issues_count",
+                "created_at",
+                "updated_at",
+                "created_by",
+                "updated_by",
+                "attachment_count",
+                "link_count",
+                "is_draft",
+                "archived_at",
+                "deleted_at",
+            )
+            .first()
+        )
+        issue = user_timezone_converter(issue, ["created_at", "updated_at"], request.user.user_timezone)
+        if dispatch_effects:
             model_activity.delay(
                 model_name="issue",
-                model_id=str(serializer.data["id"]),
+                model_id=str(issue_id),
                 requested_data=request.data,
                 current_instance=None,
                 actor_id=request.user.id,
@@ -482,12 +607,13 @@ class IssueViewSet(BaseViewSet):
             # updated issue description version
             issue_description_version_task.delay(
                 updated_issue=json.dumps(request.data, cls=DjangoJSONEncoder),
-                issue_id=str(serializer.data["id"]),
+                issue_id=str(issue_id),
                 user_id=request.user.id,
                 is_creating=True,
             )
-            return Response(issue, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if creation is not None:
+            issue["creation"] = creation
+        return Response(issue, status=status_code)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
     def retrieve(self, request, slug, project_id, pk=None):

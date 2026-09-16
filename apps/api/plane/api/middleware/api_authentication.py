@@ -41,12 +41,26 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
                 return True
             match = re.fullmatch(
                 r"/api/v1/workspaces/(?P<workspace_slug>[^/]+)/projects/(?P<project_id>[^/]+)/"
-                r"work-items/(?P<issue_id>[^/]+)(?P<resource>/comments)?/?",
+                r"work-items/(?P<issue_id>[^/]+)"
+                r"(?P<resource>/comments|/claim|/attachments(?:/"
+                r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+                r")?)?/?",
                 path,
             )
             if not match:
                 return False
-            if method not in {"GET", "POST"} or (method == "POST" and match.group("resource") != "/comments"):
+            resource = match.group("resource")
+            if resource == "/attachments":
+                allowed = method in {"GET", "POST"}
+            elif resource and resource.startswith("/attachments/"):
+                allowed = method == "PATCH"
+            else:
+                allowed = (
+                    method in {"GET", "POST"}
+                    and not (method == "GET" and resource == "/claim")
+                    and not (method == "POST" and resource not in {"/comments", "/claim"})
+                )
+            if not allowed:
                 return False
             return Issue.objects.filter(
                 id=match.group("issue_id"),

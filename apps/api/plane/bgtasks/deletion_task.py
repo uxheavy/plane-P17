@@ -140,8 +140,11 @@ def hard_delete():
         UserFavorite,
         ModuleIssue,
         CycleIssue,
+        Channel,
+        Document,
         Estimate,
         EstimatePoint,
+        FileAsset,
         User,
         WorkspaceAgentMembership,
         BotTypeEnum,
@@ -156,6 +159,15 @@ def hard_delete():
             workspace__in=expired_workspaces
         ).values_list("user_id", flat=True)
     )
+    retained_asset_workspaces = FileAsset.all_objects.filter(
+        entity_type=FileAsset.EntityTypeContext.MESSAGE_ATTACHMENT,
+        workspace_id__isnull=False,
+    ).exclude(asset="").values_list("workspace_id", flat=True)
+    expired_workspaces = expired_workspaces.exclude(id__in=retained_asset_workspaces)
+    retained_asset_channels = FileAsset.all_objects.filter(
+        entity_type=FileAsset.EntityTypeContext.MESSAGE_ATTACHMENT,
+        channel_id__isnull=False,
+    ).exclude(asset="").values_list("channel_id", flat=True)
 
     # check delete workspace and its lifecycle-owned agent users
     with agent_lifecycle():
@@ -218,6 +230,33 @@ def hard_delete():
         # Check if the model has a 'deleted_at' field
         if hasattr(model, "deleted_at"):
             # Get all instances where 'deleted_at' is greater than 30 days ago
-            _ = model.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days)).delete()
+            expired = model.all_objects.filter(deleted_at__lt=timezone.now() - timezone.timedelta(days=days))
+            if model is Document:
+                pending_asset_documents = (
+                    FileAsset.all_objects.filter(
+                        entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+                    )
+                    .exclude(asset="")
+                    .values_list("document_id", flat=True)
+                )
+                expired = expired.exclude(id__in=pending_asset_documents)
+            if model is Channel:
+                expired = expired.exclude(id__in=retained_asset_channels)
+            if model is FileAsset:
+                expired = expired.filter(document_version_links__isnull=True)
+                expired = expired.exclude(
+                    models.Q(
+                        entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+                        document__deleted_at__isnull=False,
+                    )
+                    & ~models.Q(asset="")
+                )
+                expired = expired.exclude(
+                    models.Q(
+                        entity_type=FileAsset.EntityTypeContext.MESSAGE_ATTACHMENT,
+                    )
+                    & ~models.Q(asset="")
+                )
+            _ = expired.delete()
 
     return

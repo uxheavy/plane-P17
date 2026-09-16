@@ -23,8 +23,12 @@ from .work_map import urlpatterns as work_map_urls
 from .workspace import urlpatterns as workspace_urls
 from .timezone import urlpatterns as timezone_urls
 from .exporter import urlpatterns as exporter_urls
+from .channel import urlpatterns as channel_urls
+from .conversation_proposal import urlpatterns as conversation_proposal_urls
+from .agent_profile import urlpatterns as agent_profile_urls
 
 urlpatterns = [
+    *agent_profile_urls,
     *analytic_urls,
     *asset_urls,
     *cycle_urls,
@@ -46,4 +50,6 @@ urlpatterns = [
     *work_map_urls,
     *timezone_urls,
     *exporter_urls,
+    *channel_urls,
+    *conversation_proposal_urls,
 ]

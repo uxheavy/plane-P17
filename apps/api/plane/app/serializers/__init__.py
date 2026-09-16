@@ -53,7 +53,12 @@ from .cycle import (
     CycleWriteSerializer,
     CycleUserPropertiesSerializer,
 )
-from .asset import FileAssetSerializer
+from .asset import (
+    ChannelAttachmentSerializer,
+    FileAssetSerializer,
+    WorkMapSceneAssetCreateSerializer,
+    WorkMapSceneAssetSerializer,
+)
 from .issue import (
     IssueCreateSerializer,
     IssueActivitySerializer,
@@ -105,13 +110,17 @@ from .page import (
     PageVersionDetailSerializer,
 )
 from .work_map import (
+    WorkMapBindingCancelSerializer,
     WorkMapBindingCreateSerializer,
     WorkMapBindingHydrationSerializer,
     WorkMapBindingOpenSerializer,
     WorkMapCreateSerializer,
+    WorkMapPasteRebindingSerializer,
     WorkMapSceneSerializer,
     WorkMapSourceDiscoverySerializer,
     WorkMapUpdateSerializer,
+    WorkMapVersionRestoreSerializer,
+    WorkMapVersionSerializer,
 )
 
 from .estimate import (
@@ -144,3 +153,11 @@ from .draft import (
     DraftIssueSerializer,
     DraftIssueDetailSerializer,
 )
+from .channel import (
+    ChannelAttachmentCreateSerializer,
+    ChannelCreateSerializer,
+    ChannelSerializer,
+    MessageCreateSerializer,
+    MessageSerializer,
+)
+from .conversation_proposal import ConversationProposalRequestSerializer

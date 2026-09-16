@@ -27,7 +27,10 @@ def get_entity_id_field(entity_type, entity_id):
         FileAsset.EntityTypeContext.USER_COVER: {"user_id": entity_id},
         FileAsset.EntityTypeContext.ISSUE_ATTACHMENT: {"issue_id": entity_id},
         FileAsset.EntityTypeContext.ISSUE_DESCRIPTION: {"issue_id": entity_id},
-        FileAsset.EntityTypeContext.PAGE_DESCRIPTION: {"page_id": entity_id},
+        FileAsset.EntityTypeContext.PAGE_DESCRIPTION: {
+            "page_id": entity_id,
+            "document_id": entity_id,
+        },
         FileAsset.EntityTypeContext.COMMENT_DESCRIPTION: {"comment_id": entity_id},
         FileAsset.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION: {"draft_issue_id": entity_id},
     }

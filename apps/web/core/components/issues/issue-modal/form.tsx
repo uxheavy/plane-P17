@@ -19,7 +19,7 @@ import type { EditorRefApi } from "@plane/editor";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { TIssue, TWorkspaceDraftIssue } from "@plane/types";
+import type { TIssue, TIssueCreationOrigin, TIssueCreationRequest, TWorkspaceDraftIssue } from "@plane/types";
 // hooks
 import { Switch } from "@makeplane/propel/components/switch";
 import {
@@ -49,6 +49,8 @@ import { useProjectIssueProperties } from "@/hooks/project-issue-properties/use-
 
 export interface IssueFormProps {
   data?: Partial<TIssue>;
+  createRequestMetadata?: { creation_origin: TIssueCreationRequest };
+  draftCreationOrigin?: TIssueCreationOrigin;
   issueTitleRef: React.MutableRefObject<HTMLInputElement | null>;
   isCreateMoreToggleEnabled: boolean;
   onAssetUpload: (assetId: string) => void;
@@ -402,13 +404,16 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     )
       return;
 
+    const currentDocumentHTML = editorRef.current?.getDocument().html;
+    const submittedFormData = currentDocumentHTML ? { ...formData, description_html: currentDocumentHTML } : formData;
+
     const submitData = !data?.id
-      ? formData
+      ? submittedFormData
       : {
-          ...getChangedIssuefields(formData, dirtyFields as { [key: string]: boolean | undefined }),
+          ...getChangedIssuefields(submittedFormData, dirtyFields as { [key: string]: boolean | undefined }),
           project_id: getValues<"project_id">("project_id"),
           id: data.id,
-          description_html: formData.description_html ?? "<p></p>",
+          description_html: submittedFormData.description_html ?? "<p></p>",
           type_id: getValues<"type_id">("type_id"),
         };
 

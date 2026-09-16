@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
@@ -11,16 +12,20 @@ import { Controller, useForm } from "react-hook-form";
 import { Disclosure } from "@headlessui/react";
 // plane imports
 import { ROLE, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
-import { TrashIcon, SuspendedUserIcon } from "@plane/propel/icons";
+import { InfoIcon, TrashIcon, SuspendedUserIcon } from "@plane/propel/icons";
 import { Pill, EPillVariant, EPillSize } from "@plane/propel/pill";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
+import { Tooltip } from "@plane/propel/tooltip";
 import type { IUser, IWorkspaceMember } from "@plane/types";
 // plane ui
-import { CustomSelect, PopoverMenu } from "@plane/ui";
+import { Avatar, CustomSelect, PopoverMenu } from "@plane/ui";
 // helpers
 import { getFileURL } from "@plane/utils";
 
+// components
+import { AgentProfileModal } from "@/components/profile/agent-profile-modal";
 // hooks
+import { useTranslation } from "@plane/i18n";
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 import { isNativeAgent } from "@/store/member/utils";
@@ -44,10 +49,15 @@ type AccountTypeProps = {
 
 export function NameColumn(props: NameProps) {
   const { rowData, workspaceSlug, isAdmin, currentUser, setRemoveMemberModal } = props;
+  const [isAgentProfileOpen, setIsAgentProfileOpen] = useState(false);
+  const { t } = useTranslation();
   // derived values
   const { avatar_url, display_name, email, first_name, id, last_name } = rowData.member;
   const isSuspended = rowData.is_active === false;
   const isAgent = isNativeAgent(rowData.member);
+  const memberName = isAgent
+    ? display_name || t("workspace_settings.settings.members.agent_profile.title")
+    : `${first_name} ${last_name}`;
 
   return (
     <Disclosure>
@@ -59,28 +69,41 @@ export function NameColumn(props: NameProps) {
                 <div className="rounded-full bg-layer-1">
                   <SuspendedUserIcon className="size-6 text-placeholder" />
                 </div>
-              ) : avatar_url && avatar_url.trim() !== "" ? (
-                <Link href={`/${workspaceSlug}/profile/${id}`}>
-                  <span className="relative flex size-6 items-center justify-center rounded-full text-on-color capitalize">
-                    <img
-                      src={getFileURL(avatar_url)}
-                      className="absolute top-0 left-0 h-full w-full rounded-full object-cover"
-                      alt={display_name || email}
-                    />
-                  </span>
-                </Link>
               ) : (
                 <Link href={`/${workspaceSlug}/profile/${id}`}>
-                  <span className="relative flex size-6 items-center justify-center rounded-full bg-layer-3 text-11 text-tertiary capitalize">
-                    {(email ?? display_name ?? "?")[0]}
-                  </span>
+                  <Avatar
+                    name={memberName || display_name || email || undefined}
+                    src={getFileURL(avatar_url ?? "")}
+                    size="sm"
+                    showTooltip={false}
+                  />
                 </Link>
               )}
-              <span className={isSuspended ? "text-placeholder" : ""}>
-                {isAgent ? display_name : `${first_name} ${last_name}`}
-              </span>
+              <span className={isSuspended ? "text-placeholder" : ""}>{memberName}</span>
             </div>
 
+            {!isSuspended && isAgent && (
+              <>
+                <Tooltip tooltipContent={t("workspace_settings.settings.members.agent_profile.inspect")} position="top">
+                  <button
+                    type="button"
+                    className="focus:ring-focus flex size-7 shrink-0 items-center justify-center rounded text-secondary transition-opacity hover:bg-layer-1 hover:text-primary focus:ring-2 focus:outline-none"
+                    aria-label={t("workspace_settings.settings.members.agent_profile.inspect")}
+                    onClick={() => setIsAgentProfileOpen(true)}
+                  >
+                    <InfoIcon className="size-4" aria-hidden="true" />
+                  </button>
+                </Tooltip>
+                <AgentProfileModal
+                  agentName={display_name}
+                  isAdmin={isAdmin}
+                  isOpen={isAgentProfileOpen}
+                  onClose={() => setIsAgentProfileOpen(false)}
+                  userId={id}
+                  workspaceSlug={workspaceSlug}
+                />
+              </>
+            )}
             {!isSuspended && !isAgent && (isAdmin || id === currentUser?.id) && (
               <PopoverMenu
                 data={[""]}
@@ -102,6 +125,21 @@ export function NameColumn(props: NameProps) {
         </div>
       )}
     </Disclosure>
+  );
+}
+
+export function MemberStatusColumn({ rowData }: { rowData: RowData }) {
+  const { t } = useTranslation();
+  const isSuspended = rowData.is_active === false;
+
+  return (
+    <div className="flex w-32">
+      <Pill variant={EPillVariant.DEFAULT} size={EPillSize.SM} className="border-none">
+        {isSuspended
+          ? t("workspace_settings.settings.members.agent_status.suspended")
+          : t("workspace_settings.settings.members.agent_status.active")}
+      </Pill>
+    </div>
   );
 }
 

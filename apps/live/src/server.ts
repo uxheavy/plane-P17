@@ -46,12 +46,12 @@ export class Server {
       await redisManager.initialize();
       logger.info("SERVER: Redis setup completed");
       const redisClient = redisManager.getClient();
-      if (!redisClient) throw new Error("Redis is required for Work Map realtime");
+      if (!redisClient) throw new Error("Redis is required for Work map realtime");
       const workMapPublisher = redisClient.duplicate();
       const workMapSubscriber = redisClient.duplicate();
       await Promise.all([workMapPublisher.ping(), workMapSubscriber.ping()]);
       await this.workMapRelay.initialize(workMapPublisher, workMapSubscriber);
-      logger.info("SERVER: Work Map relay setup completed");
+      logger.info("SERVER: Work map relay setup completed");
       const manager = HocusPocusServerManager.getInstance();
       this.hocuspocusServer = await manager.initialize();
       logger.info("SERVER: HocusPocus setup completed");

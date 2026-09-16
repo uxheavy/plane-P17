@@ -12,6 +12,8 @@ import { SIDEBAR_WIDTH } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
 // components
 import { ResizableSidebar } from "@/components/sidebar/resizable-sidebar";
+import type { TChatSidebarActions, TChatSidebarState } from "@/components/conversations/conversation-sidebar-state";
+import { useConversationSidebar } from "@/components/conversations/conversation-sidebar-provider";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 // local imports
@@ -19,6 +21,18 @@ import { ExtendedAppSidebar } from "./extended-sidebar";
 import { AppSidebar } from "./sidebar";
 
 export const ProjectAppSidebar = observer(function ProjectAppSidebar() {
+  const { chatSidebarActions, chatSidebarState } = useConversationSidebar();
+
+  return <ProjectAppSidebarContent chatSidebarActions={chatSidebarActions} chatSidebarState={chatSidebarState} />;
+});
+
+const ProjectAppSidebarContent = observer(function ProjectAppSidebarContent({
+  chatSidebarActions,
+  chatSidebarState,
+}: {
+  chatSidebarActions: TChatSidebarActions;
+  chatSidebarState: TChatSidebarState;
+}) {
   // store hooks
   const {
     sidebarCollapsed,
@@ -37,7 +51,7 @@ export const ProjectAppSidebar = observer(function ProjectAppSidebar() {
   // derived values
   const isAnyExtendedSidebarOpen = isExtendedSidebarOpened;
 
-  const isNotificationsPath = pathname.includes(`/${workspaceSlug}/notifications`);
+  const isNotificationsPath = pathname.includes(`/${workspaceSlug?.toString() ?? ""}/notifications`);
 
   // handlers
   const handleWidthChange = (width: number) => setValue(width);
@@ -66,7 +80,7 @@ export const ProjectAppSidebar = observer(function ProjectAppSidebar() {
         isAnyExtendedSidebarExpanded={isAnyExtendedSidebarOpen}
         isAnySidebarDropdownOpen={isAnySidebarDropdownOpen}
       >
-        <AppSidebar />
+        <AppSidebar chatSidebarActions={chatSidebarActions} chatSidebarState={chatSidebarState} />
       </ResizableSidebar>
     </>
   );

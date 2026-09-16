@@ -18,10 +18,11 @@ from celery import shared_task
 
 # Module imports
 from plane.db.models import (
-    EmailNotificationLog,
-    PageVersion,
     APIActivityLog,
+    DocumentVersion,
+    EmailNotificationLog,
     IssueDescriptionVersion,
+    PageVersion,
     WebhookLog,
 )
 from plane.utils.exception_logger import log_exception
@@ -117,9 +118,29 @@ def get_page_versions_queryset():
         .filter(row_num__gt=20)
         .values("id")
     )
-
     return (
         PageVersion.all_objects.filter(id__in=Subquery(subq))
+        .values_list("id", flat=True)
+        .iterator(chunk_size=BATCH_SIZE)
+    )
+
+
+def get_work_map_versions_queryset():
+    """Get Work map versions beyond the maximum allowed (20 per Document)."""
+    subq = (
+        DocumentVersion.all_objects.filter(work_map__isnull=False)
+        .annotate(
+            row_num=Window(
+                expression=RowNumber(),
+                partition_by=[F("document_id")],
+                order_by=F("created_at").desc(),
+            )
+        )
+        .filter(row_num__gt=20)
+        .values("id")
+    )
+    return (
+        DocumentVersion.all_objects.filter(id__in=Subquery(subq))
         .values_list("id", flat=True)
         .iterator(chunk_size=BATCH_SIZE)
     )
@@ -180,11 +201,16 @@ def delete_email_notification_logs():
 
 @shared_task
 def delete_page_versions():
-    """Delete excess page versions."""
+    """Delete excess Page and Work map document versions."""
     process_cleanup_task(
         queryset_func=get_page_versions_queryset,
         model=PageVersion,
         task_name="Page Version",
+    )
+    process_cleanup_task(
+        queryset_func=get_work_map_versions_queryset,
+        model=DocumentVersion,
+        task_name="Work map Version",
     )
 
 

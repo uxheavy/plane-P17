@@ -10,6 +10,7 @@ import re
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.db import IntegrityError
 from django.db.models import (
     Case,
@@ -66,6 +67,7 @@ from plane.app.permissions import (
 )
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import (
+    APIToken,
     Issue,
     IssueActivity,
     FileAsset,
@@ -2041,6 +2043,28 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
     model = FileAsset
     use_read_replica = True
 
+    @staticmethod
+    def _get_attachment(*, slug, project_id, issue_id, pk):
+        return get_object_or_404(
+            FileAsset,
+            pk=pk,
+            workspace__slug=slug,
+            project_id=project_id,
+            issue_id=issue_id,
+            entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+        )
+
+    @staticmethod
+    def _is_agent_runtime_request(request):
+        token = getattr(request, "auth", None)
+        return (
+            bool(token)
+            and APIToken.objects.filter(
+                token=token,
+                purpose=APIToken.Purpose.AGENT_RUNTIME,
+            ).exists()
+        )
+
     @issue_attachment_docs(
         operation_id="delete_work_item_attachment",
         description="Permanently remove an attachment from a work item. Records deletion activity for audit purposes.",
@@ -2072,7 +2096,7 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        issue_attachment = FileAsset.objects.get(pk=pk, workspace__slug=slug, project_id=project_id)
+        issue_attachment = self._get_attachment(slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
         issue_attachment.is_deleted = True
         issue_attachment.deleted_at = timezone.now()
         issue_attachment.save()
@@ -2146,7 +2170,7 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
             )
 
         # Get the asset
-        asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id)
+        asset = self._get_attachment(slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
 
         # Check if the asset is uploaded
         if not asset.is_uploaded:
@@ -2210,7 +2234,12 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        issue_attachment = FileAsset.objects.get(pk=pk, workspace__slug=slug, project_id=project_id)
+        issue_attachment = self._get_attachment(slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
+        if self._is_agent_runtime_request(request) and issue_attachment.created_by_id != request.user.id:
+            return Response(
+                {"error": "The attachment belongs to another producer"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = IssueAttachmentSerializer(issue_attachment)
 
         # Send this activity only if the attachment is not uploaded before

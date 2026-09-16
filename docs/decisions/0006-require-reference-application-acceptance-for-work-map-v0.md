@@ -1,4 +1,4 @@
-# ADR-0006: Require layered reference-application acceptance for Work Map V0
+# ADR-0006: Require layered reference-application acceptance for Work map V0
 
 ## Status
 
@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-Work Map crosses Django lifecycle and permissions, Plane entity owners, browser
+Work map crosses Django lifecycle and permissions, Plane entity owners, browser
 interaction, Excalidraw native behavior, Hocuspocus/Redis persistence, assets,
 untrusted iframes, and an external acceptance consumer. Unit tests alone cannot
 prove experienced correctness, while a hand-built demo cannot prove
@@ -26,13 +26,16 @@ that evidence lifecycle.
 
 ## Decision
 
-Work Map V0 requires layered proof:
+Work map V0 requires layered proof:
 
 1. focused unit tests for deterministic local logic;
 2. backend/live/web contract tests for authority and integration boundaries;
 3. the exact-package realtime/carrier/clipboard gate in ADR-0004;
 4. real desktop and tablet outside-in journeys through signed-in Plane; and
 5. a bounded human review of the exact automated state.
+
+The package-level integration and shortcut contract required by this proof is
+the host-owned Excalidraw boundary in ADR-0007.
 
 Passing a lower layer never substitutes for a higher layer whose risk it cannot
 observe. Evidence proves only the exercised scenarios and supported envelope.
@@ -128,16 +131,25 @@ produces no inserted subset or scene, binding, or asset change.
 
 #### Experienced desktop and tablet behavior
 
-Through the real project Work Map routes and real sign-in, prove create/list/
+Through the real project Work map routes and real sign-in, prove create/list/
 open, native drawing, placement and canonical source action, hydration and
-tombstones, disconnected/read-only state, recovery retry, URL-embed behavior,
+tombstones, transient-failure authoring, silent autosync and draft preservation
+across reconnect, permission/recovery boundaries, URL-embed behavior,
 duplicate, versions, lock/archive, search/favorite/recent, and project-scoped
 denial. Tablet proof uses touch and no-hover affordances rather than a resized
 desktop assertion.
 
+The retained review map presents the full supported source gallery: every Work
+Item state group and priority with absent/partial/bounded dates, every Module
+status, current/upcoming/completed/undated Cycles, all Intake statuses, and
+active public/private/locked Project Views and Pages. Archived Views and Pages
+are provisioned but must remain absent from discovery, proving the exclusion
+rather than presenting an unauthorized stale card.
+
 Recovery proof covers durable-acknowledgement cleanup, explicit discard, expiry
-cleanup, generation-mismatch rejection, and authority-revocation rejection,
-without silent replay or document mutation.
+cleanup, same-epoch generation/CAS convergence, authority-revocation rejection,
+and local-storage failure handling, without silent replay or unauthorized
+source, binding, or asset mutation.
 
 #### Supported performance envelope
 
@@ -158,17 +170,17 @@ makes no performance promise beyond it.
 The matrix identifies experienced risks; lower-level tests may support a row but
 cannot replace its outside-in result.
 
-| Scenario | Actor | Accepted outcome | Dangerous outcome | Source of truth | Risk |
-| --- | --- | --- | --- | --- | --- |
-| Existing Page compatibility | Page owner and project member | Existing identity, routes, supported API, access, versions, assets, associations, discovery, and realtime locator remain stable through migration and rollback boundary | identity translation, route drift, cross-project read, lost state, or permanent dual ownership | current Page contracts and migrated Plane state | critical production regression |
-| Desktop authoring and persistence | Work Map editor | Real native scene, all supported Plane-node kinds, assets, arrows, reload, and service restart preserve equivalent durable state | overlay-only behavior, session state, or restart drift | exact binary, protected bindings, assets, and rendered scene | main V0 journey is false |
-| Permission-aware loaded map | Authorized editor, authorized viewer, and source-denied viewer | Per-viewer projections differ without collaborative leakage; a denied attachment to an already-loaded room receives no content; active source revocation tombstones only the affected cached projection | map access grants source access, cached room bypass, stale protected metadata, or metadata oracle | current map/source permission owners and raw transport inspection | confidentiality breach |
-| Realtime convergence and recovery | Two editors and one read-only viewer | Deterministic conflicts converge; remote edits stay out of local undo; acknowledged state survives restart; failure freezes and explicit retry reauthorizes; acknowledgement, discard, and expiry clean journals while generation/authority rejection never replays | false durability, read-only write, silent replay, unbounded local recovery state, or stale-generation corruption | persisted binary, generation, device-local journal, and restart readback | document corruption |
-| Cross-map mixed paste | Target editor with allowed and denied source cases | Allowed paste preserves key-sharing topology, assets, and structure before one native insertion; denial, asset failure, placement failure, or cross-workspace input leaves scene, bindings, and assets unchanged | partial selection, old key, orphan binding, asset drift, broken structure, or leaked source | binding transaction, Plane asset owner, and final collaborative scene | authorization and data loss |
-| Version restore and duplicate | Document owner | Scene, binding snapshot, generation, and asset references change atomically; duplicate is complete and independently authorized | mixed version state, missing historical asset, stale overwrite, or visible partial duplicate | Work Map aggregate and Plane asset owner | unrecoverable inconsistency |
-| URL embed trust on desktop and tablet | Editor and read-only viewer | Controlled allowed, denied, and slow origins prove inert-first loading, shared document enablement, viewer-local load, origin reset, native pan/interaction, sandbox, and credential isolation | iframe steals gestures, viewer mutates document, sandbox weakens, credential leak, or canvas stall | collaborative node state, browser policy, and controlled local origins | third-party trust and gesture failure |
-| Discovery and project lifecycle | Owner and members with different project access | Lists, search, favorite, and recent open through an accessible active project; Page-like lock/archive and final-link deletion behavior hold | unscoped access, ghost route, or Work Map-only lifecycle semantics | shared Document associations and current Page behavior | secondary access drift |
-| Supported load envelope | Ten authenticated editors | A 1,000-element scene with 100 live nodes and five embeds remains interactive while hydration is independent and clients converge | hydration or embeds block drawing, crash clients, or prevent convergence | measured browser interaction and persisted final state | unusable supported scale |
+| Scenario                              | Actor                                                          | Accepted outcome                                                                                                                                                                                                                                                                                                                                                                      | Dangerous outcome                                                                                                | Source of truth                                                          | Risk                                  |
+| ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------- |
+| Existing Page compatibility           | Page owner and project member                                  | Existing identity, routes, supported API, access, versions, assets, associations, discovery, and realtime locator remain stable through migration and rollback boundary                                                                                                                                                                                                               | identity translation, route drift, cross-project read, lost state, or permanent dual ownership                   | current Page contracts and migrated Plane state                          | critical production regression        |
+| Desktop authoring and persistence     | Work map editor                                                | Real native scene, all supported Plane-node kinds, assets, arrows, reload, and service restart preserve equivalent durable state                                                                                                                                                                                                                                                      | overlay-only behavior, session state, or restart drift                                                           | exact binary, protected bindings, assets, and rendered scene             | main V0 journey is false              |
+| Permission-aware loaded map           | Authorized editor, authorized viewer, and source-denied viewer | Per-viewer projections differ without collaborative leakage; a denied attachment to an already-loaded room receives no content; active source revocation tombstones only the affected cached projection                                                                                                                                                                               | map access grants source access, cached room bypass, stale protected metadata, or metadata oracle                | current map/source permission owners and raw transport inspection        | confidentiality breach                |
+| Realtime convergence and recovery     | Two editors and one read-only viewer                           | Deterministic conflicts converge; remote edits stay out of local undo; acknowledged state survives restart; transient relay/save failures preserve local geometry/text for silent autosync when authorized; acknowledgement, discard, and expiry clean journals while permission/epoch/generation/storage boundaries never authorize stale replay or source, binding, or asset writes | false durability, read-only write, silent replay, unbounded local recovery state, or stale-generation corruption | persisted binary, generation, device-local journal, and restart readback | document corruption                   |
+| Cross-map mixed paste                 | Target editor with allowed and denied source cases             | Allowed paste preserves key-sharing topology, assets, and structure before one native insertion; denial, asset failure, placement failure, or cross-workspace input leaves scene, bindings, and assets unchanged                                                                                                                                                                      | partial selection, old key, orphan binding, asset drift, broken structure, or leaked source                      | binding transaction, Plane asset owner, and final collaborative scene    | authorization and data loss           |
+| Version restore and duplicate         | Document owner                                                 | Scene, binding snapshot, generation, and asset references change atomically; duplicate is complete and independently authorized                                                                                                                                                                                                                                                       | mixed version state, missing historical asset, stale overwrite, or visible partial duplicate                     | Work map aggregate and Plane asset owner                                 | unrecoverable inconsistency           |
+| URL embed trust on desktop and tablet | Editor and read-only viewer                                    | Controlled allowed, denied, and slow origins prove inert-first loading, shared document enablement, viewer-local load, origin reset, native pan/interaction, sandbox, and credential isolation                                                                                                                                                                                        | iframe steals gestures, viewer mutates document, sandbox weakens, credential leak, or canvas stall               | collaborative node state, browser policy, and controlled local origins   | third-party trust and gesture failure |
+| Discovery and project lifecycle       | Owner and members with different project access                | Lists, search, favorite, and recent open through an accessible active project; Page-like lock/archive and final-link deletion behavior hold                                                                                                                                                                                                                                           | unscoped access, ghost route, or Work map-only lifecycle semantics                                               | shared Document associations and current Page behavior                   | secondary access drift                |
+| Supported load envelope               | Ten authenticated editors                                      | A 1,000-element scene with 100 live nodes and five embeds remains interactive while hydration is independent and clients converge                                                                                                                                                                                                                                                     | hydration or embeds block drawing, crash clients, or prevent convergence                                         | measured browser interaction and persisted final state                   | unusable supported scale              |
 
 ### Release failure semantics
 

@@ -32,4 +32,8 @@ export const FAVORITE_ITEM_LINKS: {
     itemLevel: "project",
     getLink: (favorite) => `pages/${favorite.entity_identifier}`,
   },
+  work_map: {
+    itemLevel: "project",
+    getLink: (favorite) => `work-maps/${favorite.entity_identifier}`,
+  },
 };

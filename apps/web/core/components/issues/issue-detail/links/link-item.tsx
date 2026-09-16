@@ -5,6 +5,10 @@
  */
 
 import { observer } from "mobx-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useLocation } from "react-router";
+import type { MouseEvent } from "react";
 
 import { useTranslation } from "@plane/i18n";
 import { LinkIcon, CopyIcon, EditIcon, TrashIcon } from "@plane/propel/icons";
@@ -15,6 +19,11 @@ import { EIssueServiceType } from "@plane/types";
 // ui
 import { CustomMenu } from "@plane/ui";
 import { calculateTimeAgo, copyTextToClipboard } from "@plane/utils";
+import {
+  getConversationSourceNavigationHref,
+  isExternalNavigationHref,
+} from "@/components/conversations/conversation-navigation";
+import { useConversationSidebar } from "@/components/conversations/conversation-sidebar-provider";
 // helpers
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -39,12 +48,46 @@ export const IssueLinkItem = observer(function IssueLinkItem(props: TIssueLinkIt
     link: { getLinkById },
   } = useIssueDetail(issueServiceType);
   const { isMobile } = usePlatformOS();
+  const { chatSidebarActions } = useConversationSidebar();
+  const { workspaceSlug } = useParams();
+  const location = useLocation();
   const linkDetail = getLinkById(linkId);
   if (!linkDetail) return <></>;
 
   // const Icon = getIconForLink(linkDetail.url);
   const faviconUrl: string | undefined = linkDetail.metadata?.favicon;
   const linkTitle: string | undefined = linkDetail.metadata?.title;
+  const resolvedWorkspaceSlug = workspaceSlug?.toString() ?? "";
+  const currentHref = `${location.pathname}${location.search}${location.hash}`;
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : null;
+  const conversationHref = getConversationSourceNavigationHref(
+    currentHref,
+    linkDetail.url,
+    resolvedWorkspaceSlug,
+    currentOrigin
+  );
+  const isExternalLink = isExternalNavigationHref(linkDetail.url, currentOrigin);
+  const linkHref = conversationHref ?? linkDetail.url;
+  const handleConversationSourceClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      conversationHref === null ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    chatSidebarActions.setActiveTab("chat");
+  };
+  const linkLabel = (
+    <span className="w-0 flex-1 truncate">
+      {linkDetail.title && linkDetail.title !== "" ? linkDetail.title : linkDetail.url}
+      {linkTitle && linkTitle !== "" && <span className="text-caption-sm-regular text-placeholder"> {linkTitle}</span>}
+    </span>
+  );
 
   const toggleIssueLinkModal = (modalToggle: boolean) => {
     toggleIssueLinkModalStore(modalToggle);
@@ -63,26 +106,28 @@ export const IssueLinkItem = observer(function IssueLinkItem(props: TIssueLinkIt
             <LinkIcon className="size-4 flex-shrink-0 text-tertiary group-hover:text-primary" />
           )}
           <Tooltip tooltipContent={linkDetail.url} isMobile={isMobile}>
-            <a
-              href={linkDetail.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-0 flex-1 cursor-pointer items-center text-body-xs-regular"
-            >
-              <span className="w-0 flex-1 truncate">
-                {linkDetail.title && linkDetail.title !== "" ? linkDetail.title : linkDetail.url}
-                {linkTitle && linkTitle !== "" && (
-                  <span className="text-caption-sm-regular text-placeholder"> {linkTitle}</span>
-                )}
-              </span>
-            </a>
+            {!isExternalLink ? (
+              <Link
+                className="flex w-0 flex-1 cursor-pointer items-center text-body-xs-regular"
+                href={linkHref}
+                onClick={handleConversationSourceClick}
+              >
+                {linkLabel}
+              </Link>
+            ) : (
+              <a className="flex w-0 flex-1 cursor-pointer items-center text-body-xs-regular" href={linkHref}>
+                {linkLabel}
+              </a>
+            )}
           </Tooltip>
         </div>
         <div className="flex flex-shrink-0 items-center gap-1">
           <p className="group-hover-text-secondary p-1 align-bottom text-caption-sm-regular leading-5 text-placeholder">
             {calculateTimeAgo(linkDetail.created_at)}
           </p>
-          <span
+          <button
+            type="button"
+            aria-label={t("common.copy_link")}
             onClick={() => {
               copyTextToClipboard(linkDetail.url);
               setToast({
@@ -94,7 +139,7 @@ export const IssueLinkItem = observer(function IssueLinkItem(props: TIssueLinkIt
             className="relative grid cursor-pointer place-items-center rounded-sm p-1 text-placeholder outline-none group-hover:text-secondary hover:bg-layer-1"
           >
             <CopyIcon className="h-3.5 w-3.5 stroke-[1.5]" />
-          </span>
+          </button>
           <CustomMenu
             ellipsis
             buttonClassName="text-placeholder group-hover:text-secondary"

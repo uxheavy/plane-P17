@@ -25,11 +25,12 @@ import { useMemberColumns } from "@/components/workspace/settings/useMemberColum
 
 type Props = {
   memberDetails: (IWorkspaceMember | null)[];
+  isAgentTab?: boolean;
 };
 
 export const WorkspaceMembersListItem = observer(function WorkspaceMembersListItem(props: Props) {
-  const { memberDetails } = props;
-  const { columns, workspaceSlug, removeMemberModal, setRemoveMemberModal } = useMemberColumns();
+  const { memberDetails, isAgentTab = false } = props;
+  const { columns, workspaceSlug, removeMemberModal, setRemoveMemberModal } = useMemberColumns({ isAgentTab });
   // router
   const router = useAppRouter();
   // store hooks

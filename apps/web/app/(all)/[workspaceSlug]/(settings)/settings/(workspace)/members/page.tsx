@@ -6,11 +6,13 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
+import { useRouter, useSearchParams } from "next/navigation";
 // types
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { SearchIcon } from "@plane/propel/icons";
+import { Tabs } from "@plane/propel/tabs";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { IWorkspaceBulkInviteFormData } from "@plane/types";
 import { cn } from "@plane/utils";
@@ -26,9 +28,13 @@ import { SendWorkspaceInvitationModal } from "@/components/workspace/members";
 import { useMember } from "@/hooks/store/use-member";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 import { useUserPermissions } from "@/hooks/store/user";
+import { useQueryParams } from "@/hooks/use-query-params";
+import { isNativeAgent } from "@/store/member/utils";
 // local imports
 import type { Route } from "./+types/page";
 import { MembersWorkspaceSettingsHeader } from "./header";
+
+type TMembersTab = "people" | "agents";
 
 const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsPage({ params }: Route.ComponentProps) {
   // states
@@ -36,10 +42,14 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
   const [searchQuery, setSearchQuery] = useState<string>("");
   // router
   const { workspaceSlug } = params;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { updateQueryParams } = useQueryParams();
+  const activeTab: TMembersTab = searchParams.get("tab") === "agents" ? "agents" : "people";
   // store hooks
   const { workspaceUserInfo, allowPermissions } = useUserPermissions();
   const {
-    workspace: { workspaceMemberIds, inviteMembersToWorkspace, filtersStore },
+    workspace: { workspaceMemberIds, getWorkspaceMemberDetails, inviteMembersToWorkspace, filtersStore },
   } = useMember();
   const { currentWorkspace } = useWorkspace();
   const { t } = useTranslation();
@@ -92,6 +102,20 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
   // derived values
   const pageTitle = currentWorkspace?.name ? `${currentWorkspace.name} - Members` : undefined;
   const appliedRoleFilters = filtersStore.filters?.roles || [];
+  const memberCount =
+    workspaceMemberIds?.filter((memberId) => {
+      const details = getWorkspaceMemberDetails(memberId);
+      return details && (activeTab === "agents" ? isNativeAgent(details.member) : !isNativeAgent(details.member));
+    }).length ?? 0;
+
+  const handleTabChange = (value: string) => {
+    const nextTab: TMembersTab = value === "agents" ? "agents" : "people";
+    const route =
+      nextTab === "agents"
+        ? updateQueryParams({ paramsToAdd: { tab: "agents" } })
+        : updateQueryParams({ paramsToRemove: ["tab"] });
+    router.push(route);
+  };
 
   // if user is not authorized to view this page
   if (workspaceUserInfo && !canPerformWorkspaceMemberActions) {
@@ -112,12 +136,22 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
         })}
       >
         <div className="flex items-center justify-between gap-4 pb-3.5">
-          <h4 className="flex items-center gap-2.5 text-h3-medium">
-            {t("workspace_settings.settings.members.title")}
-            {workspaceMemberIds && workspaceMemberIds.length > 0 && (
-              <CountChip count={workspaceMemberIds.length} className="m-auto h-5" />
-            )}
-          </h4>
+          <div className="flex min-w-0 items-center gap-4">
+            <h4 className="flex items-center gap-2.5 text-h3-medium">
+              {t("workspace_settings.settings.members.title")}
+              {memberCount > 0 && <CountChip count={memberCount} className="m-auto h-5" />}
+            </h4>
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="h-auto w-auto shrink-0">
+              <Tabs.List className="h-8" background="contained">
+                <Tabs.Trigger size="sm" value="people">
+                  {t("workspace_settings.settings.members.tabs.people")}
+                </Tabs.Trigger>
+                <Tabs.Trigger size="sm" value="agents">
+                  {t("workspace_settings.settings.members.tabs.agents")}
+                </Tabs.Trigger>
+              </Tabs.List>
+            </Tabs>
+          </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5">
               <SearchIcon className="h-3.5 w-3.5 text-placeholder" />
@@ -130,19 +164,25 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <MemberListFiltersDropdown
-              appliedFilters={appliedRoleFilters}
-              handleUpdate={handleRoleFilterUpdate}
-              memberType="workspace"
-            />
-            {canPerformWorkspaceAdminActions && (
+            {activeTab === "people" && (
+              <MemberListFiltersDropdown
+                appliedFilters={appliedRoleFilters}
+                handleUpdate={handleRoleFilterUpdate}
+                memberType="workspace"
+              />
+            )}
+            {activeTab === "people" && canPerformWorkspaceAdminActions && (
               <Button variant="primary" size="lg" onClick={() => setInviteModal(true)}>
                 {t("workspace_settings.settings.members.add_member")}
               </Button>
             )}
           </div>
         </div>
-        <WorkspaceMembersList searchQuery={searchQuery} isAdmin={canPerformWorkspaceAdminActions} />
+        <WorkspaceMembersList
+          searchQuery={searchQuery}
+          isAdmin={canPerformWorkspaceAdminActions}
+          memberTab={activeTab}
+        />
       </section>
     </SettingsContentWrapper>
   );

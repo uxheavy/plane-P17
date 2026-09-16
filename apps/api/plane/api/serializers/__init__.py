@@ -68,3 +68,4 @@ from .member import (
     ProjectMemberLiteAPISerializer,
 )
 from .sticky import StickySerializer
+from .work_item_claim import WorkItemClaimRequestSerializer, WorkItemClaimResponseSerializer

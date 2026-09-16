@@ -8,17 +8,34 @@ import React from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
-import type { EIssuesStoreType, TIssue } from "@plane/types";
+import type {
+  EIssuesStoreType,
+  TIssue,
+  TIssueCreateResponse,
+  TIssueCreationOrigin,
+  TIssueCreationRequest,
+} from "@plane/types";
 // local imports
 import { CreateUpdateIssueModalBase } from "./base";
 import { IssueModalProvider } from "./provider";
+
+export type TIssueCreateRequestMetadata = {
+  creation_origin: TIssueCreationRequest;
+};
 
 export interface IssuesModalProps {
   data?: Partial<TIssue>;
   isOpen: boolean;
   onClose: () => void;
   beforeFormSubmit?: () => Promise<void>;
-  onSubmit?: (res: TIssue) => Promise<void>;
+  onSubmit?: (res: TIssueCreateResponse) => Promise<void>;
+  createRequestMetadata?: TIssueCreateRequestMetadata;
+  draftCreationOrigin?: TIssueCreationOrigin;
+  deferCloseUntilSubmit?: boolean;
+  /** Render deferred continuation controls inside the modal surface. */
+  deferredSubmitContent?: React.ReactNode;
+  /** Disable native form actions while a deferred continuation is pending. */
+  isSubmitContinuationPending?: boolean;
   withDraftIssueWrapper?: boolean;
   storeType?: EIssuesStoreType;
   isDraft?: boolean;

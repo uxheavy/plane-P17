@@ -8,7 +8,7 @@ import uuid
 
 # Third party imports
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from urllib.parse import quote
 
 # Module imports
@@ -163,7 +163,7 @@ class S3Storage(S3Boto3Storage):
                 CopySource={"Bucket": self.aws_storage_bucket_name, "Key": object_name},
                 Key=new_object_name,
             )
-        except ClientError as e:
+        except (BotoCoreError, ClientError) as e:
             log_exception(e)
             return None
 
@@ -193,13 +193,17 @@ class S3Storage(S3Boto3Storage):
             return False
 
     def delete_files(self, object_names):
-        """Delete an S3 object"""
-        try:
-            self.s3_client.delete_objects(
-                Bucket=self.aws_storage_bucket_name,
-                Delete={"Objects": [{"Key": object_name} for object_name in object_names]},
-            )
-            return True
-        except ClientError as e:
-            log_exception(e)
-            return False
+        """Delete S3 objects in service-sized batches."""
+        deleted = True
+        for offset in range(0, len(object_names), 1000):
+            try:
+                response = self.s3_client.delete_objects(
+                    Bucket=self.aws_storage_bucket_name,
+                    Delete={"Objects": [{"Key": object_name} for object_name in object_names[offset : offset + 1000]]},
+                )
+                if response.get("Errors"):
+                    deleted = False
+            except (BotoCoreError, ClientError) as e:
+                log_exception(e)
+                deleted = False
+        return deleted

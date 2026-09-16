@@ -38,6 +38,7 @@ RUN corepack enable pnpm
 # Copy full directory structure before fetch to ensure all package.json files are available
 COPY --from=builder /app/out/full/ .
 COPY turbo.json turbo.json
+COPY .pnpmfile.cjs .pnpmfile.cjs
 
 # Fetch dependencies to cache store, then install offline with dev deps
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch --store-dir=/pnpm/store
@@ -78,6 +79,8 @@ RUN pnpm turbo run build --filter=web
 FROM nginx:1.31-alpine AS production
 
 RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
+# The custom config owns the listener on 3000; the inherited IPv6 script only targets default.conf.
+RUN rm -f /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
 
 COPY apps/web/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=installer /app/apps/web/build/client /usr/share/nginx/html

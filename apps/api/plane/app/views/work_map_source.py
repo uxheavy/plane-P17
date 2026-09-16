@@ -12,10 +12,11 @@ from plane.app.serializers import (
     WorkMapBindingOpenSerializer,
     WorkMapSourceDiscoverySerializer,
 )
-from plane.db.models import WorkMapBinding
+from plane.db.models import Issue, WorkMapBinding
+from plane.utils.issue_search import ISSUE_SEARCH_FIELDS
 
 from .base import BaseAPIView
-from .work_map import _visible_work_maps
+from .work_map.base import visible_work_maps
 
 
 def _source_projection(source_kind, source, project):
@@ -23,6 +24,7 @@ def _source_projection(source_kind, source, project):
         "source_kind": source_kind,
         "source_id": source.id,
         "project_id": project.id,
+        "project_name": project.name,
         "name": source.issue.name if source_kind == "intake-item" else source.name,
     }
     if source_kind == "work-item":
@@ -37,7 +39,16 @@ def _source_projection(source_kind, source, project):
     elif source_kind == "cycle":
         projection.update(start_date=source.start_date, end_date=source.end_date)
     elif source_kind == "module":
-        projection.update(status=source.status, start_date=source.start_date, target_date=source.target_date)
+        projection.update(
+            status=source.status,
+            start_date=source.start_date,
+            target_date=source.target_date,
+            backlog_issues=source.backlog_issues,
+            unstarted_issues=source.unstarted_issues,
+            started_issues=source.started_issues,
+            completed_issues=source.completed_issues,
+            cancelled_issues=source.cancelled_issues,
+        )
     elif source_kind == "intake-item":
         projection.update(
             sequence_id=source.issue.sequence_id,
@@ -62,7 +73,7 @@ def _unavailable(node_key):
 
 
 def _visible_work_map(request, slug, project_id, work_map_id):
-    return _visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
+    return visible_work_maps(user=request.user, slug=slug, project_id=project_id).filter(id=work_map_id).first()
 
 
 def _readable_bindings(*, request, document, node_keys):
@@ -102,8 +113,12 @@ class WorkMapSourceDiscoveryEndpoint(BaseAPIView):
             workspace_id=document.workspace_id,
             source_kind=data["source_kind"],
             query=data["query"],
+            project_id=data.get("project_id"),
             limit=20,
         )
+        if data["result_format"] == "issue-search":
+            results = Issue.issue_objects.filter(id__in=[source.id for source, _ in sources]).order_by("name", "id")
+            return Response({"results": results.values(*ISSUE_SEARCH_FIELDS)}, status=status.HTTP_200_OK)
         return Response(
             {"results": [_source_projection(data["source_kind"], source, project) for source, project in sources]},
             status=status.HTTP_200_OK,
