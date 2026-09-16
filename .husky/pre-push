@@ -42,5 +42,6 @@ if [ "$base_sha" = "$zero" ]; then
   base_sha=$(git rev-parse "$prod_sha^")
 fi
 
-TURBO_SCM_BASE=$base_sha TURBO_SCM_HEAD=$prod_sha pnpm turbo run check:format check:lint check:types --affected
+TURBO_SCM_BASE=$base_sha TURBO_SCM_HEAD=$prod_sha pnpm turbo run check:format check:lint --affected
+TURBO_SCM_BASE=$base_sha TURBO_SCM_HEAD=$prod_sha pnpm turbo run check:types --affected
 pnpm turbo run test --filter=web
