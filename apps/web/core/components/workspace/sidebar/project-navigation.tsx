@@ -158,7 +158,9 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
     if (additionalNavigationItems) navigationItems.push(...additionalNavigationItems(workspaceSlug, projectId));
 
     // sort navigation items by sortOrder
-    const sortedNavigationItems = navigationItems.toSorted((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    // The web TypeScript target does not include ES2023's toSorted yet.
+    // eslint-disable-next-line unicorn/no-array-sort
+    const sortedNavigationItems = [...navigationItems].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
     return sortedNavigationItems;
   }, [workspaceSlug, projectId, baseNavigation, additionalNavigationItems]);

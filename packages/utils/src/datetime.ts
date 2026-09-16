@@ -43,13 +43,13 @@ export const formatLocalizedTimestamp = (
   date: string | number | Date | undefined | null,
   locale: string,
   userTimezone?: string,
-  mode: "date" | "dateTime" = "date"
+  mode: "date" | "dateTime" | "time" = "date"
 ): string | undefined => {
   if (date === undefined || date === null || date === "") return;
   const parsedDate = date instanceof Date ? date : new Date(date);
   if (!isValid(parsedDate)) return;
   return new Intl.DateTimeFormat(normalizeLocale(locale), {
-    dateStyle: "medium",
+    ...(mode === "time" ? { timeStyle: "short" } : { dateStyle: "medium" }),
     ...(mode === "dateTime" ? { timeStyle: "short" } : {}),
     timeZone: userTimezone || "UTC",
   }).format(parsedDate);
