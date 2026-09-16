@@ -30,11 +30,12 @@ if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
   exit 1
 fi
 
-git fetch --quiet "$remote_name" "+refs/heads/preview:${preview_ref}"
-
-if ! git merge-base --is-ancestor "$preview_ref" "$prod_sha"; then
-  echo "pre-push: prod must contain the current ${remote_name}/preview branch" >&2
-  exit 1
+if git ls-remote --exit-code --heads "$remote_name" preview >/dev/null 2>&1; then
+  git fetch --quiet "$remote_name" "+refs/heads/preview:${preview_ref}"
+  if ! git merge-base --is-ancestor "$preview_ref" "$prod_sha"; then
+    echo "pre-push: prod must contain the current ${remote_name}/preview branch" >&2
+    exit 1
+  fi
 fi
 
 if [ "$base_sha" = "$zero" ]; then
