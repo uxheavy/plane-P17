@@ -11,6 +11,32 @@ import type { TIssueAttachment } from "./issue_attachment";
 import type { TIssueLink } from "./issue_link";
 import type { TIssueReaction, IIssuePublicReaction, IPublicVote } from "./issue_reaction";
 import type { TIssueRelationTypes } from "./issue_relation";
+import type { TConversationCreationOrigin } from "../conversation";
+
+export type TWorkMapCreationOrigin = {
+  kind: "work-map";
+  work_map_id: string;
+  generation: number;
+  placement_id: string;
+  element_id: string;
+};
+
+export type TIssueCreationOrigin = TConversationCreationOrigin | TWorkMapCreationOrigin;
+
+export type TIssueCreationRequest = {
+  intent_id: string;
+  origin: TIssueCreationOrigin;
+};
+
+export type TIssueCreationResult = {
+  intent_id: string;
+  replayed: boolean;
+  origin: (TConversationCreationOrigin & { message_id: string }) | (TWorkMapCreationOrigin & { node_key: string });
+};
+
+export type TIssueCreateResponse = TIssue & {
+  creation?: TIssueCreationResult;
+};
 
 export enum EIssueLayoutTypes {
   LIST = "list",

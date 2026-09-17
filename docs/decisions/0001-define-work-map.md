@@ -1,4 +1,4 @@
-# ADR-0001: Define Work Map as a Plane-native spatial document
+# ADR-0001: Define Work map as a Plane-native spatial document
 
 ## Status
 
@@ -22,24 +22,27 @@ system remains authoritative for referenced work.
 
 ADR-0002 defines shared Document lifecycle, ADR-0003 defines protected Plane
 nodes, ADR-0004 defines realtime authority, ADR-0005 defines URL-embed trust and
-interaction, and ADR-0006 defines the proof required to ship.
+interaction, ADR-0006 defines the proof required to ship, and ADR-0007 defines
+the host-owned Excalidraw integration boundary.
+
+[ADR-0008](0008-define-work-map-host-authority-and-session-policy.md) bổ sung SSOT và chính sách phiên. It supplements these records with accepted host-authority and session policies.
 
 ## Decision
 
-A **Work Map** is a Plane-native collaborative spatial document. It contains:
+A **Work map** is a Plane-native collaborative spatial document. It contains:
 
 - native Excalidraw drawing elements and assets;
 - permission-aware projections of Plane-owned entities;
 - native Excalidraw URL embeds; and
 - native Excalidraw arrows, including free-floating arrows.
 
-Plane owns Work Map identity, metadata, access, project associations, scene
+Plane owns Work map identity, metadata, access, project associations, scene
 content, protected source bindings, versions, assets, collaboration identity,
-and lifecycle. A Work Map does not own or copy a referenced Plane entity.
+and lifecycle. A Work map does not own or copy a referenced Plane entity.
 Source entities remain authoritative in their current owners and retain their
 own authorization, mutation, and history.
 
-Opening a Work Map grants no source access. A viewer unable to read a referenced
+Opening a Work map grants no source access. A viewer unable to read a referenced
 source sees only the geometry-preserving unavailable presentation specified by
 ADR-0003. Spatial proximity and arrows create no Plane work-item relationship,
 graph record, taxonomy, or reconciliation obligation in V0. Later consumers may
@@ -47,9 +50,9 @@ read native scene relationships without changing their current ownership.
 
 ### Product surface
 
-Work Maps are a first-class project section immediately before Pages. They are
+Work maps are a first-class project section immediately before Pages. They are
 always enabled: V0 adds neither a `work_map_view` flag nor reuse of `page_view`.
-Work Maps are flat and have no Page hierarchy.
+Work maps are flat and have no Page hierarchy.
 
 The product routes are:
 
@@ -58,19 +61,22 @@ The product routes are:
 /{workspaceSlug}/projects/{projectId}/work-maps/{workMapId}
 ```
 
-The immutable Work Map ID and active project context define the detail route.
+The immutable Work map ID and active project context define the detail route.
 An editable title, customer name, demo scenario, or map contents never define
 route identity or reusable code vocabulary.
 
 Project lists show document metadata: title, owner, access, active project
-associations, and updated time. V0 stores no scene thumbnail. A new Work Map
+associations, and updated time. V0 stores no scene thumbnail. A new Work map
 persists an empty Excalidraw scene; any empty-state guidance remains local UI
 and contains no persisted template or case data.
 
-Global search indexes Work Map document metadata, including title, but not
-arbitrary scene text. Favorites and recents may discover a Work Map. Opening a
+Document lifecycle actions remain on the Work map list item, following the
+Pages surface. In particular, duplication is not repeated in the editor header.
+
+Global search indexes Work map document metadata, including title, but not
+arbitrary scene text. Favorites and recents may discover a Work map. Opening a
 workspace-level result resolves through an active associated project the viewer
-may access. V0 has no workspace-wide Work Map list, management route, or
+may access. V0 has no workspace-wide Work map list, management route, or
 unscoped detail endpoint.
 
 ### Native editor surface
@@ -82,6 +88,9 @@ undo/redo. Excalidraw remains the owner of those semantics.
 
 Plane adds document identity, permissions, persistence, collaboration, and the
 closed live-node behavior in ADR-0003. It does not recreate a drawing engine.
+Plane live-node entry points render through one generic host extension in the
+native Excalidraw toolbar. Work map must not mount a parallel canvas toolbar or
+duplicate an applicable native Excalidraw tool.
 
 Desktop web and tablet web are supported. They use Excalidraw's native pointer,
 keyboard, trackpad, and touch interaction rather than separate Plane gesture
@@ -101,16 +110,16 @@ does not build a speculative scene-text index.
 
 Document or image export remains disabled until a permission-safe contract
 covers live Plane projections, URL embeds, and native assets. This export
-decision is not implied by native copy/paste between Work Maps.
+decision is not implied by native copy/paste between Work maps.
 
 ## Invariants
 
 - Plane is authoritative for documents and referenced entities; Excalidraw is
   authoritative for native scene behavior.
-- Work Map access and source-entity access are independent decisions.
+- Work map access and source-entity access are independent decisions.
 - Case data enters through an explicit case-owned fixture or user-created
   document, never reusable Plane defaults, routes, modules, or schemas.
-- V0 contains one Work Map product, one collaborative scene, and no exported or
+- V0 contains one Work map product, one collaborative scene, and no exported or
   shadow representation presented as equivalent truth.
 
 ## Verification obligations
@@ -134,7 +143,7 @@ content and collaboration owners. ADR-0002 makes them sibling subtypes.
 
 ### Project view
 
-Rejected because a Work Map owns a durable authored scene and may contain URLs,
+Rejected because a Work map owns a durable authored scene and may contain URLs,
 free drawing, and entities from multiple accessible projects; it is not the
 result of one work-item query.
 

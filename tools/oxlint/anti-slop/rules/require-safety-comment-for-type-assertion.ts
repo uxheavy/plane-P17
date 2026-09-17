@@ -40,8 +40,7 @@ export const requireSafetyCommentForTypeAssertionRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description:
-        "Require a nearby SAFETY comment for every TypeScript type assertion except const assertions.",
+      description: "Require a nearby SAFETY comment for every TypeScript type assertion except const assertions.",
     },
     messages: {
       missingSafetyComment:

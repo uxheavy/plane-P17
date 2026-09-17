@@ -100,6 +100,17 @@ class FileAssetSerializer(BaseSerializer):
 
     asset_url = serializers.CharField(read_only=True)
 
+    def validate(self, attrs):
+        incoming = self.initial_data
+        if "channel" in incoming or "message" in incoming:
+            raise serializers.ValidationError("Channel attachments must use the channel attachment API")
+        if attrs.get("entity_type") in {
+            FileAsset.EntityTypeContext.MESSAGE_ATTACHMENT,
+            FileAsset.EntityTypeContext.WORK_MAP_SCENE,
+        }:
+            raise serializers.ValidationError("Scoped assets must use their owning API")
+        return attrs
+
     class Meta:
         model = FileAsset
         fields = "__all__"

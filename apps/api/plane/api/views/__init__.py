@@ -73,3 +73,4 @@ from .invite import WorkspaceInvitationsViewset
 
 from .sticky import StickyViewSet
 from .agent_membership import WorkspaceAgentMembershipEndpoint
+from .work_item_claim import WorkItemClaimEndpoint

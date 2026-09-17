@@ -65,9 +65,7 @@ class EntityAssetEndpoint(BaseAPIView):
         # same-origin XSS when Spaces assets are served on the application's origin.
         storage = S3Storage(request=request)
         asset_mime_type = (asset.attributes.get("type") or "").split(";")[0].strip().lower()
-        disposition = (
-            "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
-        )
+        disposition = "attachment" if asset_mime_type in settings.SCRIPT_CAPABLE_MIME_TYPES else "inline"
         # Generate a presigned URL to share an S3 object
         signed_url = storage.generate_presigned_url(
             object_name=asset.asset.name,
@@ -102,7 +100,10 @@ class EntityAssetEndpoint(BaseAPIView):
         size_limit = max(1, min(size, settings.FILE_SIZE_LIMIT))
 
         # Check if the entity type is allowed
-        if entity_type not in FileAsset.EntityTypeContext.values:
+        if (
+            entity_type not in FileAsset.EntityTypeContext.values
+            or entity_type == FileAsset.EntityTypeContext.WORK_MAP_SCENE
+        ):
             return Response(
                 {"error": "Invalid entity type.", "status": False},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -162,7 +163,9 @@ class EntityAssetEndpoint(BaseAPIView):
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         # get the asset id — scope to project to prevent cross-project IDOR
-        asset = FileAsset.objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
+        asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id
+        )
         # get the storage metadata
         asset.is_uploaded = True
         # get the storage metadata
@@ -182,7 +185,9 @@ class EntityAssetEndpoint(BaseAPIView):
         if not deploy_board:
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
         # Get the asset
-        asset = FileAsset.objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
+        asset = FileAsset.objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id
+        )
         # Check deleted assets
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -202,7 +207,9 @@ class AssetRestoreEndpoint(BaseAPIView):
             return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get the asset — scope to project to prevent cross-project IDOR
-        asset = FileAsset.all_objects.get(id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id)
+        asset = FileAsset.all_objects.exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE).get(
+            id=pk, workspace=deploy_board.workspace, project_id=deploy_board.project_id
+        )
         asset.is_deleted = False
         asset.deleted_at = None
         asset.save(update_fields=["is_deleted", "deleted_at"])
@@ -230,7 +237,7 @@ class EntityBulkAssetEndpoint(BaseAPIView):
             id__in=asset_ids,
             workspace=deploy_board.workspace,
             project_id=deploy_board.project_id,
-        )
+        ).exclude(entity_type=FileAsset.EntityTypeContext.WORK_MAP_SCENE)
 
         asset = assets.first()
 

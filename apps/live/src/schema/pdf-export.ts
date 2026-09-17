@@ -7,14 +7,14 @@
 import { Schema } from "effect";
 
 export const PdfExportRequestBody = Schema.Struct({
-  pageId: Schema.NonEmptyTrimmedString,
-  workspaceSlug: Schema.NonEmptyTrimmedString,
-  projectId: Schema.optional(Schema.NonEmptyTrimmedString),
+  pageId: Schema.Trimmed.check(Schema.isNonEmpty()),
+  workspaceSlug: Schema.Trimmed.check(Schema.isNonEmpty()),
+  projectId: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
   title: Schema.optional(Schema.String),
   author: Schema.optional(Schema.String),
   subject: Schema.optional(Schema.String),
-  pageSize: Schema.optional(Schema.Literal("A4", "A3", "A2", "LETTER", "LEGAL", "TABLOID")),
-  pageOrientation: Schema.optional(Schema.Literal("portrait", "landscape")),
+  pageSize: Schema.optional(Schema.Literals(["A4", "A3", "A2", "LETTER", "LEGAL", "TABLOID"])),
+  pageOrientation: Schema.optional(Schema.Literals(["portrait", "landscape"])),
   fileName: Schema.optional(Schema.String),
   noAssets: Schema.optional(Schema.Boolean),
 });
@@ -22,39 +22,39 @@ export const PdfExportRequestBody = Schema.Struct({
 export type TPdfExportRequestBody = Schema.Schema.Type<typeof PdfExportRequestBody>;
 
 export class PdfValidationError extends Schema.TaggedError<PdfValidationError>()("PdfValidationError", {
-  message: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
   cause: Schema.optional(Schema.Unknown),
 }) {}
 
 export class PdfAuthenticationError extends Schema.TaggedError<PdfAuthenticationError>()("PdfAuthenticationError", {
-  message: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
 }) {}
 
 export class PdfContentFetchError extends Schema.TaggedError<PdfContentFetchError>()("PdfContentFetchError", {
-  message: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
   cause: Schema.optional(Schema.Unknown),
 }) {}
 
 export class PdfMetadataFetchError extends Schema.TaggedError<PdfMetadataFetchError>()("PdfMetadataFetchError", {
-  message: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
   source: Schema.Literal("user-mentions"),
   cause: Schema.optional(Schema.Unknown),
 }) {}
 
 export class PdfImageProcessingError extends Schema.TaggedError<PdfImageProcessingError>()("PdfImageProcessingError", {
-  message: Schema.NonEmptyTrimmedString,
-  assetId: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
+  assetId: Schema.Trimmed.check(Schema.isNonEmpty()),
   cause: Schema.optional(Schema.Unknown),
 }) {}
 
 export class PdfGenerationError extends Schema.TaggedError<PdfGenerationError>()("PdfGenerationError", {
-  message: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
   cause: Schema.optional(Schema.Unknown),
 }) {}
 
 export class PdfTimeoutError extends Schema.TaggedError<PdfTimeoutError>()("PdfTimeoutError", {
-  message: Schema.NonEmptyTrimmedString,
-  operation: Schema.NonEmptyTrimmedString,
+  message: Schema.Trimmed.check(Schema.isNonEmpty()),
+  operation: Schema.Trimmed.check(Schema.isNonEmpty()),
 }) {}
 
 export type PdfExportError =

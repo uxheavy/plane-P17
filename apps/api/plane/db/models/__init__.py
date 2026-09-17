@@ -8,6 +8,7 @@ from .agent_membership import WorkspaceAgentMembership, WorkspaceAgentMembership
 from .asset import FileAsset
 from .base import BaseModel
 from .cycle import Cycle, CycleIssue, CycleUserProperties
+from .channel import Channel, Message
 from .deploy_board import DeployBoard
 from .draft import (
     DraftIssue,
@@ -49,7 +50,7 @@ from .issue import (
 )
 from .module import Module, ModuleIssue, ModuleLink, ModuleMember, ModuleUserProperties
 from .notification import EmailNotificationLog, Notification, UserNotificationPreference
-from .document import Document, DocumentProject, DocumentVersion
+from .document import Document, DocumentProject, DocumentVersion, DocumentVersionAsset
 from .page import Page, PageLabel, PageLog, PageVersion
 from .project import (
     Project,
@@ -90,6 +91,16 @@ from .label import Label
 from .device import Device, DeviceSession
 
 from .sticky import Sticky
-from .work_map import WorkMap, WorkMapBinding
+from .work_map import (
+    WorkMap,
+    WorkMapBinding,
+    WorkMapBindingPlacement,
+    WorkMapDuplicateOperation,
+    WorkMapPasteRebinding,
+    WorkMapSceneAssetPlacement,
+    WorkMapVersion,
+)
+from .message_work_item import WorkItemCreationIntent
+from .work_item_claim import WorkItemClaim
 
 from .description import Description, DescriptionVersion

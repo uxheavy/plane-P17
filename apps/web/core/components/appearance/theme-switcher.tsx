@@ -30,7 +30,7 @@ export const ThemeSwitcher = observer(function ThemeSwitcher(props: {
   // store hooks
   const { data: userProfile, updateUserTheme } = useUserProfile();
   // theme
-  const { setTheme } = useTheme();
+  const { setTheme, theme } = useTheme();
   // translation
   const { t } = useTranslation();
   // derived values
@@ -42,6 +42,7 @@ export const ThemeSwitcher = observer(function ThemeSwitcher(props: {
 
   const handleThemeChange = useCallback(
     async (themeOption: I_THEME_OPTION) => {
+      const priorTheme = theme ?? "system";
       try {
         setTheme(themeOption.value);
 
@@ -61,24 +62,23 @@ export const ThemeSwitcher = observer(function ThemeSwitcher(props: {
 
         const updatePromise = updateUserTheme({ theme: themeOption.value });
         setPromiseToast(updatePromise, {
-          loading: "Updating theme...",
+          loading: t("updating_theme"),
           success: {
-            title: "Theme updated",
-            message: () => "Reloading to apply changes...",
+            title: t("success"),
+            message: () => t("theme_updated_successfully"),
           },
           error: {
-            title: "Error!",
-            message: () => "Failed to update theme. Please try again.",
+            title: t("error"),
+            message: () => t("failed_to_update_the_theme"),
           },
         });
-        // Wait for the promise to resolve, then reload after showing toast
         await updatePromise;
-        window.location.reload();
       } catch (error) {
+        setTheme(priorTheme);
         console.error("Error updating theme:", error);
       }
     },
-    [setTheme, updateUserTheme, userProfile]
+    [setTheme, t, theme, updateUserTheme, userProfile]
   );
 
   if (!userProfile) return null;

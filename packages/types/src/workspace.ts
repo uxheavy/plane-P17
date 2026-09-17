@@ -145,6 +145,14 @@ export interface IWorkspacePageSearchResult {
   workspace__slug: string;
 }
 
+export interface IWorkspaceWorkMapSearchResult {
+  id: string;
+  name: string;
+  project_ids: [string, ...string[]];
+  project_identifiers: [string, ...string[]];
+  workspace__slug: string;
+}
+
 export interface IWorkspaceProjectSearchResult {
   id: string;
   identifier: string;
@@ -161,6 +169,7 @@ export interface IWorkspaceSearchResults {
     module: IWorkspaceDefaultSearchResult[];
     issue_view: IWorkspaceDefaultSearchResult[];
     page: IWorkspacePageSearchResult[];
+    work_map: IWorkspaceWorkMapSearchResult[];
   };
 }
 

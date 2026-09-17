@@ -10,6 +10,7 @@ import { WorkspaceContentWrapper } from "@/components/workspace/content-wrapper"
 import { AppRailVisibilityProvider } from "@/lib/app-rail";
 import { GlobalModals } from "@/components/common/modal/global";
 import { WorkspaceAuthWrapper } from "@/layouts/auth-layout/workspace-wrapper";
+import { ConversationSidebarProvider } from "@/components/conversations/conversation-sidebar-provider";
 import type { Route } from "./+types/layout";
 
 export default function WorkspaceLayout(props: Route.ComponentProps) {
@@ -18,12 +19,14 @@ export default function WorkspaceLayout(props: Route.ComponentProps) {
   return (
     <AuthenticationWrapper>
       <WorkspaceAuthWrapper>
-        <AppRailVisibilityProvider>
-          <WorkspaceContentWrapper>
-            <GlobalModals workspaceSlug={workspaceSlug} />
-            <Outlet />
-          </WorkspaceContentWrapper>
-        </AppRailVisibilityProvider>
+        <ConversationSidebarProvider workspaceSlug={workspaceSlug}>
+          <AppRailVisibilityProvider>
+            <WorkspaceContentWrapper>
+              <GlobalModals workspaceSlug={workspaceSlug} />
+              <Outlet />
+            </WorkspaceContentWrapper>
+          </AppRailVisibilityProvider>
+        </ConversationSidebarProvider>
       </WorkspaceAuthWrapper>
     </AuthenticationWrapper>
   );

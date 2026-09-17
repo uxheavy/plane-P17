@@ -10,6 +10,12 @@ from django.db.models import Q
 
 # Module imports
 
+ISSUE_SEARCH_FIELDS = (
+    "name", "id", "start_date", "sequence_id", "project__name",
+    "project__identifier", "project_id", "workspace__slug", "state__name",
+    "state__group", "state__color", "type_id",
+)
+
 
 def search_issues(query, queryset):
     fields = ["name", "sequence_id", "project__identifier"]

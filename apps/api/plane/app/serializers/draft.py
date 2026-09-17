@@ -58,6 +58,7 @@ class DraftIssueCreateSerializer(BaseSerializer):
             "updated_by",
             "created_at",
             "updated_at",
+            "creation_origin",
         ]
 
     def to_representation(self, instance):
@@ -330,6 +331,7 @@ class DraftIssueSerializer(BaseSerializer):
             "updated_by",
             "type_id",
             "description_html",
+            "creation_origin",
         ]
         read_only_fields = fields
 

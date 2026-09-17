@@ -7,13 +7,22 @@
 import { z } from "zod";
 import { APIService } from "@/services/api.service";
 
+export const workMapProfileSchema = z
+  .object({
+    display_name: z.string(),
+    avatar_url: z.string().nullable(),
+  })
+  .strict();
+
 export const workMapAuthorizationSchema = z.object({
   document_type: z.literal("work_map"),
   workspace_slug: z.string(),
   project_id: z.string().uuid(),
   work_map_id: z.string().uuid(),
   sender_id: z.string().uuid(),
+  profile: workMapProfileSchema,
   generation: z.number().int().nonnegative(),
+  collaboration_epoch: z.number().int().nonnegative(),
   readable: z.literal(true),
   editable: z.boolean(),
   is_locked: z.boolean(),

@@ -1,0 +1,33 @@
+/* Copyright (c) 2026-present Ngo Quoc Huy
+   SPDX-License-Identifier: AGPL-3.0-only */
+
+/* The editor declares these variables on its own root, so ancestor-only
+   overrides cannot transfer Plane's theme authority. Authored canvas colors
+   and drawing fonts are intentionally untouched. */
+.work-map-editor .excalidraw,
+.work-map-editor .excalidraw.theme--dark {
+  --ui-font: var(--font-body);
+  --space-factor: var(--spacing);
+  --color-primary: var(--background-color-accent-primary);
+  --color-primary-darker: var(--background-color-accent-primary-hover);
+  --color-primary-hover: var(--background-color-accent-primary-hover);
+  --color-primary-darkest: var(--border-color-accent-strong);
+  --color-brand-active: var(--background-color-accent-primary);
+  --color-brand-hover: var(--background-color-accent-primary-hover);
+  --color-selection: var(--background-color-accent-primary);
+  --focus-highlight-color: var(--border-color-accent-strong);
+  --color-on-surface: var(--text-color-primary);
+  --text-primary-color: var(--text-color-primary);
+  --keybinding-color: var(--text-color-secondary);
+  --default-border-color: var(--border-color-subtle);
+  --input-border-color: var(--border-color-subtle);
+  --sidebar-border-color: var(--border-color-subtle);
+  --island-bg-color: var(--background-color-surface-1);
+  --island-bg-color-alt: var(--background-color-surface-2);
+  --input-bg-color: var(--background-color-layer-2);
+  --input-hover-bg-color: var(--background-color-layer-1);
+  --color-surface-lowest: var(--background-color-surface-1);
+  --color-surface-low: var(--background-color-layer-1);
+  --color-surface-mid: var(--background-color-layer-2);
+  --color-surface-high: var(--background-color-layer-3);
+}

@@ -36,13 +36,18 @@ function StoreWrapper(props: TStoreWrapper) {
   const currentUserIdRef = useRef<string | undefined>(undefined);
   // Track previous theme to detect transitions from custom theme
   const previousThemeRef = useRef<string | undefined>(undefined);
+  const profileTheme = userProfile?.theme;
+  const currentTheme = profileTheme?.theme;
+  const themePrimary = profileTheme?.primary;
+  const themeBackground = profileTheme?.background;
+  const themeDarkPalette = profileTheme?.darkPalette;
 
   /**
    * Sidebar collapsed fetching from local storage
    */
   useEffect(() => {
     const localValue = localStorage && localStorage.getItem("app_sidebar_collapsed");
-    const localBoolValue = localValue ? (localValue === "true" ? true : false) : false;
+    const localBoolValue = localValue === "true";
     if (localValue && sidebarCollapsed === undefined) toggleSidebar(localBoolValue);
   }, [sidebarCollapsed, setTheme, toggleSidebar]);
 
@@ -74,7 +79,7 @@ function StoreWrapper(props: TStoreWrapper) {
 
     // Mark as initialized - prevents future syncs from server
     hasInitializedThemeRef.current = true;
-  }, [userProfile?.theme?.theme, setTheme]);
+  }, [userProfile?.id, userProfile?.theme?.theme, setTheme]);
 
   /**
    * Effect 2: Custom theme CSS application (runs on every change)
@@ -83,15 +88,13 @@ function StoreWrapper(props: TStoreWrapper) {
    * the theme changes. It runs independently of the initial sync effect.
    */
   useEffect(() => {
-    if (!userProfile?.theme?.theme) return;
+    if (!currentTheme) return;
 
-    const currentTheme = userProfile?.theme?.theme;
     const previousTheme = previousThemeRef.current;
-    const themeData = userProfile?.theme;
 
     // Apply custom theme if current theme is custom
-    if (currentTheme === "custom" && themeData.primary && themeData.background && themeData.darkPalette !== undefined) {
-      applyCustomTheme(themeData.primary, themeData.background, themeData.darkPalette ? "dark" : "light");
+    if (currentTheme === "custom" && themePrimary && themeBackground && themeDarkPalette !== undefined) {
+      applyCustomTheme(themePrimary, themeBackground, themeDarkPalette ? "dark" : "light");
     }
     // Clear custom theme CSS when switching away from custom
     else if (previousTheme === "custom" && currentTheme !== "custom") {
@@ -101,7 +104,7 @@ function StoreWrapper(props: TStoreWrapper) {
 
     // Update previous theme for next comparison
     previousThemeRef.current = currentTheme;
-  }, [userProfile?.theme]);
+  }, [currentTheme, themeBackground, themeDarkPalette, themePrimary]);
 
   useEffect(() => {
     if (!params) return;

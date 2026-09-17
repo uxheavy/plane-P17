@@ -18,6 +18,7 @@ import { CountChip } from "@/components/common/count-chip";
 import { MembersSettingsLoader } from "@/components/ui/loader/settings/members";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
+import { isNativeAgent } from "@/store/member/utils";
 // local imports
 import { WorkspaceInvitationsListItem } from "./invitations-list-item";
 import { WorkspaceMembersListItem } from "./members-list-item";
@@ -25,8 +26,9 @@ import { WorkspaceMembersListItem } from "./members-list-item";
 export const WorkspaceMembersList = observer(function WorkspaceMembersList(props: {
   searchQuery: string;
   isAdmin: boolean;
+  memberTab: "people" | "agents";
 }) {
-  const { searchQuery, isAdmin } = props;
+  const { searchQuery, isAdmin, memberTab } = props;
   const [showPendingInvites, setShowPendingInvites] = useState<boolean>(true);
 
   // router
@@ -60,10 +62,31 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
 
   // derived values
   const filteredMemberIds = workspaceSlug ? getFilteredWorkspaceMemberIds(workspaceSlug.toString()) : [];
-  const searchedMemberIds = searchQuery ? getSearchedWorkspaceMemberIds(searchQuery) : filteredMemberIds;
+  const agentMemberIds =
+    workspaceMemberIds?.filter((memberId) => isNativeAgent(getWorkspaceMemberDetails(memberId)?.member)) ?? [];
+  const searchedMemberIds =
+    memberTab === "agents"
+      ? searchQuery
+        ? agentMemberIds.filter((memberId) => {
+            const member = getWorkspaceMemberDetails(memberId)?.member;
+            if (!member) return false;
+            return `${member.display_name} ${member.first_name} ${member.last_name} ${member.joining_date ?? ""}`
+              .toLowerCase()
+              .includes(searchQuery.toLowerCase());
+          })
+        : agentMemberIds
+      : searchQuery
+        ? getSearchedWorkspaceMemberIds(searchQuery)
+        : filteredMemberIds;
   const searchedInvitationsIds = getSearchedWorkspaceInvitationIds(searchQuery);
   const memberDetails = searchedMemberIds
     ?.map((memberId) => getWorkspaceMemberDetails(memberId))
+    .filter((member): member is NonNullable<typeof member> => {
+      if (!member) return false;
+      return memberTab === "agents" ? isNativeAgent(member.member) : !isNativeAgent(member.member);
+    })
+    // The mapped and filtered values form a fresh array for this render.
+    // oxlint-disable-next-line unicorn/no-array-sort
     .sort((a, b) => {
       if (a?.is_active && !b?.is_active) return -1;
       if (!a?.is_active && b?.is_active) return 1;
@@ -73,12 +96,14 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
   return (
     <>
       <div className="divide-y-[0.5px] divide-subtle overflow-scroll">
-        {searchedMemberIds?.length !== 0 && <WorkspaceMembersListItem memberDetails={memberDetails ?? []} />}
-        {searchedInvitationsIds?.length === 0 && searchedMemberIds?.length === 0 && (
+        {memberDetails && memberDetails.length > 0 && (
+          <WorkspaceMembersListItem memberDetails={memberDetails} isAgentTab={memberTab === "agents"} />
+        )}
+        {memberDetails?.length === 0 && (memberTab === "agents" || searchedInvitationsIds?.length === 0) && (
           <h4 className="mt-16 text-center text-body-xs-regular text-placeholder">{t("no_matching_members")}</h4>
         )}
       </div>
-      {isAdmin && searchedInvitationsIds && searchedInvitationsIds.length > 0 && (
+      {memberTab === "people" && isAdmin && searchedInvitationsIds && searchedInvitationsIds.length > 0 && (
         <Collapsible
           isOpen={showPendingInvites}
           onToggle={() => setShowPendingInvites((prev) => !prev)}

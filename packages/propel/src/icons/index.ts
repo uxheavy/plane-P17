@@ -71,3 +71,4 @@ export * from "./updates-icon";
 export * from "./user-activity-icon";
 export * from "./workspace-icon";
 export * from "./workspace";
+export * from "./work-map-icon";

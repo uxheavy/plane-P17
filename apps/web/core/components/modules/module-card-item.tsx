@@ -13,8 +13,6 @@ import { Info, SquareUser } from "lucide-react";
 // plane package imports
 import { MODULE_STATUS, EUserPermissions, EUserPermissionsLevel, IS_FAVORITE_MENU_OPEN } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
-import { LinearProgress } from "@makeplane/propel/components/linear-progress";
-import { WorkItemsIcon } from "@plane/propel/icons";
 import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
 import { Tooltip } from "@plane/propel/tooltip";
 import type { IModule } from "@plane/types";
@@ -24,6 +22,7 @@ import { getDate, renderFormattedPayloadDate, generateQueryParams } from "@plane
 import { DateRangeDropdown } from "@/components/dropdowns/date-range";
 import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { ModuleQuickActions } from "@/components/modules";
+import { ModuleProgressSummary } from "@/components/modules/module-progress-summary";
 import { ModuleStatusDropdown } from "@/components/modules/module-status-dropdown";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
@@ -34,6 +33,11 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 
 type Props = {
   moduleId: string;
+};
+
+const stopCardEventPropagation = (e: SyntheticEvent<HTMLDivElement>) => {
+  e.stopPropagation();
+  e.preventDefault();
 };
 
 export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
@@ -69,6 +73,7 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
     const addToFavoritePromise = addModuleToFavorites(workspaceSlug.toString(), projectId.toString(), moduleId).then(
       () => {
         if (!storedValue) toggleFavoriteMenu(true);
+        return undefined;
       }
     );
 
@@ -109,11 +114,6 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
     });
   };
 
-  const handleEventPropagation = (e: SyntheticEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    e.preventDefault();
-  };
-
   const handleModuleDetailsChange = async (payload: Partial<IModule>) => {
     if (!workspaceSlug || !projectId) return;
 
@@ -124,6 +124,7 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
           title: "Success!",
           message: "Module updated successfully.",
         });
+        return undefined;
       })
       .catch((err) => {
         setToast({
@@ -148,29 +149,11 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
 
   if (!moduleDetails) return null;
 
-  const moduleTotalIssues =
-    moduleDetails.backlog_issues +
-    moduleDetails.unstarted_issues +
-    moduleDetails.started_issues +
-    moduleDetails.completed_issues +
-    moduleDetails.cancelled_issues;
-
-  const moduleCompletedIssues = moduleDetails.completed_issues;
-
   // const areYearsEqual = startDate.getFullYear() === endDate.getFullYear();
 
   const moduleStatus = MODULE_STATUS.find((status) => status.value === moduleDetails.status);
 
-  const issueCount = moduleDetails
-    ? !moduleTotalIssues || moduleTotalIssues === 0
-      ? `0 work items`
-      : moduleTotalIssues === moduleCompletedIssues
-        ? `${moduleTotalIssues} Work item${moduleTotalIssues > 1 ? `s` : ``}`
-        : `${moduleCompletedIssues}/${moduleTotalIssues} Work items`
-    : `0 work items`;
-
   const moduleLeadDetails = moduleDetails.lead_id ? getUserDetails(moduleDetails.lead_id) : undefined;
-  const progressValue = moduleTotalIssues > 0 ? (moduleCompletedIssues / moduleTotalIssues) * 100 : 0;
 
   return (
     <div className="relative" data-prevent-progress>
@@ -181,7 +164,7 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
               <Tooltip tooltipContent={moduleDetails.name} position="top" isMobile={isMobile}>
                 <span className="truncate text-14 font-medium">{moduleDetails.name}</span>
               </Tooltip>
-              <div className="flex items-center gap-2" onClick={handleEventPropagation}>
+              <div className="flex items-center gap-2" role="presentation" onClick={stopCardEventPropagation}>
                 {moduleStatus && (
                   <ModuleStatusDropdown
                     isDisabled={isDisabled}
@@ -196,29 +179,29 @@ export const ModuleCardItem = observer(function ModuleCardItem(props: Props) {
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-secondary">
-                <WorkItemsIcon className="h-4 w-4 text-tertiary" />
-                <span className="text-11 text-tertiary">{issueCount ?? "0 Work item"}</span>
-              </div>
-              {moduleLeadDetails ? (
-                <span className="cursor-default">
-                  <ButtonAvatars showTooltip={false} userIds={moduleLeadDetails?.id} />
-                </span>
-              ) : (
-                <Tooltip tooltipContent="No lead">
-                  <SquareUser className="mx-1 h-4 w-4 text-tertiary" />
-                </Tooltip>
-              )}
-            </div>
-            <LinearProgress
-              value={progressValue}
-              size="md"
-              variant="brand"
-              showValue={false}
-              aria-label="Module progress"
+            <ModuleProgressSummary
+              backlog_issues={moduleDetails.backlog_issues}
+              unstarted_issues={moduleDetails.unstarted_issues}
+              started_issues={moduleDetails.started_issues}
+              completed_issues={moduleDetails.completed_issues}
+              cancelled_issues={moduleDetails.cancelled_issues}
+              trailingContent={
+                moduleLeadDetails ? (
+                  <span className="cursor-default">
+                    <ButtonAvatars showTooltip={false} userIds={moduleLeadDetails.id} />
+                  </span>
+                ) : (
+                  <Tooltip tooltipContent="No lead">
+                    <SquareUser className="mx-1 h-4 w-4 text-tertiary" />
+                  </Tooltip>
+                )
+              }
             />
-            <div className="flex items-center justify-between py-0.5" onClick={handleEventPropagation}>
+            <div
+              className="flex items-center justify-between py-0.5"
+              role="presentation"
+              onClick={stopCardEventPropagation}
+            >
               <DateRangeDropdown
                 buttonContainerClassName={`h-6 w-full flex ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"} items-center gap-1.5 text-tertiary border-[0.5px] border-strong rounded-sm text-11`}
                 buttonVariant="transparent-with-text"

@@ -11,12 +11,12 @@ import { useTranslation } from "@plane/i18n";
 import { renderFormattedDate } from "@plane/utils";
 import { MemberHeaderColumn } from "@/components/project/member-header-column";
 import type { RowData } from "@/components/workspace/settings/member-columns";
-import { AccountTypeColumn, NameColumn } from "@/components/workspace/settings/member-columns";
+import { AccountTypeColumn, MemberStatusColumn, NameColumn } from "@/components/workspace/settings/member-columns";
 import { useMember } from "@/hooks/store/use-member";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 import type { IMemberFilters } from "@/store/member/utils";
 
-export const useMemberColumns = () => {
+export const useMemberColumns = ({ isAgentTab = false }: { isAgentTab?: boolean } = {}) => {
   // states
   const [removeMemberModal, setRemoveMemberModal] = useState<RowData | null>(null);
 
@@ -133,5 +133,33 @@ export const useMemberColumns = () => {
       ),
     },
   ];
-  return { columns, workspaceSlug, removeMemberModal, setRemoveMemberModal };
+  const agentColumns = [
+    {
+      key: "Agent name",
+      content: t("workspace_settings.settings.members.details.name"),
+      thClassName: "text-left",
+      tdRender: (rowData: RowData) => (
+        <NameColumn
+          rowData={rowData}
+          workspaceSlug={workspaceSlug}
+          isAdmin={isAdmin}
+          currentUser={currentUser}
+          setRemoveMemberModal={setRemoveMemberModal}
+        />
+      ),
+    },
+    {
+      key: "Status",
+      content: t("workspace_settings.settings.members.details.status"),
+      tdRender: (rowData: RowData) => <MemberStatusColumn rowData={rowData} />,
+    },
+    {
+      key: "Joining date",
+      content: t("workspace_settings.settings.members.details.joining_date"),
+      tdRender: (rowData: RowData) =>
+        isSuspended(rowData) ? null : <div>{renderFormattedDate(rowData?.member?.joining_date)}</div>,
+    },
+  ];
+
+  return { columns: isAgentTab ? agentColumns : columns, workspaceSlug, removeMemberModal, setRemoveMemberModal };
 };

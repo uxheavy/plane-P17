@@ -1,0 +1,121 @@
+name: Production CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [prod]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [prod]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Check, test, and build web
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: "--max-old-space-size=4096"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - name: Enable Corepack and pnpm
+        run: corepack enable pnpm
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm turbo run check:format
+
+      - name: Check lint
+        run: pnpm turbo run check:lint
+
+      - name: Check types
+        run: pnpm turbo run check:types
+
+      - name: Test web
+        run: pnpm turbo run test --filter=web
+
+      - name: Build production applications
+        run: pnpm build
+
+  api:
+    name: Lint API
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12.x"
+
+      - name: Install pinned Ruff
+        shell: bash
+        run: |
+          ruff_requirement=$(grep -E '^ruff==' apps/api/requirements/local.txt)
+          test -n "$ruff_requirement"
+          python -m pip install "$ruff_requirement"
+
+      - name: Resolve comparison base
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            base=$(git rev-parse HEAD^)
+          else
+            base="${{ github.event.before }}"
+          fi
+          echo "BASE_SHA=$base" >> "$GITHUB_ENV"
+
+      - name: Lint changed API files
+        shell: bash
+        run: |
+          diff_status=0
+          git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- apps/api/pyproject.toml apps/api/requirements/local.txt || diff_status=$?
+          if [ "$diff_status" -eq 1 ]; then
+            ruff check apps/api
+            exit 0
+          elif [ "$diff_status" -ne 0 ]; then
+            exit "$diff_status"
+          fi
+          files="$RUNNER_TEMP/changed-api-files"
+          git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- 'apps/api/**/*.py' > "$files"
+          if [ ! -s "$files" ]; then
+            echo "No changed API Python files"
+            exit 0
+          fi
+          xargs -0 ruff check --force-exclude < "$files"

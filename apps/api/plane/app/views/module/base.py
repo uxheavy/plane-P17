@@ -13,7 +13,6 @@ from django.db.models import (
     Exists,
     F,
     Func,
-    IntegerField,
     OuterRef,
     Prefetch,
     Q,
@@ -66,6 +65,7 @@ from plane.bgtasks.webhook_task import model_activity
 from .. import BaseAPIView, BaseViewSet
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.utils.host import base_host
+from plane.utils.module_counts import with_module_issue_counts
 
 
 class ModuleViewSet(BaseViewSet):
@@ -82,65 +82,6 @@ class ModuleViewSet(BaseViewSet):
             entity_identifier=OuterRef("pk"),
             project_id=self.kwargs.get("project_id"),
             workspace__slug=self.kwargs.get("slug"),
-        )
-        cancelled_issues = (
-            Issue.issue_objects.filter(
-                state__group="cancelled",
-                issue_module__module_id=OuterRef("pk"),
-                issue_module__deleted_at__isnull=True,
-            )
-            .values("issue_module__module_id")
-            .annotate(cnt=Count("pk"))
-            .values("cnt")
-        )
-        completed_issues = (
-            Issue.issue_objects.filter(
-                state__group="completed",
-                issue_module__module_id=OuterRef("pk"),
-                issue_module__deleted_at__isnull=True,
-            )
-            .values("issue_module__module_id")
-            .annotate(cnt=Count("pk"))
-            .values("cnt")
-        )
-        started_issues = (
-            Issue.issue_objects.filter(
-                state__group="started",
-                issue_module__module_id=OuterRef("pk"),
-                issue_module__deleted_at__isnull=True,
-            )
-            .values("issue_module__module_id")
-            .annotate(cnt=Count("pk"))
-            .values("cnt")
-        )
-        unstarted_issues = (
-            Issue.issue_objects.filter(
-                state__group="unstarted",
-                issue_module__module_id=OuterRef("pk"),
-                issue_module__deleted_at__isnull=True,
-            )
-            .values("issue_module__module_id")
-            .annotate(cnt=Count("pk"))
-            .values("cnt")
-        )
-        backlog_issues = (
-            Issue.issue_objects.filter(
-                state__group="backlog",
-                issue_module__module_id=OuterRef("pk"),
-                issue_module__deleted_at__isnull=True,
-            )
-            .values("issue_module__module_id")
-            .annotate(cnt=Count("pk"))
-            .values("cnt")
-        )
-        total_issues = (
-            Issue.issue_objects.filter(
-                issue_module__module_id=OuterRef("pk"),
-                issue_module__deleted_at__isnull=True,
-            )
-            .values("issue_module__module_id")
-            .annotate(cnt=Count("pk"))
-            .values("cnt")
         )
         completed_estimate_point = (
             Issue.issue_objects.filter(
@@ -208,7 +149,7 @@ class ModuleViewSet(BaseViewSet):
             .annotate(cancelled_estimate_point=Sum(Cast("estimate_point__value", FloatField())))
             .values("cancelled_estimate_point")[:1]
         )
-        return (
+        return with_module_issue_counts(
             super()
             .get_queryset()
             .filter(project_id=self.kwargs.get("project_id"))
@@ -221,27 +162,6 @@ class ModuleViewSet(BaseViewSet):
                     queryset=ModuleLink.objects.select_related("module", "created_by"),
                 )
             )
-            .annotate(
-                completed_issues=Coalesce(
-                    Subquery(completed_issues[:1]),
-                    Value(0, output_field=IntegerField()),
-                )
-            )
-            .annotate(
-                cancelled_issues=Coalesce(
-                    Subquery(cancelled_issues[:1]),
-                    Value(0, output_field=IntegerField()),
-                )
-            )
-            .annotate(started_issues=Coalesce(Subquery(started_issues[:1]), Value(0, output_field=IntegerField())))
-            .annotate(
-                unstarted_issues=Coalesce(
-                    Subquery(unstarted_issues[:1]),
-                    Value(0, output_field=IntegerField()),
-                )
-            )
-            .annotate(backlog_issues=Coalesce(Subquery(backlog_issues[:1]), Value(0, output_field=IntegerField())))
-            .annotate(total_issues=Coalesce(Subquery(total_issues[:1]), Value(0, output_field=IntegerField())))
             .annotate(
                 backlog_estimate_points=Coalesce(
                     Subquery(backlog_estimate_point),

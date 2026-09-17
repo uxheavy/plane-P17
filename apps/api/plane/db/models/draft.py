@@ -67,6 +67,7 @@ class DraftIssue(WorkspaceBaseModel):
     completed_at = models.DateTimeField(null=True)
     external_source = models.CharField(max_length=255, null=True, blank=True)
     external_id = models.CharField(max_length=255, blank=True, null=True)
+    creation_origin = models.JSONField(null=True, blank=True)
     type = models.ForeignKey(
         "db.IssueType",
         on_delete=models.SET_NULL,

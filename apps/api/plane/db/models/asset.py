@@ -44,6 +44,8 @@ class FileAsset(BaseModel):
         PROJECT_COVER = "PROJECT_COVER"
         DRAFT_ISSUE_ATTACHMENT = "DRAFT_ISSUE_ATTACHMENT"
         DRAFT_ISSUE_DESCRIPTION = "DRAFT_ISSUE_DESCRIPTION"
+        MESSAGE_ATTACHMENT = "MESSAGE_ATTACHMENT"
+        WORK_MAP_SCENE = "WORK_MAP_SCENE"
 
     attributes = models.JSONField(default=dict)
     asset = models.FileField(upload_to=get_upload_path, max_length=800)
@@ -53,7 +55,12 @@ class FileAsset(BaseModel):
     project = models.ForeignKey("db.Project", on_delete=models.CASCADE, null=True, related_name="assets")
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, null=True, related_name="assets")
     comment = models.ForeignKey("db.IssueComment", on_delete=models.CASCADE, null=True, related_name="assets")
-    page = models.ForeignKey("db.Page", on_delete=models.CASCADE, null=True, related_name="assets")
+    # Kept for legacy Page API payloads; Document is the sole lifecycle owner
+    # after the page/document cutover.
+    page = models.ForeignKey("db.Page", on_delete=models.SET_NULL, null=True, related_name="assets")
+    document = models.ForeignKey("db.Document", on_delete=models.CASCADE, null=True, related_name="document_assets")
+    channel = models.ForeignKey("db.Channel", on_delete=models.CASCADE, null=True, blank=True, related_name="assets")
+    message = models.ForeignKey("db.Message", on_delete=models.SET_NULL, null=True, blank=True, related_name="attachments")
     entity_type = models.CharField(max_length=255, null=True, blank=True)
     entity_identifier = models.CharField(max_length=255, null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
@@ -74,6 +81,60 @@ class FileAsset(BaseModel):
             models.Index(fields=["entity_identifier"], name="asset_entity_identifier_idx"),
             models.Index(fields=["entity_type", "entity_identifier"], name="asset_entity_idx"),
             models.Index(fields=["asset"], name="asset_asset_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(entity_type__in=["PAGE_DESCRIPTION", "WORK_MAP_SCENE"])
+                | models.Q(document__isnull=False),
+                name="content_asset_has_document",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(entity_type="WORK_MAP_SCENE")
+                | (
+                    models.Q(document__isnull=False)
+                    & models.Q(workspace__isnull=False)
+                    & models.Q(project__isnull=True)
+                    & models.Q(page__isnull=True)
+                    & models.Q(user__isnull=True)
+                    & models.Q(draft_issue__isnull=True)
+                    & models.Q(issue__isnull=True)
+                    & models.Q(comment__isnull=True)
+                ),
+                name="work_map_scene_asset_has_document_only",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(document__isnull=True)
+                | models.Q(entity_type__in=["PAGE_DESCRIPTION", "WORK_MAP_SCENE"]),
+                name="file_asset_document_owner_is_closed",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(entity_type__isnull=True, channel__isnull=True)
+                    | (
+                        models.Q(entity_type__isnull=False, entity_type="MESSAGE_ATTACHMENT")
+                        & models.Q(channel__isnull=False)
+                        & models.Q(workspace__isnull=False)
+                        & models.Q(user__isnull=True)
+                        & models.Q(project__isnull=True)
+                        & models.Q(draft_issue__isnull=True)
+                        & models.Q(issue__isnull=True)
+                        & models.Q(comment__isnull=True)
+                        & models.Q(page__isnull=True)
+                        & models.Q(document__isnull=True)
+                    )
+                    | (
+                        models.Q(entity_type__isnull=False)
+                        & ~models.Q(entity_type="MESSAGE_ATTACHMENT")
+                        & models.Q(channel__isnull=True)
+                    )
+                ),
+                name="message_attachment_channel_owner_only",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(message__isnull=True)
+                | (models.Q(entity_type__isnull=False) & models.Q(entity_type="MESSAGE_ATTACHMENT")),
+                name="file_asset_message_owner_is_closed",
+            ),
         ]
 
     def __str__(self):
@@ -99,5 +160,8 @@ class FileAsset(BaseModel):
             self.EntityTypeContext.DRAFT_ISSUE_DESCRIPTION,
         ]:
             return f"/api/assets/v2/workspaces/{self.workspace.slug}/projects/{self.project_id}/{self.id}/"
+
+        if self.entity_type == self.EntityTypeContext.MESSAGE_ATTACHMENT and self.channel_id:
+            return f"/api/channels/{self.channel_id}/attachments/{self.id}/"
 
         return None
