@@ -5,8 +5,7 @@
       "@/*": ["./core/*"],
       "@/app/*": ["./app/*"],
       "@/helpers/*": ["./helpers/*"],
-      "@/styles/*": ["./styles/*"],
-      "package.json": ["./package.json"]
+      "@/styles/*": ["./styles/*"]
     },
     "strictNullChecks": true,
     "exactOptionalPropertyTypes": false,

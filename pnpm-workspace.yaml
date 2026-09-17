@@ -190,6 +190,7 @@ catalog:
   "y-protocols": "^1.0.6"
   "yjs": "^13.6.20"
   "zod": "^3.25.76"
+  react-grab: 0.2.0
 
 overrides:
   # Force a single React across the whole graph. With node-linker=isolated,

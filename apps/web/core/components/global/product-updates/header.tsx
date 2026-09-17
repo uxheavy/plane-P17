@@ -5,10 +5,10 @@
  */
 
 import { observer } from "mobx-react";
-import packageJson from "package.json";
 import { useTranslation } from "@plane/i18n";
 // helpers
 import { cn } from "@plane/utils";
+import { PLANE_VERSION } from "@/lib/version";
 
 export const ProductUpdatesHeader = observer(function ProductUpdatesHeader() {
   const { t } = useTranslation();
@@ -21,7 +21,7 @@ export const ProductUpdatesHeader = observer(function ProductUpdatesHeader() {
             "mx-2 rounded-full bg-accent-primary/20 px-2 py-0.5 text-center text-11 font-medium text-accent-primary"
           )}
         >
-          {t("version")}: v{packageJson.version}
+          {t("version")}: v{PLANE_VERSION}
         </div>
       </div>
     </div>

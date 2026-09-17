@@ -6,21 +6,15 @@
 
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import packageJson from "../../../../package.json";
 import { AuthFooter } from "../../../../core/components/auth-screens/footer";
 
-vi.mock("@plane/i18n", () => ({
-  useTranslation: () => ({
-    t: (key: string) => (key === "version" ? "Version" : key),
-  }),
-}));
-
 describe("AuthFooter", () => {
-  it("shows the running Plane version", () => {
+  it("shows the running Plane build", () => {
     const footer = renderToStaticMarkup(createElement(AuthFooter));
 
-    expect(footer).toContain(`Version: v${packageJson.version}`);
+    expect(footer).toContain(`v${packageJson.version} (abc12) TEST`);
   });
 });

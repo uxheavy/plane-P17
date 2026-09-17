@@ -14,6 +14,10 @@ import { isStaleAssetErrorMessage, recoverFromStaleAsset } from "@/lib/stale-ass
 
 void polyfills;
 
+if (import.meta.env.DEV) {
+  void import("react-grab");
+}
+
 // Production-only: in dev these errors come from the dev server itself (restarts,
 // stale optimized deps) and auto-reloading would mask them.
 if (import.meta.env.PROD) {
@@ -47,4 +51,5 @@ void initPromise
         </StrictMode>
       );
     });
+    return undefined;
   });

@@ -179,6 +179,9 @@ jobs:
           buildx-version: ${{ needs.branch_build_setup.outputs.gh_buildx_version }}
           buildx-platforms: ${{ needs.branch_build_setup.outputs.gh_buildx_platforms }}
           buildx-endpoint: ${{ needs.branch_build_setup.outputs.gh_buildx_endpoint }}
+          build-args: |
+            VITE_APP_ENVIRONMENT=${{ needs.branch_build_setup.outputs.build_release == 'true' && needs.branch_build_setup.outputs.build_prerelease == 'false' && 'PROD' || 'PREVIEW' }}
+            VITE_APP_REVISION=${{ github.sha }}
 
   branch_build_push_space:
     name: Build-Push Space Docker Image

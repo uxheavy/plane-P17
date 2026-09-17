@@ -4,12 +4,12 @@
  * See the LICENSE file for details.
  */
 
-import Link from "next/link";
 import { GOD_MODE_URL } from "@plane/constants";
 // assets
 import GradientLogo from "@/app/assets/auth/gradient-logo.webp?url";
 import GradientBgLogo from "@/app/assets/auth/gradient-bg-logo.webp?url";
 import DefaultLayout from "@/layouts/default-layout";
+import { PlaneVersionNumber } from "@/components/global/version-number";
 import { PlaneLockup } from "@plane/propel/icons";
 import { Button } from "@plane/propel/button";
 
@@ -50,6 +50,9 @@ export function InstanceNotReady() {
                 Get started
               </Button>
             </a>
+          </div>
+          <div className="absolute right-4 bottom-3 text-11 whitespace-nowrap text-tertiary">
+            <PlaneVersionNumber />
           </div>
         </div>
       </div>

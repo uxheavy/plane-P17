@@ -4,15 +4,8 @@
  * See the LICENSE file for details.
  */
 
-// assets
-import { useTranslation } from "@plane/i18n";
-import packageJson from "package.json";
+import { PLANE_BUILD_LABEL } from "@/lib/version";
 
 export function PlaneVersionNumber() {
-  const { t } = useTranslation();
-  return (
-    <span>
-      {t("version")}: v{packageJson.version}
-    </span>
-  );
+  return <span>{PLANE_BUILD_LABEL}</span>;
 }

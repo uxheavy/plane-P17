@@ -197,6 +197,14 @@ function buildYourOwnImage(){
     REPO=https://github.com/$GH_REPO.git
     git clone "$REPO" "$PLANE_TEMP_CODE_DIR"  --branch "$BRANCH" --single-branch --depth 1
 
+    export VITE_APP_ENVIRONMENT="PROD"
+    export VITE_APP_REVISION
+    VITE_APP_REVISION=$(git -C "$PLANE_TEMP_CODE_DIR" rev-parse --short=5 HEAD)
+    if [ -z "$VITE_APP_REVISION" ]; then
+        echo "Could not resolve the web source revision. Build aborted."
+        exit 1
+    fi
+
     cp "$PLANE_TEMP_CODE_DIR/deployments/cli/community/build.yml" "$PLANE_TEMP_CODE_DIR/build.yml"
 
     cd "$PLANE_TEMP_CODE_DIR" || exit

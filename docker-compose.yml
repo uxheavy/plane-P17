@@ -6,6 +6,8 @@ services:
       dockerfile: ./apps/web/Dockerfile.web
       args:
         DOCKER_BUILDKIT: 1
+        VITE_APP_ENVIRONMENT: ${VITE_APP_ENVIRONMENT:-PROD}
+        VITE_APP_REVISION: ${VITE_APP_REVISION:?web source revision is required}
     restart: always
     depends_on:
       - api
