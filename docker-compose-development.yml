@@ -1,0 +1,57 @@
+# Development override for docker-compose-local.yml.
+#
+# Usage:
+#   docker compose -p company-runner-development \
+#     -f docker-compose-local.yml -f docker-compose-development.yml up
+#
+# Contains no secret. SECRET_KEY is a development placeholder.
+services:
+  plane-db:
+    env_file: !override
+      - ./.env.example
+  plane-mq:
+    env_file: !override
+      - ./.env.example
+  plane-minio:
+    image: quay.io/minio/minio:latest
+    env_file: !override
+      - ./.env.example
+    entrypoint:
+      - minio
+    command:
+      - server
+      - /export
+      - --console-address
+      - :9090
+  api:
+    env_file: !override
+      - ./apps/api/.env.example
+    environment:
+      SECRET_KEY: development-only-key
+      DEBUG: "1"
+      WEB_URL: http://localhost:3000
+      APP_BASE_URL: http://localhost:3000
+      AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+      USE_MINIO: "1"
+  worker:
+    env_file: !override
+      - ./apps/api/.env.example
+    environment:
+      SECRET_KEY: development-only-key
+      DEBUG: "1"
+      WEB_URL: http://localhost:3000
+      APP_BASE_URL: http://localhost:3000
+      AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+      USE_MINIO: "1"
+  migrator:
+    env_file: !override
+      - ./apps/api/.env.example
+    environment:
+      SECRET_KEY: development-only-key
+      DEBUG: "1"
+  beat-worker:
+    env_file: !override
+      - ./apps/api/.env.example
+    environment:
+      SECRET_KEY: development-only-key
+      DEBUG: "1"
