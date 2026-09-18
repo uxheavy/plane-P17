@@ -69,7 +69,7 @@
     "page": {
       "step_zero": {
         "title": "Dokumentujte s AI stránkami",
-        "description": "Stránky v Plane vám umožňujú zachytiť, organizovať a spolupracovať na projektových informáciách—bez externých nástrojov."
+        "description": "Stránky v Company Runner vám umožňujú zachytiť, organizovať a spolupracovať na projektových informáciách—bez externých nástrojov."
       },
       "step_one": {
         "title": "Urobte stránku Verejnou alebo Súkromnou",
@@ -154,7 +154,7 @@
   },
   "get_started": {
     "title": "Ahoj {name}, vitaj na palube!",
-    "description": "Tu je všetko, čo potrebujete na spustenie vašej cesty s Plane.",
+    "description": "Tu je všetko, čo potrebujete na spustenie vašej cesty s Company Runner.",
     "checklist_section": {
       "title": "Začať",
       "description": "Začnite s nastavením a uvidíte svoje nápady ožívať rýchlejšie.",
@@ -188,8 +188,8 @@
       "more_integrations": "Prezerať viac integrácií"
     },
     "switch_to_plane_section": {
-      "title": "Objavte, prečo tímy prechádzajú na Plane",
-      "description": "Porovnajte Plane s nástrojmi, ktoré dnes používate a uvidíte rozdiel."
+      "title": "Objavte, prečo tímy prechádzajú na Company Runner",
+      "description": "Porovnajte Company Runner s nástrojmi, ktoré dnes používate a uvidíte rozdiel."
     }
   }
 }

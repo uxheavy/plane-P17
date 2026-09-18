@@ -234,7 +234,7 @@
         "generating": "Đang tạo",
         "delete": {
           "title": "Xóa token truy cập",
-          "description": "Mọi ứng dụng dùng token này sẽ không còn truy cập được dữ liệu Plane. Hành động này không thể hoàn tác.",
+          "description": "Mọi ứng dụng dùng token này sẽ không còn truy cập được dữ liệu Company Runner. Hành động này không thể hoàn tác.",
           "success": {
             "title": "Thành công",
             "message": "Đã xóa token"
@@ -249,7 +249,7 @@
         "title": "Tích hợp",
         "heading": "Tích hợp",
         "description": "Kết nối các công cụ và dịch vụ phổ biến để đồng bộ công việc trong toàn bộ quy trình.",
-        "page_title": "Dùng dữ liệu Plane trong các ứng dụng có sẵn hoặc ứng dụng của riêng bạn.",
+        "page_title": "Dùng dữ liệu Company Runner trong các ứng dụng có sẵn hoặc ứng dụng của riêng bạn.",
         "page_description": "Xem tất cả tích hợp mà không gian làm việc này hoặc bạn đang sử dụng."
       },
       "imports": {
@@ -376,14 +376,14 @@
         "install": "Cài đặt",
         "installed": "Đã cài đặt",
         "configure": "Cấu hình",
-        "app_available": "Ứng dụng này đã sẵn sàng để dùng với một không gian làm việc Plane",
+        "app_available": "Ứng dụng này đã sẵn sàng để dùng với một không gian làm việc Company Runner",
         "app_credentials_regenrated": {
           "title": "Đã tạo lại thông tin xác thực ứng dụng",
           "description": "Hãy thay Client Secret ở mọi nơi đang sử dụng. Client Secret cũ không còn hợp lệ."
         },
         "app_created": {
           "title": "Đã tạo ứng dụng",
-          "description": "Dùng thông tin xác thực để cài đặt ứng dụng trong không gian làm việc Plane"
+          "description": "Dùng thông tin xác thực để cài đặt ứng dụng trong không gian làm việc Company Runner"
         },
         "installed_apps": "Ứng dụng đã cài đặt",
         "all_apps": "Tất cả ứng dụng",
@@ -424,10 +424,10 @@
         },
         "redirect_uris": {
           "label": "Các Redirect URI (cách nhau bằng dấu cách)",
-          "description": "Sau khi xác thực với Plane, người dùng sẽ được chuyển hướng đến đường dẫn này.",
+          "description": "Sau khi xác thực với Company Runner, người dùng sẽ được chuyển hướng đến đường dẫn này.",
           "placeholder": "https://example.com https://example.com/"
         },
-        "app_available_description": "Kết nối một không gian làm việc Plane để bắt đầu sử dụng ứng dụng",
+        "app_available_description": "Kết nối một không gian làm việc Company Runner để bắt đầu sử dụng ứng dụng",
         "client_id_and_secret": "Client ID và Client Secret",
         "client_id_and_secret_description": "Sao chép và lưu khóa bí mật này trong Plane Pages. Bạn sẽ không thể xem lại khóa sau khi nhấn Đóng.",
         "client_id_and_secret_download": "Bạn có thể tải tệp CSV chứa khóa từ đây.",
@@ -476,12 +476,12 @@
         "workspace_permissions": "Quyền không gian làm việc",
         "workspace_permissions_description": "Quyền không gian làm việc dùng để cấp quyền truy cập vào không gian làm việc.",
         "with_the_permissions": "với các quyền",
-        "app_consent_title": "{app} đang yêu cầu quyền truy cập vào không gian làm việc và hồ sơ Plane của bạn.",
+        "app_consent_title": "{app} đang yêu cầu quyền truy cập vào không gian làm việc và hồ sơ Company Runner của bạn.",
         "choose_workspace_to_connect_app_with": "Chọn không gian làm việc để kết nối ứng dụng",
         "app_consent_workspace_permissions_title": "{app} muốn",
         "app_consent_user_permissions_title": "{app} cũng có thể yêu cầu quyền của người dùng đối với các tài nguyên sau. Những quyền này chỉ được yêu cầu và cấp bởi người dùng.",
         "app_consent_accept_title": "Khi chấp nhận, bạn sẽ:",
-        "app_consent_accept_1": "Cấp cho ứng dụng quyền truy cập dữ liệu Plane ở mọi nơi bạn dùng ứng dụng, trong hoặc ngoài Plane",
+        "app_consent_accept_1": "Cấp cho ứng dụng quyền truy cập dữ liệu Company Runner ở mọi nơi bạn dùng ứng dụng, trong hoặc ngoài Company Runner",
         "app_consent_accept_2": "Đồng ý với Chính sách bảo mật và Điều khoản sử dụng của {app}",
         "accepting": "Đang chấp nhận...",
         "accept": "Chấp nhận",
@@ -523,7 +523,7 @@
         "upload_and_save": "Tải lên và lưu",
         "app_consent_no_access_title": "Yêu cầu cài đặt",
         "app_consent_no_access_description": "Chỉ có thể cài ứng dụng này sau khi quản trị viên không gian làm việc cài ứng dụng. Hãy liên hệ quản trị viên để tiếp tục.",
-        "app_consent_unapproved_title": "Ứng dụng này chưa được Plane xem xét hoặc phê duyệt.",
+        "app_consent_unapproved_title": "Ứng dụng này chưa được Company Runner xem xét hoặc phê duyệt.",
         "app_consent_unapproved_description": "Hãy chắc chắn rằng bạn tin tưởng ứng dụng này trước khi kết nối với không gian làm việc.",
         "go_to_app": "Mở ứng dụng",
         "enable_app_mentions": "Bật đề cập ứng dụng",
@@ -553,7 +553,7 @@
         "description": "Xem công việc trở nên thông minh và nhanh hơn với AI được tích hợp trực tiếp vào công việc và cơ sở kiến thức."
       },
       "runners": {
-        "title": "Plane Runner",
+        "title": "Company Runner",
         "heading": "Script",
         "new_script": "Script mới",
         "description": "Tự động hóa quy trình bằng script tùy chỉnh và các quy tắc tự động hóa."
@@ -562,7 +562,7 @@
     "empty_state": {
       "api_tokens": {
         "title": "Chưa có token truy cập",
-        "description": "Bạn có thể dùng Plane API để tích hợp dữ liệu trong Plane với mọi hệ thống bên ngoài. Tạo token để bắt đầu."
+        "description": "Bạn có thể dùng Company Runner API để tích hợp dữ liệu trong Company Runner với mọi hệ thống bên ngoài. Tạo token để bắt đầu."
       },
       "webhooks": {
         "title": "Chưa có webhook",

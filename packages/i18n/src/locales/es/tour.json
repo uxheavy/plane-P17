@@ -69,7 +69,7 @@
     "page": {
       "step_zero": {
         "title": "Documenta con Páginas potenciadas por IA",
-        "description": "Las Páginas en Plane te permiten capturar, organizar y colaborar en información del proyecto—sin herramientas externas."
+        "description": "Las Páginas en Company Runner te permiten capturar, organizar y colaborar en información del proyecto—sin herramientas externas."
       },
       "step_one": {
         "title": "Hacer página Pública o Privada",
@@ -154,7 +154,7 @@
   },
   "get_started": {
     "title": "¡Hola {name}, bienvenido a bordo!",
-    "description": "Aquí está todo lo que necesitas para comenzar tu viaje con Plane.",
+    "description": "Aquí está todo lo que necesitas para comenzar tu viaje con Company Runner.",
     "checklist_section": {
       "title": "Comenzar",
       "description": "Comienza tu configuración y ve tus ideas cobrar vida más rápido.",
@@ -188,8 +188,8 @@
       "more_integrations": "Explorar más integraciones"
     },
     "switch_to_plane_section": {
-      "title": "Descubre por qué los equipos cambian a Plane",
-      "description": "Compara Plane con las herramientas que usas hoy y ve la diferencia."
+      "title": "Descubre por qué los equipos cambian a Company Runner",
+      "description": "Compara Company Runner con las herramientas que usas hoy y ve la diferencia."
     }
   }
 }

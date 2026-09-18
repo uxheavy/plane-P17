@@ -170,7 +170,7 @@
           },
           "company_name": {
             "label": "Tên công ty",
-            "placeholder": "Plane",
+            "placeholder": "Company Runner",
             "validation": {
               "required": "Vui lòng nhập tên công ty.",
               "maxLength": "Tên công ty không được dài quá 255 ký tự."
@@ -227,7 +227,7 @@
     "empty_state": {
       "upgrade": {
         "title": "Mẫu",
-        "description": "Với mẫu dự án, mẫu mục công việc và mẫu trang trong Plane, bạn không cần tạo dự án từ đầu hay thiết lập thuộc tính cho từng mục công việc.",
+        "description": "Với mẫu dự án, mẫu mục công việc và mẫu trang trong Company Runner, bạn không cần tạo dự án từ đầu hay thiết lập thuộc tính cho từng mục công việc.",
         "sub_description": "Tiết kiệm 80% thời gian quản trị khi sử dụng Mẫu."
       },
       "no_templates": {

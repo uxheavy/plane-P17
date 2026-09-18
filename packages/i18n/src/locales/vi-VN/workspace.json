@@ -1,7 +1,7 @@
 {
   "workspace_creation": {
     "heading": "Tạo không gian làm việc",
-    "subheading": "Để bắt đầu dùng Plane, hãy tạo hoặc tham gia một không gian làm việc.",
+    "subheading": "Để bắt đầu dùng Company Runner, hãy tạo hoặc tham gia một không gian làm việc.",
     "form": {
       "name": {
         "label": "Đặt tên cho không gian làm việc",
@@ -54,11 +54,11 @@
     "empty_state": {
       "general": {
         "title": "Tổng quan dự án, hoạt động và chỉ số",
-        "description": "Chào mừng bạn đến với Plane! Hãy tạo dự án đầu tiên và theo dõi các mục công việc. Trang này sẽ trở thành nơi giúp bạn theo dõi tiến độ. Quản trị viên cũng sẽ thấy các mục giúp nhóm tiến lên.",
+        "description": "Chào mừng bạn đến với Company Runner! Hãy tạo dự án đầu tiên và theo dõi các mục công việc. Trang này sẽ trở thành nơi giúp bạn theo dõi tiến độ. Quản trị viên cũng sẽ thấy các mục giúp nhóm tiến lên.",
         "primary_button": {
           "text": "Tạo dự án đầu tiên",
           "comic": {
-            "title": "Mọi thứ trong Plane đều bắt đầu từ một dự án",
+            "title": "Mọi thứ trong Company Runner đều bắt đầu từ một dự án",
             "description": "Dự án có thể là lộ trình sản phẩm, chiến dịch tiếp thị hoặc kế hoạch ra mắt mẫu xe mới."
           }
         }
@@ -200,7 +200,7 @@
         "primary_button": {
           "text": "Bắt đầu dự án đầu tiên",
           "comic": {
-            "title": "Mọi thứ trong Plane đều bắt đầu từ một dự án",
+            "title": "Mọi thứ trong Company Runner đều bắt đầu từ một dự án",
             "description": "Dự án có thể là lộ trình sản phẩm, chiến dịch tiếp thị hoặc kế hoạch ra mắt mẫu xe mới."
           }
         }
@@ -211,7 +211,7 @@
         "primary_button": {
           "text": "Bắt đầu dự án đầu tiên",
           "comic": {
-            "title": "Mọi thứ trong Plane đều bắt đầu từ một dự án",
+            "title": "Mọi thứ trong Company Runner đều bắt đầu từ một dự án",
             "description": "Dự án có thể là lộ trình sản phẩm, chiến dịch tiếp thị hoặc kế hoạch ra mắt mẫu xe mới."
           }
         }
@@ -289,8 +289,8 @@
   "workspace_pages": {
     "empty_state": {
       "general": {
-        "title": "Viết ghi chú, tài liệu hoặc xây dựng cơ sở kiến thức. Nhờ Galileo, trợ lý AI của Plane, giúp bạn bắt đầu.",
-        "description": "Trang là nơi ghi lại ý tưởng trong Plane. Ghi chú cuộc họp, dễ dàng định dạng, nhúng mục công việc, sắp xếp bằng thư viện thành phần và giữ mọi thứ trong ngữ cảnh dự án. Muốn rút gọn tài liệu, hãy gọi Galileo, AI của Plane, bằng phím tắt hoặc nút bấm.",
+        "title": "Viết ghi chú, tài liệu hoặc xây dựng cơ sở kiến thức. Nhờ Galileo, trợ lý AI của Company Runner, giúp bạn bắt đầu.",
+        "description": "Trang là nơi ghi lại ý tưởng trong Company Runner. Ghi chú cuộc họp, dễ dàng định dạng, nhúng mục công việc, sắp xếp bằng thư viện thành phần và giữ mọi thứ trong ngữ cảnh dự án. Muốn rút gọn tài liệu, hãy gọi Galileo, AI của Company Runner, bằng phím tắt hoặc nút bấm.",
         "primary_button": {
           "text": "Tạo trang đầu tiên của bạn"
         }

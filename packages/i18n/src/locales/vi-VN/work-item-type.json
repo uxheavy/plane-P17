@@ -367,7 +367,7 @@
         },
         "confirmation": {
           "title": "Không thể tắt loại mục công việc sau khi bật.",
-          "description": "Mục công việc của Plane sẽ trở thành loại mặc định của dự án và hiển thị cùng biểu tượng, nền tương ứng.",
+          "description": "Mục công việc của Company Runner sẽ trở thành loại mặc định của dự án và hiển thị cùng biểu tượng, nền tương ứng.",
           "button": {
             "default": "Bật",
             "loading": "Đang thiết lập"

@@ -69,7 +69,7 @@
     "page": {
       "step_zero": {
         "title": "Dokumentasikan dengan Halaman bertenaga AI",
-        "description": "Halaman di Plane memungkinkan Anda menangkap, mengorganisir, dan berkolaborasi pada info proyek—tanpa alat eksternal."
+        "description": "Halaman di Company Runner memungkinkan Anda menangkap, mengorganisir, dan berkolaborasi pada info proyek—tanpa alat eksternal."
       },
       "step_one": {
         "title": "Jadikan halaman Publik atau Privat",
@@ -154,7 +154,7 @@
   },
   "get_started": {
     "title": "Hai {name}, selamat datang!",
-    "description": "Inilah semua yang Anda butuhkan untuk memulai perjalanan Anda dengan Plane.",
+    "description": "Inilah semua yang Anda butuhkan untuk memulai perjalanan Anda dengan Company Runner.",
     "checklist_section": {
       "title": "Mulai",
       "description": "Mulai pengaturan Anda dan lihat ide Anda terwujud lebih cepat.",
@@ -188,8 +188,8 @@
       "more_integrations": "Jelajahi lebih banyak integrasi"
     },
     "switch_to_plane_section": {
-      "title": "Temukan mengapa tim beralih ke Plane",
-      "description": "Bandingkan Plane dengan alat yang Anda gunakan hari ini dan lihat perbedaannya."
+      "title": "Temukan mengapa tim beralih ke Company Runner",
+      "description": "Bandingkan Company Runner dengan alat yang Anda gunakan hari ini dan lihat perbedaannya."
     }
   }
 }

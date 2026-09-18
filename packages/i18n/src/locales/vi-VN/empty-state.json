@@ -14,7 +14,7 @@
     },
     "not_found": {
       "title": "Rất tiếc, đã xảy ra lỗi",
-      "description": "Hiện không thể tải tài khoản Plane của bạn. Có thể do lỗi mạng.",
+      "description": "Hiện không thể tải tài khoản Company Runner của bạn. Có thể do lỗi mạng.",
       "cta_primary": "Tải lại"
     },
     "server_error": {
@@ -188,7 +188,7 @@
     },
     "wiki": {
       "title": "Viết ghi chú, tài liệu hoặc cả kho kiến thức.",
-      "description": "Trang là nơi ghi lại ý tưởng trong Plane. Ghi chú họp, định dạng dễ dàng, nhúng mục công việc, sắp xếp nội dung bằng thư viện thành phần và giữ mọi thứ trong bối cảnh dự án.",
+      "description": "Trang là nơi ghi lại ý tưởng trong Company Runner. Ghi chú họp, định dạng dễ dàng, nhúng mục công việc, sắp xếp nội dung bằng thư viện thành phần và giữ mọi thứ trong bối cảnh dự án.",
       "cta_primary": "Tạo Trang của bạn"
     },
     "project_overview_state_sidebar": {

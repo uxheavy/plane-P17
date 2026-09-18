@@ -14,7 +14,7 @@
       "sidebar_header": "Thiết lập điều kiện kích hoạt",
       "input_label": "Tự động hóa này được kích hoạt bởi điều gì?",
       "input_placeholder": "Chọn tùy chọn",
-      "section_plane_events": "Sự kiện trong Plane",
+      "section_plane_events": "Sự kiện trong Company Runner",
       "section_time_based": "Theo thời gian",
       "fixed_schedule": "Lịch cố định",
       "schedule": {

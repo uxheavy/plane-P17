@@ -5,7 +5,7 @@
       "not_right_now": "Để sau",
       "create_project": {
         "title": "Tạo dự án",
-        "description": "Hầu hết mọi việc trong Plane đều bắt đầu từ một dự án.",
+        "description": "Hầu hết mọi việc trong Company Runner đều bắt đầu từ một dự án.",
         "cta": "Bắt đầu"
       },
       "invite_team": {
@@ -19,7 +19,7 @@
         "cta": "Cấu hình không gian làm việc"
       },
       "personalize_account": {
-        "title": "Tùy chỉnh Plane theo ý bạn",
+        "title": "Tùy chỉnh Company Runner theo ý bạn",
         "description": "Chọn ảnh đại diện, màu sắc và nhiều tùy chọn khác.",
         "cta": "Cá nhân hóa ngay"
       },
@@ -53,7 +53,7 @@
       }
     },
     "new_at_plane": {
-      "title": "Mới trên Plane"
+      "title": "Mới trên Company Runner"
     },
     "quick_tutorial": {
       "title": "Hướng dẫn nhanh"

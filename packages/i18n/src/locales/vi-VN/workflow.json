@@ -32,7 +32,7 @@
     "empty_state": {
       "upgrade": {
         "title": "Kiểm soát các thay đổi và lượt duyệt bằng Quy trình.",
-        "description": "Đặt quy tắc xác định công việc sẽ chuyển đi đâu, ai chuyển và khi nào bằng Quy trình trong Plane."
+        "description": "Đặt quy tắc xác định công việc sẽ chuyển đi đâu, ai chuyển và khi nào bằng Quy trình trong Company Runner."
       }
     },
     "quick_actions": {
