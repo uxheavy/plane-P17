@@ -95,7 +95,7 @@ export function InstanceSignInForm() {
   }, [errorCode, errorMessage]);
 
   const isButtonDisabled = useMemo(
-    () => (!isSubmitting && formData.email && formData.password ? false : true),
+    () => !(formData.email && formData.password) || isSubmitting,
     [formData.email, formData.password, isSubmitting]
   );
 
@@ -114,7 +114,7 @@ export function InstanceSignInForm() {
       <div className="mt-10 flex w-full flex-grow flex-col items-center justify-center py-6">
         <div className="relative flex w-full max-w-[22.5rem] flex-col gap-6">
           <FormHeader
-            heading="Manage your Plane instance"
+            heading="Manage your Company Runner instance"
             subHeading="Configure instance-wide settings to secure your instance"
           />
           <form
@@ -145,6 +145,7 @@ export function InstanceSignInForm() {
                   value={formData.email}
                   onChange={(e) => handleFormChange("email", e.target.value)}
                   autoComplete="off"
+                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- only control on this screen
                   autoFocus
                 />
               </InputGroup>

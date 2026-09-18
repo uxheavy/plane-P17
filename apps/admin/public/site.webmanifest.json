@@ -1,7 +1,7 @@
 {
-  "name": "Plane God Mode",
-  "short_name": "Plane God Mode",
-  "description": "Plane helps you plan your issues, cycles, and product modules.",
+  "name": "Company Runner Admin",
+  "short_name": "Company Runner Admin",
+  "description": "Company Runner helps you plan your issues, cycles, and product modules.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f9fafb",
