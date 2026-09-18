@@ -8,20 +8,27 @@
 #   varlock run -- docker compose -p company-runner-development \
 #     -f docker-compose-local.yml -f docker-compose-development.yml up
 #
-# Environment values come from varlock, not from an env_file. Each service
-# clears the base definition's `env_file` so that the resolved schema is the
-# only source. Running `docker compose` without varlock therefore leaves these
-# services without configuration rather than silently using stale files.
+# Each service reads an env file that the lifecycle resolves from the tracked
+# .env.schema beside it, so the tracked schema is the only source of values
+# (ADR-0011). The override repoints env_file at that generated file; it does not
+# clear it, because Compose forwards only the variables a service declares and
+# several services take their configuration from the file alone.
+#
+# Running `docker compose` without the lifecycle leaves those files absent or
+# stale, rather than merging a second definition over them.
 #
 # Contains no secret. The development SECRET_KEY is a placeholder.
 services:
   plane-db:
-    env_file: !override []
+    env_file: !override
+      - ./.env
   plane-mq:
-    env_file: !override []
+    env_file: !override
+      - ./.env
   plane-minio:
     image: quay.io/minio/minio:latest
-    env_file: !override []
+    env_file: !override
+      - ./.env
     entrypoint:
       - minio
     command:
@@ -30,7 +37,8 @@ services:
       - --console-address
       - :9090
   api:
-    env_file: !override []
+    env_file: !override
+      - ./apps/api/.env
     environment:
       DEBUG: "1"
       WEB_URL: http://localhost:3000
@@ -38,7 +46,8 @@ services:
       AWS_S3_ENDPOINT_URL: http://plane-minio:9000
       USE_MINIO: "1"
   worker:
-    env_file: !override []
+    env_file: !override
+      - ./apps/api/.env
     environment:
       DEBUG: "1"
       WEB_URL: http://localhost:3000
@@ -46,18 +55,18 @@ services:
       AWS_S3_ENDPOINT_URL: http://plane-minio:9000
       USE_MINIO: "1"
   migrator:
-    env_file: !override []
+    env_file: !override
+      - ./apps/api/.env
     environment:
       DEBUG: "1"
   beat-worker:
-    env_file: !override []
+    env_file: !override
+      - ./apps/api/.env
     environment:
       DEBUG: "1"
   # The web client. Development runs the Vite dev server so the UI reflects
-  # source edits without a rebuild. Its configuration is resolved from
-  # apps/web/.env.schema, the same way every other service is configured;
-  # DEV_BACKEND_URL there names the `api` service on the Compose network, which
-  # is what vite.config.ts proxies to.
+  # source edits without a rebuild. DEV_BACKEND_URL names the `api` service on
+  # the Compose network, which is what vite.config.ts proxies to.
   web:
     build:
       context: .
@@ -69,6 +78,18 @@ services:
       - dev_env
     env_file: !override
       - ./apps/web/.env
+    environment:
+      # The container must bind its own interface for the published port to
+      # reach the dev server; the schema default is loopback for host runs.
+      DEV_SERVER_HOST: 0.0.0.0
+    # Turbo runs the web `dev` task and builds its workspace dependencies first,
+    # which a bare `react-router dev` would skip and then fail to resolve.
+    # `react-router` resolves the bind host before the Vite config, so the host
+    # is also given on the command line.
+    command:
+      - sh
+      - -c
+      - exec npx turbo run dev --filter=web -- --host 0.0.0.0
     volumes:
       - ./apps/web:/app/apps/web
       - web_node_modules:/app/apps/web/node_modules
