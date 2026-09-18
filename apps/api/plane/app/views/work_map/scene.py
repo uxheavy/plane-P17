@@ -163,7 +163,7 @@ class WorkMapSceneEndpoint(BaseAPIView):
                 if set(referenced_bindings) != carrier_keys or any(
                     binding.work_map_id != work_map.pk for binding in referenced_bindings.values()
                 ):
-                    raise ValueError("Plane carrier binding is unavailable")
+                    raise ValueError("Company Runner carrier binding is unavailable")
                 if not all(
                     can_read_work_map_source(
                         user=request.user,
@@ -174,7 +174,7 @@ class WorkMapSceneEndpoint(BaseAPIView):
                     for node_key, binding in referenced_bindings.items()
                     if node_key not in current_carrier_keys
                 ):
-                    raise ValueError("Plane carrier binding source is unavailable")
+                    raise ValueError("Company Runner carrier binding source is unavailable")
 
                 active_bindings = {
                     binding.node_key: binding
@@ -195,7 +195,7 @@ class WorkMapSceneEndpoint(BaseAPIView):
                 ]
                 retained_sources = [(binding.source_kind, binding.source_id) for binding in retained_bindings]
                 if len(retained_sources) != len(set(retained_sources)):
-                    raise ValueError("Plane source has conflicting protected binding keys")
+                    raise ValueError("Company Runner source has conflicting protected binding keys")
                 validate_protected_binding_carriers(
                     scene,
                     referenced_bindings,

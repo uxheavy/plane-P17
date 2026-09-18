@@ -34,15 +34,15 @@ def protected_binding_keys(scene):
         if node_key_value is None:
             continue
         if set(custom_data) != {"nodeKey"}:
-            raise ValueError("Plane carrier contains protected source metadata")
+            raise ValueError("Company Runner carrier contains protected source metadata")
         if PROTECTED_SOURCE_FIELDS.intersection(element):
-            raise ValueError("Plane carrier contains protected source metadata")
+            raise ValueError("Company Runner carrier contains protected source metadata")
         if element.get("type") != "rectangle" or element.get("link") is not None:
-            raise ValueError("Protected binding key is outside a Plane carrier")
+            raise ValueError("Protected binding key is outside a Company Runner carrier")
         try:
             node_key = parse_work_map_node_key(node_key_value)
         except ValueError:
-            raise ValueError("Plane carrier binding key is invalid")
+            raise ValueError("Company Runner carrier binding key is invalid")
         carrier_keys.add(node_key)
     return carrier_keys
 
@@ -51,9 +51,9 @@ def validate_protected_binding_carriers(scene, bindings, *, require_every_bindin
     binding_keys = set(bindings)
     carrier_keys = protected_binding_keys(scene)
     if not carrier_keys.issubset(binding_keys):
-        raise ValueError("Plane carrier binding is unavailable")
+        raise ValueError("Company Runner carrier binding is unavailable")
     if require_every_binding and carrier_keys != binding_keys:
-        raise ValueError("Protected binding has no live Plane carrier")
+        raise ValueError("Protected binding has no live Company Runner carrier")
     return carrier_keys
 
 

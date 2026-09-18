@@ -27,7 +27,7 @@ class Command(BaseCommand):
             creator = input("Your email: ")
 
             if creator == "" or not User.objects.filter(email=creator).exists():
-                raise CommandError("User email is required and should have signed in plane")
+                raise CommandError("User email is required and should have signed in to Company Runner")
 
             user = User.objects.get(email=creator)
 

@@ -83,7 +83,7 @@ class WorkMapPasteRebindingSerializer(serializers.Serializer):
         node_keys = attrs["node_keys"]
         files = attrs["files"]
         if not node_keys and not files:
-            raise serializers.ValidationError("Paste rebinding requires Plane-owned nodes or files.")
+            raise serializers.ValidationError("Paste rebinding requires Company Runner-owned nodes or files.")
         if len(node_keys) != len(set(node_keys)):
             raise serializers.ValidationError("Paste node keys must be unique.")
         file_ids = [item["file_id"] for item in files]
