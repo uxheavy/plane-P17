@@ -7,6 +7,12 @@ RUN apk add --no-cache libc6-compat
 # Set working directory
 WORKDIR /app
 
+# pnpm installs its global bin outside the default PATH. Without this, the
+# `pnpm add -g` below fails with "The configured global bin directory is not in
+# PATH". Dockerfile.web configures the same pair.
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
+
 COPY . .
 RUN corepack enable pnpm && pnpm add -g turbo
 RUN pnpm install
