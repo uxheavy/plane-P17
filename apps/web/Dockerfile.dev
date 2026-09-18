@@ -1,6 +1,6 @@
 # The workspace declares `engines.node >= 22.22.0`. Pinning the minor keeps the
 # build from silently floating below it, while staying on the upstream 22.x
-alpine convention used by the other Dockerfiles.
+# alpine convention used by the other Dockerfiles.
 FROM node:22.22-alpine
 
 RUN apk add --no-cache libc6-compat
