@@ -45,6 +45,13 @@ services:
       APP_BASE_URL: http://localhost:3000
       AWS_S3_ENDPOINT_URL: http://plane-minio:9000
       USE_MINIO: "1"
+    volumes:
+      - ./apps/api:/code
+      # The tracked development baseline lives in the parent repository rather
+      # than in this fork, so it is mounted read-only for the reconcile command
+      # (ADR-0012). Read-only because applying the baseline reads case-owned
+      # data; it never writes back to the manifest.
+      - ../tests/acceptance/baseline:/baseline:ro
   worker:
     env_file: !override
       - ./apps/api/.env
