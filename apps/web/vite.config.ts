@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import * as dotenv from "dotenv";
 import { reactRouter } from "@react-router/dev/vite";
-import packageJson from "./package.json";
 import { defineConfig, searchForWorkspaceRoot } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
@@ -41,6 +40,29 @@ const viteEnv = Object.keys(process.env)
 
 const REVISION_PATTERN = /^[0-9a-f]{5,40}$/i;
 const BUILD_ENVIRONMENTS = new Set(["DEV", "PREVIEW", "PROD"]);
+const PRODUCT_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+
+// The product version belongs to the repository that builds this application,
+// which this checkout cannot see, so it arrives as a build input.
+//
+// A value that is PRESENT must be valid: a malformed version is supplied
+// garbage and always fails. Whether a version must be present is the caller's
+// decision, not this build's, because the caller is the only party that knows
+// whether it is producing a release. Container and CI callers declare that by
+// requiring the variable, the same way they already require the revision.
+//
+// Absence is therefore meaningful rather than an error state: a build with no
+// product version renders a label without one. This also keeps the rule
+// independent of build mode, which is a tooling detail that prerender steps
+// re-evaluate independently.
+function resolveProductVersion() {
+  const version = process.env.VITE_APP_PRODUCT_VERSION?.trim();
+  if (!version) return "";
+  if (!PRODUCT_VERSION_PATTERN.test(version)) {
+    throw new Error("VITE_APP_PRODUCT_VERSION must be a Semantic Version such as 1.0.0.");
+  }
+  return version;
+}
 
 function resolveRevision() {
   let revision = process.env.VITE_APP_REVISION?.trim();
@@ -74,40 +96,43 @@ function resolveEnvironment(mode: string) {
   return environment;
 }
 
-export default defineConfig(({ mode }) => ({
-  define: {
-    "import.meta.env.VITE_APP_ENVIRONMENT": JSON.stringify(resolveEnvironment(mode)),
-    "import.meta.env.VITE_APP_REVISION": JSON.stringify(resolveRevision()),
-    "import.meta.env.VITE_APP_VERSION": JSON.stringify(packageJson.version),
-    "process.env": JSON.stringify(viteEnv),
-  },
-  build: {
-    assetsInlineLimit: 0,
-  },
-  plugins: [reactRouter(), tsconfigPaths({ projects: [path.resolve(__dirname, "tsconfig.json")] })],
-  resolve: {
-    alias: [
-      ...sourceAliases,
-      // Next.js compatibility shims used within web
-      { find: "next/link", replacement: path.resolve(__dirname, "app/compat/next/link.tsx") },
-      { find: "next/navigation", replacement: path.resolve(__dirname, "app/compat/next/navigation.ts") },
-      { find: "next/script", replacement: path.resolve(__dirname, "app/compat/next/script.tsx") },
-    ],
-    dedupe: ["react", "react-dom", "@headlessui/react"],
-  },
-  server: {
-    host: "127.0.0.1",
-    ...(excalidrawSource ? { fs: { allow: [searchForWorkspaceRoot(__dirname), excalidrawSource] } } : {}),
-    ...(backend
-      ? {
-          proxy: Object.fromEntries(
-            ["/api", "/auth", "/static", "/uploads", "/live"].map((route) => [
-              route,
-              { target: backend, ws: route === "/live" },
-            ])
-          ),
-        }
-      : {}),
-  },
-  // No SSR-specific overrides needed; alias resolves to ESM build
-}));
+export default defineConfig(({ mode }) => {
+  const environment = resolveEnvironment(mode);
+  return {
+    define: {
+      "import.meta.env.VITE_APP_ENVIRONMENT": JSON.stringify(environment),
+      "import.meta.env.VITE_APP_REVISION": JSON.stringify(resolveRevision()),
+      "import.meta.env.VITE_APP_PRODUCT_VERSION": JSON.stringify(resolveProductVersion()),
+      "process.env": JSON.stringify(viteEnv),
+    },
+    build: {
+      assetsInlineLimit: 0,
+    },
+    plugins: [reactRouter(), tsconfigPaths({ projects: [path.resolve(__dirname, "tsconfig.json")] })],
+    resolve: {
+      alias: [
+        ...sourceAliases,
+        // Next.js compatibility shims used within web
+        { find: "next/link", replacement: path.resolve(__dirname, "app/compat/next/link.tsx") },
+        { find: "next/navigation", replacement: path.resolve(__dirname, "app/compat/next/navigation.ts") },
+        { find: "next/script", replacement: path.resolve(__dirname, "app/compat/next/script.tsx") },
+      ],
+      dedupe: ["react", "react-dom", "@headlessui/react"],
+    },
+    server: {
+      host: "127.0.0.1",
+      ...(excalidrawSource ? { fs: { allow: [searchForWorkspaceRoot(__dirname), excalidrawSource] } } : {}),
+      ...(backend
+        ? {
+            proxy: Object.fromEntries(
+              ["/api", "/auth", "/static", "/uploads", "/live"].map((route) => [
+                route,
+                { target: backend, ws: route === "/live" },
+              ])
+            ),
+          }
+        : {}),
+    },
+    // No SSR-specific overrides needed; alias resolves to ESM build
+  };
+});

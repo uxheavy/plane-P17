@@ -11,7 +11,7 @@ import { useTranslation } from "@plane/i18n";
 import { Tooltip } from "@plane/propel/tooltip";
 // hooks
 import { usePlatformOS } from "@/hooks/use-platform-os";
-import { PLANE_VERSION } from "@/lib/version";
+import { PLANE_BUILD_LABEL } from "@/lib/version";
 // local components
 import { Button } from "@plane/propel/button";
 import { PaidPlanUpgradeModal } from "@/components/license/modal/upgrade-modal";
@@ -30,7 +30,7 @@ export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
         isOpen={isPaidPlanPurchaseModalOpen}
         handleClose={() => setIsPaidPlanPurchaseModalOpen(false)}
       />
-      <Tooltip tooltipContent={`Version: v${PLANE_VERSION}`} isMobile={isMobile}>
+      <Tooltip tooltipContent={`Version: ${PLANE_BUILD_LABEL}`} isMobile={isMobile}>
         <Button
           variant="tertiary"
           size="lg"
