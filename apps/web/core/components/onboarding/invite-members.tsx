@@ -181,10 +181,10 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
             control={control}
             name={`emails.${index}.role`}
             rules={{ required: true }}
-            render={({ field: { value, onChange } }) => (
+            render={({ field: { value: roleValue, onChange } }) => (
               <Listbox
                 as="div"
-                value={value}
+                value={roleValue}
                 onChange={(val) => {
                   onChange(val);
                   setValue(`emails.${index}.role_active`, true);
@@ -201,7 +201,7 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
                       !getValues(`emails.${index}.role_active`) ? "text-placeholder" : "text-primary"
                     } sm:text-13`}
                   >
-                    {ROLE[value]}
+                    {ROLE[roleValue]}
                   </span>
 
                   <ChevronDownIcon
@@ -309,6 +309,7 @@ export function InviteMembers(props: Props) {
           message: "Invitations sent successfully.",
         });
         await nextStep();
+        return;
       })
       .catch((err) => {
         setToast({
@@ -345,7 +346,8 @@ export function InviteMembers(props: Props) {
           <div className="mx-auto w-4/5 space-y-1 py-4 text-center">
             <h3 className="text-24 font-bold text-primary">Invite your teammates</h3>
             <p className="font-medium text-placeholder">
-              Work in plane happens best with your team. Invite them now to use Plane to its potential.
+              Work in Company Runner happens best with your team. Invite them now to use Company Runner to its
+              potential.
             </p>
           </div>
           <form

@@ -7,6 +7,7 @@
 import { observer } from "mobx-react";
 import { RotateCcw } from "lucide-react";
 // hooks
+import { SYSTEM_ACTOR_NAME } from "@plane/constants";
 import { ArchiveIcon } from "@plane/propel/icons";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // components
@@ -37,7 +38,7 @@ export const IssueArchivedAtActivity = observer(function IssueArchivedAtActivity
       }
       activityId={activityId}
       ends={ends}
-      customUserName={activity.new_value === "archive" ? "Plane" : undefined}
+      customUserName={activity.new_value === "archive" ? SYSTEM_ACTOR_NAME : undefined}
     >
       {activity.new_value === "restore" ? "restored the work item" : "archived the work item"}.
     </IssueActivityBlockComponent>

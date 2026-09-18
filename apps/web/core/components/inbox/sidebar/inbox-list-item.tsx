@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 // plane imports
+import { SYSTEM_ACTOR_NAME } from "@plane/constants";
 import { PriorityIcon } from "@plane/propel/icons";
 import { Tooltip } from "@plane/propel/tooltip";
 import { Row, Avatar } from "@plane/ui";
@@ -127,7 +128,7 @@ export const InboxIssueListItem = observer(function InboxIssueListItem(props: In
             </div>
             {/* created by */}
             {createdByDetails && createdByDetails.email?.includes("intake@plane.so") ? (
-              <Avatar src={getFileURL("")} name={"Plane"} size="md" showTooltip />
+              <Avatar src={getFileURL("")} name={SYSTEM_ACTOR_NAME} size="md" showTooltip />
             ) : createdByDetails ? (
               <ButtonAvatars showTooltip={false} userIds={createdByDetails?.id} />
             ) : null}

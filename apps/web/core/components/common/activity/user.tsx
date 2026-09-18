@@ -7,6 +7,7 @@
 import { observer } from "mobx-react";
 import Link from "next/link";
 // types
+import { SYSTEM_ACTOR_NAME } from "@plane/constants";
 import type { TWorkspaceBaseActivity } from "@plane/types";
 // store hooks
 import { useMember } from "@/hooks/store/use-member";
@@ -29,7 +30,7 @@ export const User = observer(function User(props: TUser) {
   return (
     <>
       {customUserName || actorDetail?.display_name?.includes("-intake") ? (
-        <span className="font-medium text-primary">{customUserName || "Plane"}</span>
+        <span className="font-medium text-primary">{customUserName || SYSTEM_ACTOR_NAME}</span>
       ) : (
         <Link
           href={`/${workspaceDetail?.slug}/profile/${actorDetail?.id}`}

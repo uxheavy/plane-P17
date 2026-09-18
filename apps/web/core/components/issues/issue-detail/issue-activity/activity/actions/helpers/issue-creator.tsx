@@ -7,6 +7,8 @@
 import Link from "next/link";
 // hooks
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
+// plane imports
+import { SYSTEM_ACTOR_NAME } from "@plane/constants";
 
 type TIssueUser = {
   activityId: string;
@@ -27,7 +29,7 @@ export function IssueCreatorDisplay(props: TIssueUser) {
   return (
     <>
       {customUserName ? (
-        <span className="font-medium text-primary">{customUserName || "Plane"}</span>
+        <span className="font-medium text-primary">{customUserName || SYSTEM_ACTOR_NAME}</span>
       ) : (
         <Link
           href={`/${activity?.workspace_detail?.slug}/profile/${activity?.actor_detail?.id}`}

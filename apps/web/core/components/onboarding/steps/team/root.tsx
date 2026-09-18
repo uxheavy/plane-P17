@@ -177,10 +177,10 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
             control={control}
             name={`emails.${index}.role`}
             rules={{ required: true }}
-            render={({ field: { value, onChange } }) => (
+            render={({ field: { value: roleValue, onChange } }) => (
               <Listbox
                 as="div"
-                value={value}
+                value={roleValue}
                 onChange={(val) => {
                   onChange(val);
                   setValue(`emails.${index}.role_active`, true);
@@ -197,7 +197,7 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
                       !getValues(`emails.${index}.role_active`) ? "text-placeholder" : "text-primary"
                     } sm:text-13`}
                   >
-                    {ROLE[value]}
+                    {ROLE[roleValue]}
                   </span>
 
                   <ChevronDownIcon
@@ -309,6 +309,7 @@ export const InviteTeamStep = observer(function InviteTeamStep(props: Props) {
           message: "Invitations sent successfully.",
         });
         await nextStep();
+        return;
       })
       .catch((err) => {
         setToast({
@@ -348,7 +349,7 @@ export const InviteTeamStep = observer(function InviteTeamStep(props: Props) {
     >
       <CommonOnboardingHeader
         title="Invite your teammates"
-        description="Work in plane happens best with your team. Invite them now to use Plane to its potential."
+        description="Work in Company Runner happens best with your team. Invite them now to use Company Runner to its potential."
       />
       <div className="w-full py-4 text-13">
         <div className="group relative mx-8 grid grid-cols-10 gap-4 py-2">

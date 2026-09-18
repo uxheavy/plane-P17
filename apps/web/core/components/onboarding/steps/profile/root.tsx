@@ -141,13 +141,15 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
 
   // Check for all available fields validation and if password field is available, then checks for password validation (strength + confirmation).
   // Also handles the condition for optional password i.e if password field is optional it only checks for above validation if it's not empty.
-  const isButtonDisabled =
-    !isSubmitting && isValid ? (isPasswordAlreadySetup ? false : isValidPassword ? false : true) : true;
+  const isButtonDisabled = !isSubmitting && isValid ? !(isPasswordAlreadySetup ? false : isValidPassword) : true;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-10">
       {/* Header */}
-      <CommonOnboardingHeader title="Create your profile." description="This is how you will appear in Plane." />
+      <CommonOnboardingHeader
+        title="Create your profile."
+        description="This is how you will appear in Company Runner."
+      />
 
       {/* Profile Picture Section */}
       <Controller
@@ -173,6 +175,7 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
           onClick={() => setIsImageUploadModalOpen(true)}
         >
           {userAvatar ? (
+            // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- decorative avatar rendering, the surrounding button already owns the click and keyboard behaviour
             <img
               src={getFileURL(userAvatar ?? "")}
               onClick={() => setIsImageUploadModalOpen(true)}
@@ -222,6 +225,7 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
+                // oxlint-disable-next-line jsx-a11y/no-autofocus -- single-field focused profile step, the name input is the primary action
                 autoFocus
                 className={cn(
                   "w-full rounded-md border border-strong bg-surface-1 px-3 py-2 text-secondary transition-all duration-200 placeholder:text-placeholder focus:border-transparent focus:ring-2 focus:ring-accent-strong focus:outline-none",

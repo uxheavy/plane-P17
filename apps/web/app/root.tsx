@@ -9,7 +9,7 @@ import { Links, Meta, Outlet, Scripts } from "react-router";
 import type { LinksFunction } from "react-router";
 import { ThemeProvider, useTheme } from "next-themes";
 // plane imports
-import { SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
+import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_TITLE, SITE_URL, TWITTER_USER_NAME } from "@plane/constants";
 // types
 // assets
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
@@ -27,12 +27,13 @@ import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-erro
 // local
 import { CustomErrorComponent } from "./error";
 // fonts
+// oxlint-disable-next-line import/no-unassigned-import -- registered as a side effect
 import "@fontsource-variable/inter";
 import interVariableWoff2 from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+// oxlint-disable-next-line import/no-unassigned-import -- registered as a side effect
 import "@fontsource/material-symbols-rounded";
+// oxlint-disable-next-line import/no-unassigned-import -- registered as a side effect
 import "@fontsource/ibm-plex-mono";
-
-const APP_TITLE = "Plane | Simple, extensible, open-source project management tool.";
 
 export const links: LinksFunction = () => [
   { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
@@ -61,7 +62,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#fff" />
         {/* Meta info for PWA */}
-        <meta name="application-name" content="Plane" />
+        <meta name="application-name" content={SITE_NAME} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
@@ -83,29 +84,28 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export const meta: Route.MetaFunction = () => [
-  { title: APP_TITLE },
+  { title: SITE_TITLE },
   { name: "description", content: SITE_DESCRIPTION },
-  { property: "og:title", content: APP_TITLE },
+  { property: "og:title", content: SITE_TITLE },
   {
     property: "og:description",
-    content: "Open-source project management tool to manage work items, cycles, and product roadmaps easily",
+    content: SITE_DESCRIPTION,
   },
-  { property: "og:url", content: "https://app.plane.so/" },
+  { property: "og:url", content: SITE_URL },
   { property: "og:image", content: ogImage },
   { property: "og:image:width", content: "1200" },
   { property: "og:image:height", content: "630" },
-  { property: "og:image:alt", content: "Plane - Modern project management" },
+  { property: "og:image:alt", content: SITE_TITLE },
   {
     name: "keywords",
-    content:
-      "software development, plan, ship, software, accelerate, code management, release management, project management, work item tracking, agile, scrum, kanban, collaboration",
+    content: SITE_KEYWORDS,
   },
-  { name: "twitter:site", content: "@planepowers" },
+  { name: "twitter:site", content: TWITTER_USER_NAME },
   { name: "twitter:card", content: "summary_large_image" },
   { name: "twitter:image", content: ogImage },
   { name: "twitter:image:width", content: "1200" },
   { name: "twitter:image:height", content: "630" },
-  { name: "twitter:image:alt", content: "Plane - Modern project management" },
+  { name: "twitter:image:alt", content: SITE_TITLE },
 ];
 
 // Root stays shell-thin: in SPA mode React Router server-builds only the root route, so

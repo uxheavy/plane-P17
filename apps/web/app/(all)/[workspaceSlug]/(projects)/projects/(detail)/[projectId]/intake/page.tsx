@@ -8,7 +8,7 @@ import { observer } from "mobx-react";
 import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 // plane imports
-import { EUserPermissionsLevel } from "@plane/constants";
+import { EUserPermissionsLevel, SYSTEM_ACTOR_NAME } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { EUserProjectRoles, EInboxIssueCurrentTab } from "@plane/types";
 // assets
@@ -67,7 +67,7 @@ function ProjectInboxPage({ params }: Route.ComponentProps) {
         workspace: currentProjectDetails?.name,
       })
     : t("inbox_issue.page_label", {
-        workspace: "Plane",
+        workspace: SYSTEM_ACTOR_NAME,
       });
 
   const currentNavigationTab = navigationTab
