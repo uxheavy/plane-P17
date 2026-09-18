@@ -18,24 +18,38 @@ echo -e "${BOLD}${BLUE}                   Plane - Project Management Tool       
 echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BOLD}Setting up your development environment...${NC}\n"
 
-# Function to handle file copying with error checking
-copy_env_file() {
-    local source=$1
-    local destination=$2
+# Function to resolve one .env.schema into a .env file with varlock.
+#
+# varlock owns the tracked definition; this script only materializes the
+# resolved values where the Docker tooling expects to find them. An existing
+# .env is preserved, so local overrides are not reset.
+resolve_env_file() {
+    local directory=$1
 
-    if [ ! -f "$source" ]; then
-        echo -e "${RED}Error: Source file $source does not exist.${NC}"
+    if [ ! -f "${directory}.env.schema" ]; then
+        echo -e "${RED}Error: ${directory}.env.schema does not exist.${NC}"
         return 1
     fi
 
-    cp "$source" "$destination"
+    if [ -f "${directory}.env" ]; then
+        echo -e "${GREEN}✓${NC} Kept existing ${directory}.env"
+        return 0
+    fi
 
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓${NC} Copied $destination"
-    else
-        echo -e "${RED}✗${NC} Failed to copy $destination"
+    if ! command -v varlock >/dev/null 2>&1; then
+        echo -e "${RED}Error: varlock is not installed.${NC}"
+        echo -e "${RED}Install it from https://varlock.dev before running setup.${NC}"
         return 1
     fi
+
+    if varlock load --path "${directory}.env.schema" --format env --compact > "${directory}.env"; then
+        echo -e "${GREEN}✓${NC} Resolved ${directory}.env from ${directory}.env.schema"
+        return 0
+    fi
+
+    rm -f "${directory}.env"
+    echo -e "${RED}✗${NC} Failed to resolve ${directory}.env.schema${NC}"
+    return 1
 }
 
 # Export character encoding settings for macOS compatibility
@@ -43,7 +57,7 @@ export LC_ALL=C
 export LC_CTYPE=C
 echo -e "${YELLOW}Setting up environment files...${NC}"
 
-# Copy all environment example files
+# Resolve each .env from its tracked .env.schema
 services=("" "web" "api" "space" "admin" "live")
 success=true
 
@@ -56,7 +70,13 @@ for service in "${services[@]}"; do
         prefix="./apps/$service/"
     fi
 
-    copy_env_file "${prefix}.env.example" "${prefix}.env" || success=false
+    # Services without a schema are upstream-owned and not migrated yet.
+    if [ ! -f "${prefix}.env.schema" ]; then
+        echo -e "${YELLOW}•${NC} Skipped ${prefix}.env (no schema)"
+        continue
+    fi
+
+    resolve_env_file "$prefix" || success=false
 done
 
 # Generate SECRET_KEY for Django
