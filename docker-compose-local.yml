@@ -1,6 +1,8 @@
-# Host ports are parameterized (see .env.example) so that a development
-# lifecycle can allocate them from its own block. Each host side binds to
-# loopback only; publishing a development port on all interfaces is a defect.
+# Host ports intentionally have no defaults in the tracked schemas. Company
+# Runner's development lifecycle allocates them and invokes this base definition
+# with docker-compose-development.yml; this file is not a standalone entry point
+# in this fork. Each host side binds to loopback only; publishing a development
+# port on all interfaces is a defect.
 services:
   plane-redis:
     image: valkey/valkey:7.2.11-alpine
