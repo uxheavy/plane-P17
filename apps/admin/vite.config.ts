@@ -35,7 +35,14 @@ export default defineConfig(() => ({
     dedupe: ["react", "react-dom"],
   },
   server: {
-    host: "127.0.0.1",
+    // Loopback by default, which is what a host-run dev server should use.
+    // A container publishes its port through Docker, so Vite must bind the
+    // container's interface instead; DEV_SERVER_HOST supplies that without
+    // changing the default for every other case. This mirrors the workspace
+    // client's config, so both apps behave the same way in and out of a
+    // container rather than relying on a CLI flag to override a hardcoded
+    // value.
+    host: process.env.DEV_SERVER_HOST || "127.0.0.1",
   },
   // No SSR-specific overrides needed; alias resolves to ESM build
 }));

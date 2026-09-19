@@ -1,17 +1,31 @@
-FROM node:22-alpine
+# The workspace declares `engines.node >= 22.22.0`. Pinning the minor keeps the
+# build from silently floating below it, while staying on the upstream 22.x
+# alpine convention used by the other Dockerfiles.
+FROM node:22.22-alpine
+
 RUN apk add --no-cache libc6-compat
 # Set working directory
 WORKDIR /app
 
-COPY . .
+# pnpm installs its global bin outside the default PATH. Without this, the
+# `pnpm add -g` below fails with "The configured global bin directory is not in
+# PATH". Dockerfile.web and Dockerfile.dev configure the same pair.
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
 
+COPY . .
 RUN corepack enable pnpm && pnpm add -g turbo
 RUN pnpm install
 
 ENV VITE_ADMIN_BASE_PATH="/god-mode"
 
-EXPOSE 3000
-
-VOLUME [ "/app/node_modules", "/app/admin/node_modules" ]
-
+# The admin dev task binds port 3001. This image previously exposed 3000, which
+# is the workspace client's port, so a published mapping built from this file
+# would forward to a port nothing in the container listens on.
+EXPOSE 3001
+# The admin package lives under apps/ after the workspace restructure. The
+# second mount keeps the workspace's own node_modules (pnpm's isolated linker
+# places package-level dependencies there) from being shadowed by the host bind
+# mount in docker-compose-development.yml.
+VOLUME [ "/app/node_modules", "/app/apps/admin/node_modules" ]
 CMD ["pnpm", "dev", "--filter=admin"]
