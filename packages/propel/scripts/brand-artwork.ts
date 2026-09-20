@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026-present Ngo Quoc Huy
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 /* eslint-disable no-await-in-loop -- Rasterize frames sequentially to bound encoder memory. */
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";

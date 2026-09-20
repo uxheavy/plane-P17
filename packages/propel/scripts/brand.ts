@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026-present Ngo Quoc Huy
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
 /* eslint-disable no-await-in-loop -- Render one animation at a time before publishing any outputs. */
 /** Generate declared identity exports; artwork lives in the runtime components. */
 import { randomBytes } from "node:crypto";
