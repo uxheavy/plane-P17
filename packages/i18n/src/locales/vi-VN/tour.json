@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Tinh gọn yêu cầu bằng Intake",
-        "description": "Tính năng riêng của Plane cho phép Khách tạo mục công việc cho lỗi, yêu cầu hoặc phiếu hỗ trợ."
+        "description": "Tính năng riêng của Company Runner cho phép Khách tạo mục công việc cho lỗi, yêu cầu hoặc phiếu hỗ trợ."
       },
       "step_one": {
         "title": "Yêu cầu Intake đang mở/đã đóng",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Không cần chuyển tab. Kết nối mọi thứ.",
-        "description": "Kết nối GitHub và Slack để theo dõi PR, tóm tắt trò chuyện ngay trong Plane AI."
+        "description": "Kết nối GitHub và Slack để theo dõi PR, tóm tắt trò chuyện ngay trong Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Tạo trang"
         },
         "item_5": {
-          "title": "Thử trò chuyện với Plane AI"
+          "title": "Thử trò chuyện với Company Runner AI"
         },
         "item_6": {
           "title": "Kết nối tích hợp"

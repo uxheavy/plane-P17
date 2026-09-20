@@ -10,7 +10,7 @@ import { useTranslation } from "@plane/i18n";
 import { Avatar } from "@plane/ui";
 import { getFileURL } from "@plane/utils";
 // assets
-import emptyMembers from "@/app/assets/empty-state/empty_members.svg?url";
+import emptyMembers from "@/app/assets/empty-state/empty_members.webp?url";
 import userImage from "@/app/assets/user.png?url";
 // components
 import { SingleProgressStats } from "@/components/core/sidebar/single-progress-stats";

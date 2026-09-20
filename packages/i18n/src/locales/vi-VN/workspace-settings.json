@@ -3,7 +3,7 @@
     "label": "Cài đặt không gian làm việc",
     "page_label": "{workspace} - Cài đặt chung",
     "key_created": "Đã tạo khóa",
-    "copy_key": "Hãy sao chép và lưu khóa bí mật này trong Plane Pages. Bạn sẽ không thể xem lại khóa sau khi nhấn Đóng. Tệp CSV chứa khóa đã được tải xuống.",
+    "copy_key": "Hãy sao chép và lưu khóa bí mật này trong Company Runner Publish. Bạn sẽ không thể xem lại khóa sau khi nhấn Đóng. Tệp CSV chứa khóa đã được tải xuống.",
     "token_copied": "Đã sao chép token vào bảng tạm.",
     "settings": {
       "general": {
@@ -331,7 +331,7 @@
       "project_states": {
         "title": "Trạng thái dự án",
         "heading": "Xem tổng quan tiến độ của mọi dự án.",
-        "description": "Trạng thái dự án là tính năng riêng của Plane, giúp theo dõi tiến độ mọi dự án theo từng thuộc tính.",
+        "description": "Trạng thái dự án là tính năng riêng của Company Runner, giúp theo dõi tiến độ mọi dự án theo từng thuộc tính.",
         "go_to_settings": "Mở cài đặt"
       },
       "projects": {
@@ -429,7 +429,7 @@
         },
         "app_available_description": "Kết nối một không gian làm việc Company Runner để bắt đầu sử dụng ứng dụng",
         "client_id_and_secret": "Client ID và Client Secret",
-        "client_id_and_secret_description": "Sao chép và lưu khóa bí mật này trong Plane Pages. Bạn sẽ không thể xem lại khóa sau khi nhấn Đóng.",
+        "client_id_and_secret_description": "Sao chép và lưu khóa bí mật này trong Company Runner Publish. Bạn sẽ không thể xem lại khóa sau khi nhấn Đóng.",
         "client_id_and_secret_download": "Bạn có thể tải tệp CSV chứa khóa từ đây.",
         "application_id": "Application ID",
         "client_id": "Client ID",
@@ -548,8 +548,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Xem công việc trở nên thông minh và nhanh hơn với AI được tích hợp trực tiếp vào công việc và cơ sở kiến thức."
       },
       "runners": {

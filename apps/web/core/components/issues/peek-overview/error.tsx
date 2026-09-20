@@ -7,7 +7,7 @@
 import { MoveRight } from "lucide-react";
 import { Tooltip } from "@plane/propel/tooltip";
 // assets
-import emptyIssue from "@/app/assets/empty-state/issue.svg?url";
+import emptyIssue from "@/app/assets/empty-state/issue.webp?url";
 // components
 import { EmptyState } from "@/components/common/empty-state";
 // hooks

@@ -636,6 +636,9 @@ importers:
       '@plane/hooks':
         specifier: workspace:*
         version: link:../../packages/hooks
+      '@plane/propel':
+        specifier: workspace:*
+        version: link:../../packages/propel
       '@plane/services':
         specifier: workspace:*
         version: link:../../packages/services
@@ -1648,12 +1651,21 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.17)
+      fontkit:
+        specifier: 2.0.4
+        version: 2.0.4
+      sharp:
+        specifier: 'catalog:'
+        version: 0.35.3(@types/node@22.12.0)
       storybook:
         specifier: 'catalog:'
         version: 10.4.6(@testing-library/dom@10.4.0)(@types/react@19.2.17)(prettier@3.9.6)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       tsdown:
         specifier: 'catalog:'
         version: 0.16.0(oxc-resolver@11.20.0)(typescript@5.8.3)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.20.6
       typescript:
         specifier: 5.8.3
         version: 5.8.3

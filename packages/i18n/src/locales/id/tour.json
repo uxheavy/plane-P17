@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Sederhanakan permintaan dengan intake",
-        "description": "Fitur eksklusif Plane yang memungkinkan Tamu membuat item pekerjaan untuk bug, permintaan, atau tiket."
+        "description": "Fitur eksklusif Company Runner yang memungkinkan Tamu membuat item pekerjaan untuk bug, permintaan, atau tiket."
       },
       "step_one": {
         "title": "Permintaan intake terbuka/tertutup",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Berhenti berpindah tab. Hubungkan dunia Anda.",
-        "description": "Tautkan GitHub, Slack untuk melacak PR dan meringkas obrolan langsung di Plane AI."
+        "description": "Tautkan GitHub, Slack untuk melacak PR dan meringkas obrolan langsung di Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Buat halaman"
         },
         "item_5": {
-          "title": "Coba obrolan Plane AI"
+          "title": "Coba obrolan Company Runner AI"
         },
         "item_6": {
           "title": "Tautkan Integrasi"

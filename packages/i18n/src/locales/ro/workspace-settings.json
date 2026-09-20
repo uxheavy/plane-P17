@@ -3,7 +3,7 @@
     "label": "Setări spațiu de lucru",
     "page_label": "{workspace} - Setări generale",
     "key_created": "Cheie creată",
-    "copy_key": "Copiază și salvează această cheie secretă în Plane Documentație. Nu vei mai putea vedea această cheie după ce închizi. Un fișier CSV care conține cheia a fost descărcat.",
+    "copy_key": "Copiază și salvează această cheie secretă în Company Runner Documentație. Nu vei mai putea vedea această cheie după ce închizi. Un fișier CSV care conține cheia a fost descărcat.",
     "token_copied": "Token-ul a fost copiat în memoria temporară.",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "Stări de proiect",
         "heading": "Vezi prezentarea progresului pentru toate proiectele.",
-        "description": "Stările proiectelor sunt o funcție exclusivă Plane pentru urmărirea progresului tuturor proiectelor tale după orice proprietate a proiectului.",
+        "description": "Stările proiectelor sunt o funcție exclusivă Company Runner pentru urmărirea progresului tuturor proiectelor tale după orice proprietate a proiectului.",
         "go_to_settings": "Mergi la setări"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Vezi-ți munca să devină mai inteligentă și mai rapidă cu AI care este conectată în mod nativ la munca ta și la baza de cunoștințe."
       },
       "runners": {

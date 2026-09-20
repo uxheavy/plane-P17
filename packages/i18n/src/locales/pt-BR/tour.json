@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Simplifique solicitações com entrada",
-        "description": "Um recurso exclusivo do Plane que permite aos Convidados criar itens de trabalho para bugs, solicitações ou tickets."
+        "description": "Um recurso exclusivo do Company Runner que permite aos Convidados criar itens de trabalho para bugs, solicitações ou tickets."
       },
       "step_one": {
         "title": "Solicitações de entrada abertas/fechadas",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Pare de alternar abas. Conecte seu mundo.",
-        "description": "Conecte o GitHub e o Slack para acompanhar PRs e resumir conversas diretamente no Plane AI."
+        "description": "Conecte o GitHub e o Slack para acompanhar PRs e resumir conversas diretamente no Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Criar uma página"
         },
         "item_5": {
-          "title": "Experimentar o chat Plane AI"
+          "title": "Experimentar o chat Company Runner AI"
         },
         "item_6": {
           "title": "Vincular integrações"

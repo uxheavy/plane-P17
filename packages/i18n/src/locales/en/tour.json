@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Streamline requests with intake",
-        "description": "A Plane-only feature that lets Guests create work items for bugs, requests, or tickets."
+        "description": "A Company Runner-only feature that lets Guests create work items for bugs, requests, or tickets."
       },
       "step_one": {
         "title": "Open/closed intake requests",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Stop tab-switching. Connect your world.",
-        "description": "Link GitHub, Slack to track PRs and summarize chats directly in Plane AI."
+        "description": "Link GitHub, Slack to track PRs and summarize chats directly in Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Create a page"
         },
         "item_5": {
-          "title": "Try Plane AI chat"
+          "title": "Try Company Runner AI chat"
         },
         "item_6": {
           "title": "Link Integrations"

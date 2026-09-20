@@ -13,7 +13,7 @@ import { TOAST_TYPE, setPromiseToast, setToast } from "@plane/propel/toast";
 import type { TIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 // assets
-import emptyIssue from "@/app/assets/empty-state/issue.svg?url";
+import emptyIssue from "@/app/assets/empty-state/issue.webp?url";
 // components
 import { EmptyState } from "@/components/common/empty-state";
 // hooks

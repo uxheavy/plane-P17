@@ -3,7 +3,7 @@
     "label": "Configurações do espaço de trabalho",
     "page_label": "{workspace} - Configurações gerais",
     "key_created": "Chave criada",
-    "copy_key": "Copie e salve esta chave secreta no Páginas do Plane. Você não pode ver esta chave depois de clicar em Fechar. Um arquivo CSV contendo a chave foi baixado.",
+    "copy_key": "Copie e salve esta chave secreta no Páginas do Company Runner. Você não pode ver esta chave depois de clicar em Fechar. Um arquivo CSV contendo a chave foi baixado.",
     "token_copied": "Token copiado para a área de transferência.",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "Estados do projeto",
         "heading": "Veja uma visão geral do progresso de todos os projetos.",
-        "description": "Os Estados de projeto são um recurso exclusivo do Plane para acompanhar o progresso de todos os seus projetos por qualquer propriedade do projeto.",
+        "description": "Os Estados de projeto são um recurso exclusivo do Company Runner para acompanhar o progresso de todos os seus projetos por qualquer propriedade do projeto.",
         "go_to_settings": "Ir para as configurações"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Veja seu trabalho se tornar mais inteligente e mais rápido com IA que está conectada de forma nativa ao seu trabalho e base de conhecimentos."
       },
       "runners": {

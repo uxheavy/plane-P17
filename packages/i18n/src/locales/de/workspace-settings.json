@@ -3,7 +3,7 @@
     "label": "Arbeitsbereich-Einstellungen",
     "page_label": "{workspace} - Allgemeine Einstellungen",
     "key_created": "Schlüssel erstellt",
-    "copy_key": "Kopieren Sie diesen Schlüssel und fügen Sie ihn in Plane Pages ein. Nach dem Schließen können Sie ihn nicht mehr sehen. Eine CSV-Datei mit dem Schlüssel wurde heruntergeladen.",
+    "copy_key": "Kopieren Sie diesen Schlüssel und fügen Sie ihn in Company Runner Publish ein. Nach dem Schließen können Sie ihn nicht mehr sehen. Eine CSV-Datei mit dem Schlüssel wurde heruntergeladen.",
     "token_copied": "Token in die Zwischenablage kopiert.",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "Projektstatus",
         "heading": "Fortschrittsübersicht für alle Projekte anzeigen.",
-        "description": "Projektstatus ist eine Plane-exklusive Funktion zur Verfolgung des Fortschritts aller Ihrer Projekte nach beliebiger Projekteigenschaft.",
+        "description": "Projektstatus ist eine Company Runner-exklusive Funktion zur Verfolgung des Fortschritts aller Ihrer Projekte nach beliebiger Projekteigenschaft.",
         "go_to_settings": "Zu den Einstellungen"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Lassen Sie Ihre Arbeit intelligenter und schneller werden mit KI, die nativ mit Ihrer Arbeit und Wissensbasis verbunden ist."
       },
       "runners": {
