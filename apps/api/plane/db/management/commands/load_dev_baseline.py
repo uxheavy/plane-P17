@@ -27,16 +27,17 @@ the baseline could be applied.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
-
-from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
+from crum import impersonate
 
 from plane.api.services import (
     AgentMembershipError,
@@ -54,7 +55,6 @@ from plane.db.models import (
     Issue,
     IssueAssignee,
     IssueLabel,
-    IssueSequence,
     Label,
     Message,
     Module,
@@ -68,16 +68,19 @@ from plane.db.models import (
     WorkMap,
     WorkMapBinding,
     Workspace,
+    WorkspaceAgentMembership,
     WorkspaceMember,
 )
+from plane.db.models.project import ROLE as PROJECT_ROLE
 from plane.license.models import Instance, InstanceAdmin
 
 # A workspace member who may administer the workspace. The value matches the
 # role the product's own workspace-creation path assigns to an owner.
 WORKSPACE_ADMIN_ROLE = 20
 
-# The role the product assigns to a project creator and project lead.
-PROJECT_ADMIN_ROLE = 20
+# The roles the product assigns to project administrators and members.
+PROJECT_ADMIN_ROLE = PROJECT_ROLE.ADMIN.value
+PROJECT_MEMBER_ROLE = PROJECT_ROLE.MEMBER.value
 
 MANIFEST_FILES = {
     "operator": "operator.json",
@@ -90,6 +93,16 @@ MANIFEST_FILES = {
 
 class BaselineError(CommandError):
     """A manifest is missing, malformed, or internally inconsistent."""
+
+
+def _find_active_or_tombstoned(model: Any, **lookup: Any) -> tuple[Any | None, bool]:
+    """Return an active match first, or its tombstone without reviving it."""
+
+    active = model.objects.filter(**lookup).order_by("created_at", "id").first()
+    if active is not None:
+        return active, False
+    tombstone = model.all_objects.filter(**lookup, deleted_at__isnull=False).order_by("-deleted_at", "id").first()
+    return tombstone, tombstone is not None
 
 
 def _read(manifest_dir: Path, name: str) -> dict[str, Any]:
@@ -112,45 +125,33 @@ def _load(manifest_dir: Path) -> dict[str, Any]:
 
 
 def _resolve_operator(spec: dict[str, Any]) -> User:
-    """Resolve the account that owns the workspace, and ensure it can sign in.
+    """Resolve the workspace operator, creating its initial credentials once.
 
-    Instance setup creates the first administrator, so by the time the baseline
-    reconciles a workspace that account normally exists. Its credentials are then
-    *ensured* rather than assumed: a documented sign-in that only works because
-    someone remembers a password typed once into a browser is not reproducible,
-    and a reset stack would have no working account at all.
-
-    The password is compared before it is set, so re-running is a no-op and a
-    password changed through the UI is not reset. That is what keeps the
-    manifest true without violating the rule that the baseline never resets
-    user edits.
+    A fresh stack has no account to sign in with, so the baseline creates the
+    declared operator when absent. An existing account is user-owned: replay
+    must not reset its password, display name, or active state.
     """
 
     email = spec.get("email")
     if not email:
         raise BaselineError("operator.email is required")
+    email = email.strip().lower()
     user = User.objects.filter(email=email).first()
-    if user is None:
-        # Setup has not run. Creating the account here is what lets one command
-        # reach a reviewable state; `_ensure_instance` then completes setup with
-        # this same account, matching what the admin client would have produced.
-        user = User.objects.create_user(
-            email=email,
-            username=spec.get("username") or email.split("@")[0],
-            password=spec.get("password"),
-        )
-        user.is_password_autoset = False
-        user.save(update_fields=["is_password_autoset"])
+    if user is not None:
+        return user
+
+    # Setup has not run. Creating the account here is what lets one command
+    # reach a reviewable state; `_ensure_instance` then completes setup with
+    # this same account, matching what the admin client would have produced.
+    user = User.objects.create_user(
+        email=email,
+        username=spec.get("username") or email.split("@")[0],
+        password=spec.get("password"),
+    )
+    user.is_password_autoset = False
     if display_name := spec.get("display_name"):
         user.display_name = display_name
-        user.save(update_fields=["display_name"])
-    password = spec.get("password")
-    if password and not user.check_password(password):
-        user.set_password(password)
-        # Plane's own setup marks a chosen password this way. Leaving the flag
-        # unset would make the client treat the password as machine-generated.
-        user.is_password_autoset = False
-        user.save(update_fields=["password", "is_password_autoset"])
+    user.save(update_fields=["display_name", "is_password_autoset"])
     return user
 
 
@@ -186,32 +187,23 @@ def _ensure_instance(spec: dict[str, Any], operator: User) -> dict[str, Any]:
 
 
 def _ensure_workspace(workspace: Workspace, owner: User) -> Workspace:
-    workspace.owner = owner
-    workspace.save(update_fields=["owner"])
-    WorkspaceMember.objects.get_or_create(
+    if not WorkspaceMember.all_objects.filter(
         workspace=workspace,
         member=owner,
-        defaults={"role": WORKSPACE_ADMIN_ROLE},
-    )
+    ).exists():
+        WorkspaceMember.objects.create(
+            workspace=workspace,
+            member=owner,
+            role=WORKSPACE_ADMIN_ROLE,
+        )
     return workspace
 
 
 def _ensure_operator_is_onboarded(workspace: Workspace, operator: User) -> list[str]:
-    """Make the operator a returning user rather than a new signup.
+    """Initialize navigation state for an operator's newly created workspace.
 
-    `get_redirection_path` sends a user to onboarding unless their profile is
-    marked onboarded, and to the first workspace they belong to otherwise. An
-    operator who already owns a reconciled workspace and is still walked through
-    create-your-workspace onboarding is seeing state that contradicts what is in
-    the database, after signing in with credentials that were supposed to take
-    them straight in.
-
-    The product tour is cleared for the same reason: it is a first-run surface
-    that obscures the workspace a reviewer opened the stack to inspect.
-
-    Only these flags are set, and only when they are unset, so a reviewer who
-    has deliberately revisited onboarding or the tour is not thrown back out of
-    it.
+    This runs only when the baseline creates the workspace. Later reconciles
+    preserve onboarding, tour, and last-workspace choices made through the UI.
     """
 
     profile, _ = Profile.objects.get_or_create(user=operator)
@@ -255,8 +247,10 @@ def _ensure_members(
         email = entry.get("email")
         if not key or not email:
             raise BaselineError("each member requires a key and an email")
+        email = email.strip().lower()
         user = User.objects.filter(email=email).first()
-        if user is None:
+        was_created = user is None
+        if was_created:
             user = User.objects.create_user(
                 email=email,
                 username=key,
@@ -264,34 +258,37 @@ def _ensure_members(
                 first_name=entry.get("display_name", ""),
             )
             user.is_password_autoset = False
-            user.save(update_fields=["is_password_autoset"])
+            if display_name := entry.get("display_name"):
+                user.display_name = display_name
+            user.save(update_fields=["display_name", "is_password_autoset"])
             created += 1
         else:
             existing += 1
-        if display_name := entry.get("display_name"):
-            user.display_name = display_name
-        user.is_active = True
-        user.save(update_fields=["display_name", "is_active"])
-        if default_password and not user.check_password(default_password):
-            user.set_password(default_password)
-            user.is_password_autoset = False
-            user.save(update_fields=["password", "is_password_autoset"])
 
         role = int(entry.get("role", WORKSPACE_ADMIN_ROLE))
-        membership, was_created = WorkspaceMember.objects.get_or_create(
-            workspace=workspace, member=user, defaults={"role": role}
-        )
-        # A workspace that predates a role change should converge rather than
-        # keep the old one, because the role is what the permissions checks read.
-        if not was_created and membership.role != role:
-            membership.role = role
-            membership.is_active = True
-            membership.save(update_fields=["role", "is_active"])
+        if not WorkspaceMember.all_objects.filter(
+            workspace=workspace,
+            member=user,
+        ).exists():
+            WorkspaceMember.objects.create(
+                workspace=workspace,
+                member=user,
+                role=role,
+            )
 
         profile, _ = Profile.objects.get_or_create(user=user)
         job_role = entry.get("job_role")
-        if job_role and profile.role != job_role:
-            profile.role = job_role
+        locales = entry.get("locales") or []
+        role_text = " · ".join(
+            part
+            for part in (
+                job_role,
+                f"Languages: {', '.join(locales)}" if locales else None,
+            )
+            if part
+        )
+        if was_created and role_text:
+            profile.role = role_text
             profile.save(update_fields=["role"])
         member_ids[key] = str(user.id)
     return {"members_created": created, "members_existing": existing}, member_ids
@@ -303,45 +300,84 @@ def _ensure_roster(
     actor: User,
     project_ids: list[str],
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Ensure one lifecycle-managed agent per profile.
+    """Create missing agents and add only genuinely new project access.
 
-    Agent membership is owned by the product's own service rather than by this
-    command. A database trigger rejects a bot workspace membership created any
-    other way: agent rows require the lifecycle opt-in, an owning
-    ``WorkspaceAgentMembership``, and the agent role. Assembling those rows here
-    would duplicate a contract the schema already enforces, so this delegates
-    and lets the service's own idempotency receipts make a re-run a replay.
-
-    Returns the report fragment and each profile's resolved user id.
+    Agent membership is owned by the product's lifecycle service. Existing
+    identity, activation, and access state is user-owned, so replay does not
+    submit the manifest's initial display name or re-activate a deleted project
+    membership. When the manifest gains a project, an active agent may gain that
+    one missing membership without dropping any other active access.
     """
 
     created = 0
     replayed = 0
     agent_ids: dict[str, str] = {}
     for slug, spec in sorted(profiles.items()):
-        display_name = spec.get("display_name") or slug
+        membership = (
+            WorkspaceAgentMembership.objects.filter(
+                workspace=workspace,
+                agent_key=slug,
+            )
+            .select_related("user")
+            .first()
+        )
+        existing_project_ids: set[str] = set()
+        missing_project_ids: set[str] = set()
+        if membership is not None:
+            user = membership.user
+            existing_project_ids = {
+                str(project_id)
+                for project_id in ProjectMember.objects.filter(
+                    workspace=workspace,
+                    member=user,
+                    is_active=True,
+                ).values_list("project_id", flat=True)
+            }
+            if user.is_active:
+                missing_project_ids = {
+                    project_id
+                    for project_id in project_ids
+                    if not ProjectMember.all_objects.filter(
+                        workspace=workspace,
+                        member=user,
+                        project_id=project_id,
+                    ).exists()
+                }
+            if not missing_project_ids:
+                agent_ids[slug] = str(user.id)
+                replayed += 1
+                continue
+            display_name = user.display_name or slug
+            desired_state = "active"
+        else:
+            display_name = spec.get("display_name") or slug
+            desired_state = "active"
+            missing_project_ids = set(project_ids)
+
+        desired = {
+            "display_name": display_name,
+            "state": desired_state,
+            "project_ids": sorted(existing_project_ids | missing_project_ids),
+            "credential_action": "ensure",
+        }
+        request_hash = hashlib.sha256(json.dumps(desired, separators=(",", ":"), sort_keys=True).encode()).hexdigest()[
+            :20
+        ]
         try:
             result = WorkspaceAgentMemberships.apply(
                 workspace_id=workspace.id,
                 agent_key=slug,
-                desired={
-                    "display_name": display_name,
-                    "state": "active",
-                    "project_ids": project_ids,
-                    "credential_action": "ensure",
-                },
-                # Derived from the agent key so a re-run replays the same
-                # request instead of conflicting with the first one.
-                idempotency_key=f"baseline-{slug}",
+                desired=desired,
+                idempotency_key=f"baseline-{slug}-{request_hash}",
                 actor=actor,
             )
         except AgentMembershipError as error:
             raise BaselineError(f"profile {slug!r} could not be applied as an agent: {error}") from error
         agent_ids[slug] = str(result["user_id"])
-        if result.get("replayed"):
-            replayed += 1
-        else:
+        if membership is None:
             created += 1
+        else:
+            replayed += 1
     return {"agents_created": created, "agents_replayed": replayed}, agent_ids
 
 
@@ -353,7 +389,8 @@ def _ensure_states(workspace: Workspace, project: Project, actor: User) -> None:
     """
 
     for state in DEFAULT_STATES:
-        State.objects.get_or_create(
+        manager = State.triage_objects if state["name"] == "Triage" else State.objects
+        manager.get_or_create(
             project=project,
             workspace=workspace,
             name=state["name"],
@@ -367,14 +404,27 @@ def _ensure_states(workspace: Workspace, project: Project, actor: User) -> None:
         )
 
 
-def _ensure_project(workspace: Workspace, spec: dict[str, Any], actor: User) -> tuple[Project, bool]:
-    identifier = spec.get("identifier")
+def _ensure_project(
+    workspace: Workspace,
+    spec: dict[str, Any],
+    actor: User,
+) -> tuple[Project, bool, bool]:
+    identifier = str(spec.get("identifier") or "").strip().upper()
     name = spec.get("name")
     if not identifier or not name:
         raise BaselineError("each project requires an identifier and a name")
-    project = Project.objects.filter(workspace=workspace, identifier=identifier).first()
+    project, tombstoned = _find_active_or_tombstoned(
+        Project,
+        workspace=workspace,
+        identifier=identifier,
+    )
+    if tombstoned:
+        return project, False, True
     if project is not None:
-        return project, False
+        return project, False, False
+    name_owner = Project.objects.filter(workspace=workspace, name=name).first()
+    if name_owner is not None:
+        raise BaselineError(f"project name {name!r} is already owned by identifier {name_owner.identifier!r}")
     views = spec.get("views") or {}
     project = Project.objects.create(
         workspace=workspace,
@@ -392,10 +442,43 @@ def _ensure_project(workspace: Workspace, spec: dict[str, Any], actor: User) -> 
     )
     ProjectMember.objects.create(project=project, workspace=workspace, member=actor, role=PROJECT_ADMIN_ROLE)
     _ensure_states(workspace, project, actor)
-    return project, True
+    return project, True, False
 
 
-def _ensure_labels(workspace: Workspace, spec: dict[str, Any], actor: User) -> tuple[dict[str, str], int]:
+def _ensure_project_members(
+    workspace: Workspace,
+    project: Project,
+    spec: dict[str, Any],
+    member_ids: dict[str, str],
+) -> int:
+    """Ensure the human project team declared by the case-owned manifest."""
+
+    created = 0
+    for key in spec.get("members") or []:
+        member_id = member_ids.get(key)
+        if member_id is None:
+            raise BaselineError(f"project {project.identifier!r} names undeclared member {key!r}")
+        membership_exists = ProjectMember.all_objects.filter(
+            workspace=workspace,
+            project=project,
+            member_id=member_id,
+        ).exists()
+        if not membership_exists:
+            ProjectMember.objects.create(
+                workspace=workspace,
+                project=project,
+                member_id=member_id,
+                role=PROJECT_MEMBER_ROLE,
+            )
+            created += 1
+    return created
+
+
+def _ensure_labels(
+    workspace: Workspace,
+    spec: dict[str, Any],
+    actor: User,
+) -> tuple[dict[str, str | None], int]:
     """Ensure the workspace label set the work items reference.
 
     Labels are workspace-scoped rather than project-scoped, so one set serves
@@ -403,20 +486,34 @@ def _ensure_labels(workspace: Workspace, spec: dict[str, Any], actor: User) -> t
     and how many were created.
     """
 
-    label_ids: dict[str, str] = {}
+    label_ids: dict[str, str | None] = {}
     created = 0
     for entry in spec.get("labels") or []:
         key = entry.get("key")
         name = entry.get("name")
         if not key or not name:
             raise BaselineError("each label requires a key and a name")
-        label, was_created = Label.objects.get_or_create(
+        label, tombstoned = _find_active_or_tombstoned(
+            Label,
             workspace=workspace,
             project=None,
             name=name,
-            defaults={"color": entry.get("color", ""), "created_by": actor},
         )
-        created += int(was_created)
+        if tombstoned:
+            label_ids[key] = None
+            continue
+        if label is None:
+            occupied = Label.objects.filter(project=None, name=name).exclude(workspace=workspace).first()
+            if occupied is not None:
+                raise BaselineError(f"workspace label {name!r} is already owned by another workspace")
+            label = Label.objects.create(
+                workspace=workspace,
+                project=None,
+                name=name,
+                color=entry.get("color", ""),
+                created_by=actor,
+            )
+            created += 1
         label_ids[key] = str(label.id)
     return label_ids, created
 
@@ -426,7 +523,7 @@ def _ensure_cycles(
     project: Project,
     spec: dict[str, Any],
     actor: User,
-) -> tuple[dict[int, str], int]:
+) -> tuple[dict[int, str | None], int]:
     """Ensure the declared cycles exist, keyed by their manifest index.
 
     A cycle needs an owner and a date range. The offsets in the manifest are
@@ -438,24 +535,32 @@ def _ensure_cycles(
     """
 
     today = timezone.now().date()
-    cycle_ids: dict[int, str] = {}
+    cycle_ids: dict[int, str | None] = {}
     created = 0
     for index, entry in enumerate(spec.get("cycles") or []):
         name = entry.get("name")
         if not name:
             raise BaselineError(f"project {project.identifier!r} has a cycle without a name")
-        cycle, was_created = Cycle.objects.get_or_create(
+        cycle, tombstoned = _find_active_or_tombstoned(
+            Cycle,
             workspace=workspace,
             project=project,
             name=name,
-            defaults={
-                "owned_by": actor,
-                "start_date": today + timedelta(days=int(entry.get("start_offset_days", 0))),
-                "end_date": today + timedelta(days=int(entry.get("end_offset_days", 14))),
-                "created_by": actor,
-            },
         )
-        created += int(was_created)
+        if tombstoned:
+            cycle_ids[index] = None
+            continue
+        if cycle is None:
+            cycle = Cycle.objects.create(
+                workspace=workspace,
+                project=project,
+                name=name,
+                owned_by=actor,
+                start_date=today + timedelta(days=int(entry.get("start_offset_days", 0))),
+                end_date=today + timedelta(days=int(entry.get("end_offset_days", 14))),
+                created_by=actor,
+            )
+            created += 1
         cycle_ids[index] = str(cycle.id)
     return cycle_ids, created
 
@@ -466,7 +571,7 @@ def _ensure_modules(
     spec: dict[str, Any],
     actor: User,
     member_ids: dict[str, str],
-) -> tuple[dict[int, str], int]:
+) -> tuple[dict[int, str | None], int]:
     """Ensure the declared modules exist, keyed by their manifest index.
 
     A module carries a lead and a status, and the work items reference it, so a
@@ -475,7 +580,7 @@ def _ensure_modules(
     """
 
     today = timezone.now().date()
-    module_ids: dict[int, str] = {}
+    module_ids: dict[int, str | None] = {}
     created = 0
     for index, entry in enumerate(spec.get("modules") or []):
         name = entry.get("name")
@@ -487,19 +592,27 @@ def _ensure_modules(
                 f"project {project.identifier!r} module {name!r} names lead "
                 f"{entry.get('lead')!r}, which is not a declared member"
             )
-        module, was_created = Module.objects.get_or_create(
+        module, tombstoned = _find_active_or_tombstoned(
+            Module,
             workspace=workspace,
             project=project,
             name=name,
-            defaults={
-                "status": entry.get("status", "planned"),
-                "lead_id": lead_id,
-                "start_date": today + timedelta(days=int(entry.get("start_offset_days", 0))),
-                "target_date": today + timedelta(days=int(entry.get("target_offset_days", 30))),
-                "created_by": actor,
-            },
         )
-        created += int(was_created)
+        if tombstoned:
+            module_ids[index] = None
+            continue
+        if module is None:
+            module = Module.objects.create(
+                workspace=workspace,
+                project=project,
+                name=name,
+                status=entry.get("status", "planned"),
+                lead_id=lead_id,
+                start_date=today + timedelta(days=int(entry.get("start_offset_days", 0))),
+                target_date=today + timedelta(days=int(entry.get("target_offset_days", 30))),
+                created_by=actor,
+            )
+            created += 1
         module_ids[index] = str(module.id)
     return module_ids, created
 
@@ -523,7 +636,13 @@ def _ensure_pages(
         name = entry.get("name")
         if not name:
             raise BaselineError(f"project {project.identifier!r} has a page without a name")
-        page = Page.objects.filter(workspace=workspace, name=name).first()
+        page, tombstoned = _find_active_or_tombstoned(
+            Page,
+            workspace=workspace,
+            name=name,
+        )
+        if tombstoned:
+            continue
         if page is None:
             page = Page.objects.create(
                 workspace=workspace,
@@ -534,12 +653,17 @@ def _ensure_pages(
                 description_html=entry.get("body", "<p></p>"),
             )
             created += 1
-        DocumentProject.objects.get_or_create(
+        if not DocumentProject.all_objects.filter(
             document_id=page.id,
             project=project,
             workspace=workspace,
-            defaults={"created_by": actor},
-        )
+        ).exists():
+            DocumentProject.objects.create(
+                document_id=page.id,
+                project=project,
+                workspace=workspace,
+                created_by=actor,
+            )
     return created
 
 
@@ -779,9 +903,10 @@ def _ensure_work_maps(
     spec: dict[str, Any],
     actor: User,
 ) -> tuple[int, int]:
-    """Ensure the declared work maps exist with a scene and source bindings.
+    """Create missing work maps with their initial scene and source bindings.
 
-    A work map is a ``Document`` of kind ``work-map`` plus a ``WorkMap`` row and
+    Existing maps are user-owned and never rewritten by baseline replay. A new
+    work map is a ``Document`` of kind ``work-map`` plus a ``WorkMap`` row and
     a project link, exactly as the create endpoint builds it. ``WorkMap`` shares
     the document's primary key, so the document is created first and the row
     references it rather than the reverse.
@@ -800,68 +925,44 @@ def _ensure_work_maps(
         name = entry.get("name")
         if not name:
             raise BaselineError(f"project {project.identifier!r} has a work map without a name")
-        targets, node_keys = _resolve_bindings(workspace, project, entry)
-        card_keys = {
-            card: node_keys[card]
-            for lane in entry.get("lanes") or []
-            for card in lane.get("cards") or []
-            if str(card) in node_keys
-        }
-        document = Document.objects.filter(workspace=workspace, kind=Document.Kind.WORK_MAP, name=name).first()
-        if document is None:
-            lanes = [
-                (str(lane.get("name") or ""), [str(card) for card in lane.get("cards") or []])
-                for lane in entry.get("lanes") or []
-            ]
-            document = Document.objects.create(
-                kind=Document.Kind.WORK_MAP,
-                workspace=workspace,
-                owned_by=actor,
-                created_by=actor,
-                name=name,
-                access=entry.get("access", Document.PUBLIC_ACCESS),
-            )
-            work_map = WorkMap.objects.create(
-                document=document,
-                scene_binary=_scene_document(name, lanes, card_keys),
-                generation=1,
-            )
-            created += 1
-        else:
-            # A work map that already exists still converges to the manifest.
-            # Bindings and carriers are written on creation only, so a map from
-            # an earlier reconcile would otherwise keep its canvas and stay
-            # unbound, and re-running could never repair it.
-            work_map = document.work_map
-            existing = set(
-                WorkMapBinding.objects.filter(work_map=work_map, deleted_at__isnull=True).values_list(
-                    "node_key", flat=True
-                )
-            )
-            if existing != {uuid.UUID(key) for key in card_keys.values()}:
-                lanes = [
-                    (str(lane.get("name") or ""), [str(card) for card in lane.get("cards") or []])
-                    for lane in entry.get("lanes") or []
-                ]
-                work_map.scene_binary = _scene_document(name, lanes, card_keys)
-                work_map.generation += 1
-                work_map.save(update_fields=["scene_binary", "generation"])
-                # Recreate the full binding set, because the carriers in the new
-                # scene are the manifest's cards and the binding contract refuses
-                # a carrier with no live binding.
-                work_map.bindings.filter(deleted_at__isnull=True).update(deleted_at=timezone.now())
+        document_links = DocumentProject.all_objects.filter(
+            workspace=workspace,
+            project=project,
+            document__workspace=workspace,
+            document__kind=Document.Kind.WORK_MAP,
+            document__name=name,
+        )
+        if document_links.exists():
+            # Baseline ownership ends after initial creation. Active maps keep
+            # user edits; soft-deleted maps and links remain deleted.
+            continue
 
-        # Bindings are written here rather than inside either branch, because a
-        # map that was just created needs them as much as one being converged.
-        # Writing them only on the converge path left a fresh database with maps
-        # whose carriers had no binding, which the binding contract refuses.
-        bound_keys = set(
-            WorkMapBinding.objects.filter(work_map=work_map, deleted_at__isnull=True).values_list("node_key", flat=True)
+        targets = _resolve_bindings(workspace, project, entry)
+        document = Document.objects.create(
+            kind=Document.Kind.WORK_MAP,
+            workspace=workspace,
+            owned_by=actor,
+            created_by=actor,
+            name=name,
+            access=entry.get("access", Document.PUBLIC_ACCESS),
+        )
+        created += 1
+        card_keys = {
+            card: str(uuid.uuid5(document.id, card))
+            for lane in entry.get("lanes") or []
+            for value in lane.get("cards") or []
+            if (card := str(value)) in targets
+        }
+        lanes = [
+            (str(lane.get("name") or ""), [str(card) for card in lane.get("cards") or []])
+            for lane in entry.get("lanes") or []
+        ]
+        work_map = WorkMap.objects.create(
+            document=document,
+            scene_binary=_scene_document(name, lanes, card_keys),
+            generation=1,
         )
         for card, node_key in card_keys.items():
-            key = uuid.UUID(node_key)
-            if key in bound_keys:
-                continue
             source_kind, source_id = targets[card]
             WorkMapBinding.objects.create(
                 work_map=work_map,
@@ -884,16 +985,14 @@ def _resolve_bindings(
     workspace: Workspace,
     project: Project,
     work_map: dict[str, Any],
-) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
-    """Resolve each declared binding to a Plane object and a fresh node key.
+) -> dict[str, tuple[str, str]]:
+    """Resolve each declared binding to its project-scoped Plane object.
 
     An unresolvable target fails here, before the scene is written, rather than
     producing a carrier whose binding is missing.
     """
 
     target_ids: dict[str, tuple[str, str]] = {}
-    node_keys: dict[str, str] = {}
-    map_name = str(work_map.get("name") or "")
     resolvers: dict[str, Any] = {
         WorkMapBinding.SourceKind.WORK_ITEM: Issue,
         WorkMapBinding.SourceKind.MODULE: Module,
@@ -912,18 +1011,21 @@ def _resolve_bindings(
             raise BaselineError(
                 f"work map {work_map.get('name')!r} binds card {card!r} to unsupported source_kind {source_kind!r}"
             )
-        target = model.objects.filter(workspace=workspace, project=project, name=source_name).first()
+        target, tombstoned = _find_active_or_tombstoned(
+            model,
+            workspace=workspace,
+            project=project,
+            name=source_name,
+        )
+        if tombstoned:
+            continue
         if target is None:
             raise BaselineError(
                 f"work map {work_map.get('name')!r} binds card {card!r} to "
                 f"{source_kind} {source_name!r}, which does not exist in this project"
             )
         target_ids[str(card)] = (source_kind, str(target.id))
-        # Derived rather than generated, so the same card keeps the same key
-        # across runs. A generated key would make every reconcile look like a
-        # fresh binding and the map would never converge.
-        node_keys[str(card)] = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{map_name}:{card}"))
-    return target_ids, node_keys
+    return target_ids
 
 
 def _ensure_conversations(
@@ -947,26 +1049,51 @@ def _ensure_conversations(
         name = entry.get("name")
         if not name:
             raise BaselineError("each channel requires a name")
-        channel, was_created = Channel.objects.get_or_create(
-            workspace=workspace, name=name, defaults={"created_by": actor}
+        channel, tombstoned = _find_active_or_tombstoned(
+            Channel,
+            workspace=workspace,
+            name=name,
         )
-        channels_created += int(was_created)
+        if tombstoned:
+            continue
+        if channel is None:
+            channel = Channel.objects.create(
+                workspace=workspace,
+                name=name,
+                created_by=actor,
+            )
+            channels_created += 1
         for message in entry.get("messages") or []:
             body = message.get("content")
             client_id = message.get("client_id")
             if not body or not client_id:
                 raise BaselineError(f"channel {name!r} has a message without content and client_id")
-            parent = None
-            if (parent_id := message.get("parent")) is not None:
-                parent = Message.objects.filter(channel=channel, client_id=parent_id).first()
-                if parent is None:
-                    raise BaselineError(f"channel {name!r} has a reply to unknown message {parent_id!r}")
-            _, made = Message.objects.get_or_create(
+            existing, _ = _find_active_or_tombstoned(
+                Message,
                 channel=channel,
                 client_id=client_id,
-                defaults={"content": body, "parent": parent, "created_by": actor},
             )
-            messages_created += int(made)
+            if existing is not None:
+                continue
+            parent = None
+            if (parent_id := message.get("parent")) is not None:
+                parent, parent_tombstoned = _find_active_or_tombstoned(
+                    Message,
+                    channel=channel,
+                    client_id=parent_id,
+                )
+                if parent_tombstoned:
+                    continue
+                if parent is None:
+                    raise BaselineError(f"channel {name!r} has a reply to unknown message {parent_id!r}")
+            Message.objects.create(
+                channel=channel,
+                client_id=client_id,
+                content=body,
+                parent=parent,
+                created_by=actor,
+            )
+            messages_created += 1
     return channels_created, messages_created
 
 
@@ -990,49 +1117,83 @@ def _ensure_intake(
         return 0, 0
     intakes_created = 0
     items_created = 0
-    intake, was_created = Intake.objects.get_or_create(
+    # State has specialized managers rather than SoftDeleteModel's `all_objects`:
+    # `objects` excludes triage, while `all_state_objects` includes tombstones.
+    triage_state = State.triage_objects.filter(
+        project=project,
+        workspace=workspace,
+    ).first()
+    if triage_state is None:
+        triage_tombstoned = State.all_state_objects.filter(
+            project=project,
+            workspace=workspace,
+            name="Triage",
+            deleted_at__isnull=False,
+        ).exists()
+        if triage_tombstoned:
+            return 0, 0
+        raise BaselineError(f"project {project.identifier!r} has no triage state")
+
+    intake, tombstoned = _find_active_or_tombstoned(
+        Intake,
         workspace=workspace,
         project=project,
         name=intake_spec.get("name") or "Intake",
-        defaults={"is_default": True, "created_by": actor},
     )
-    intakes_created += int(was_created)
-    states = {state.name: state for state in State.objects.filter(project=project, workspace=workspace)}
+    if tombstoned:
+        return 0, 0
+    if intake is None:
+        intake = Intake.objects.create(
+            workspace=workspace,
+            project=project,
+            name=intake_spec.get("name") or "Intake",
+            is_default=True,
+            created_by=actor,
+        )
+        intakes_created += 1
     for item in intake_spec.get("items") or []:
         name = item.get("name")
         if not name:
             raise BaselineError(f"project {project.identifier!r} has an intake item without a name")
-        issue = Issue.objects.filter(workspace=workspace, project=project, name=name).first()
+        issue, issue_tombstoned = _find_active_or_tombstoned(
+            Issue,
+            workspace=workspace,
+            project=project,
+            name=name,
+        )
+        if issue_tombstoned:
+            continue
         if issue is None:
-            sequence = IssueSequence.objects.filter(project=project).first()
-            if sequence is None:
-                sequence = IssueSequence.objects.create(project=project, workspace=workspace, created_by=actor)
-            sequence.sequence += 1
-            sequence.save(update_fields=["sequence"])
             # A submitted item lands in Triage, which is the state the product
-            # routes an unaccepted intake submission to.
+            # routes an unaccepted intake submission to. Issue.save owns the
+            # project sequence and its transaction-level lock.
             issue = Issue.objects.create(
                 workspace=workspace,
                 project=project,
                 name=name,
-                state=states.get("Triage") or states.get("Backlog"),
+                state=triage_state,
                 priority=item.get("priority", "none"),
                 created_by=actor,
-                sequence_id=sequence.sequence,
             )
             items_created += 1
-        IntakeIssue.objects.get_or_create(
+        intake_issue, _ = _find_active_or_tombstoned(
+            IntakeIssue,
             workspace=workspace,
             project=project,
             intake=intake,
             issue=issue,
-            defaults={
-                "status": item.get("status", -2),
-                "source": "IN_APP",
-                "source_email": item.get("source_email"),
-                "created_by": actor,
-            },
         )
+        if intake_issue is None:
+            IntakeIssue.objects.create(
+                workspace=workspace,
+                project=project,
+                intake=intake,
+                issue=issue,
+                status=item.get("status", -2),
+                source="IN_APP",
+                source_email=item.get("source_email"),
+                created_by=actor,
+            )
     return intakes_created, items_created
 
 
@@ -1042,9 +1203,9 @@ def _ensure_work_items(
     spec: dict[str, Any],
     actor: User,
     assignee_ids: dict[str, str],
-    label_ids: dict[str, str],
-    cycle_ids: dict[int, str],
-    module_ids: dict[int, str],
+    label_ids: dict[str, str | None],
+    cycle_ids: dict[int, str | None],
+    module_ids: dict[int, str | None],
 ) -> tuple[int, int, int, int]:
     """Ensure the declared work items exist in the declared state.
 
@@ -1074,13 +1235,17 @@ def _ensure_work_items(
                 "neither a declared member nor a declared profile"
             )
 
-        issue = Issue.objects.filter(workspace=workspace, project=project, name=name).first()
+        issue, issue_tombstoned = _find_active_or_tombstoned(
+            Issue,
+            workspace=workspace,
+            project=project,
+            name=name,
+        )
+        if issue_tombstoned:
+            existing += 1
+            continue
         if issue is None:
-            sequence = IssueSequence.objects.filter(project=project).first()
-            if sequence is None:
-                sequence = IssueSequence.objects.create(project=project, workspace=workspace, created_by=actor)
-            sequence.sequence += 1
-            sequence.save(update_fields=["sequence"])
+            # Issue.save owns the project sequence and its transaction-level lock.
             issue = Issue.objects.create(
                 workspace=workspace,
                 project=project,
@@ -1088,7 +1253,6 @@ def _ensure_work_items(
                 state=state,
                 priority=item.get("priority", "none"),
                 created_by=actor,
-                sequence_id=sequence.sequence,
             )
             created += 1
         else:
@@ -1099,62 +1263,101 @@ def _ensure_work_items(
         # the relation declares a ``through`` model, and the work item would
         # report as created while having no assignee.
         if assignee_id is not None:
-            _, was_assigned = IssueAssignee.objects.get_or_create(
+            assignment, _ = _find_active_or_tombstoned(
+                IssueAssignee,
                 issue=issue,
                 assignee_id=assignee_id,
                 project=project,
                 workspace=workspace,
-                defaults={"created_by": actor},
             )
-            assigned += int(was_assigned)
+            if assignment is None:
+                IssueAssignee.objects.create(
+                    issue=issue,
+                    assignee_id=assignee_id,
+                    project=project,
+                    workspace=workspace,
+                    created_by=actor,
+                )
+                assigned += 1
 
         # Labels are a through relation for the same reason as assignees.
         for label_key in item.get("labels") or []:
-            label_id = label_ids.get(str(label_key))
-            if label_id is None:
+            key = str(label_key)
+            if key not in label_ids:
                 raise BaselineError(
                     f"project {project.identifier!r} work item {name!r} names label "
                     f"{label_key!r}, which is not declared in the workspace label set"
                 )
-            _, was_labelled = IssueLabel.objects.get_or_create(
+            label_id = label_ids[key]
+            if label_id is None:
+                continue
+            issue_label, _ = _find_active_or_tombstoned(
+                IssueLabel,
                 issue=issue,
                 label_id=label_id,
                 project=project,
                 workspace=workspace,
-                defaults={"created_by": actor},
             )
-            labelled += int(was_labelled)
+            if issue_label is None:
+                IssueLabel.objects.create(
+                    issue=issue,
+                    label_id=label_id,
+                    project=project,
+                    workspace=workspace,
+                    created_by=actor,
+                )
+                labelled += 1
 
         # Cycle and module membership are through rows as well. A work item in a
         # cycle is what makes the cycle view non-empty.
         if (index := item.get("cycle")) is not None:
-            cycle_id = cycle_ids.get(int(index))
-            if cycle_id is None:
+            index = int(index)
+            if index not in cycle_ids:
                 raise BaselineError(
                     f"project {project.identifier!r} work item {name!r} names cycle "
                     f"index {index}, which is not declared"
                 )
-            CycleIssue.objects.get_or_create(
-                issue=issue,
-                cycle_id=cycle_id,
-                project=project,
-                workspace=workspace,
-                defaults={"created_by": actor},
-            )
+            cycle_id = cycle_ids[index]
+            if cycle_id is not None:
+                cycle_issue, _ = _find_active_or_tombstoned(
+                    CycleIssue,
+                    issue=issue,
+                    cycle_id=cycle_id,
+                    project=project,
+                    workspace=workspace,
+                )
+                if cycle_issue is None:
+                    CycleIssue.objects.create(
+                        issue=issue,
+                        cycle_id=cycle_id,
+                        project=project,
+                        workspace=workspace,
+                        created_by=actor,
+                    )
         if (index := item.get("module")) is not None:
-            module_id = module_ids.get(int(index))
-            if module_id is None:
+            index = int(index)
+            if index not in module_ids:
                 raise BaselineError(
                     f"project {project.identifier!r} work item {name!r} names module "
                     f"index {index}, which is not declared"
                 )
-            ModuleIssue.objects.get_or_create(
-                issue=issue,
-                module_id=module_id,
-                project=project,
-                workspace=workspace,
-                defaults={"created_by": actor},
-            )
+            module_id = module_ids[index]
+            if module_id is not None:
+                module_issue, _ = _find_active_or_tombstoned(
+                    ModuleIssue,
+                    issue=issue,
+                    module_id=module_id,
+                    project=project,
+                    workspace=workspace,
+                )
+                if module_issue is None:
+                    ModuleIssue.objects.create(
+                        issue=issue,
+                        module_id=module_id,
+                        project=project,
+                        workspace=workspace,
+                        created_by=actor,
+                    )
     return created, existing, assigned, labelled
 
 
@@ -1182,120 +1385,148 @@ class Command(BaseCommand):
         operator_spec = manifest["operator"].get("operator") or {}
 
         with transaction.atomic():
+            workspace, workspace_tombstoned = _find_active_or_tombstoned(
+                Workspace,
+                slug=slug,
+            )
+            if workspace_tombstoned:
+                report.update({"status": "passed", "workspace_tombstoned": True})
+                self.stdout.write(json.dumps(report, indent=2, sort_keys=True))
+                return None
+
             # Instance readiness comes first. An instance that has not completed
             # setup keeps its workspace client on the first-run screen, so
             # nothing reconciled below would be reachable through the UI.
             operator = _resolve_operator(operator_spec)
-            report.update(_ensure_instance(operator_spec, operator))
-            if not Workspace.objects.filter(slug=slug).exists():
-                Workspace.objects.create(
-                    slug=slug,
-                    name=workspace_spec.get("name") or slug,
-                    owner=operator,
-                    organization_size=workspace_spec.get("organization_size"),
+            with impersonate(operator):
+                report.update(_ensure_instance(operator_spec, operator))
+                workspace_created = workspace is None
+                if workspace_created:
+                    workspace = Workspace.objects.create(
+                        slug=slug,
+                        name=workspace_spec.get("name") or slug,
+                        owner=operator,
+                        organization_size=workspace_spec.get("organization_size"),
+                        timezone=workspace_spec.get("timezone") or "UTC",
+                    )
+                report["workspace_created"] = workspace_created
+                _ensure_workspace(workspace, operator)
+                report["operator_onboarded"] = (
+                    _ensure_operator_is_onboarded(workspace, operator) if workspace_created else []
                 )
-                report["workspace_created"] = True
-            else:
-                report["workspace_created"] = False
-            workspace = Workspace.objects.get(slug=slug)
-            _ensure_workspace(workspace, operator)
-            report["operator_onboarded"] = _ensure_operator_is_onboarded(workspace, operator)
 
-            # People first: a module lead, a work-item assignee, and a review
-            # owner all name a member or a profile, so both must exist before
-            # anything references them.
-            members_report, member_ids = _ensure_members(workspace, manifest["members"])
-            report.update(members_report)
+                # People first: a module lead, a work-item assignee, and a review
+                # owner all name a member or a profile, so both must exist before
+                # anything references them.
+                members_report, member_ids = _ensure_members(workspace, manifest["members"])
+                report.update(members_report)
 
-            profiles = manifest["roster"].get("profiles") or {}
-            if not profiles:
-                raise BaselineError("roster.profiles must declare at least one profile")
+                profiles = manifest["roster"].get("profiles") or {}
+                if not profiles:
+                    raise BaselineError("roster.profiles must declare at least one profile")
 
-            projects_created = 0
-            projects_existing = 0
-            projects: list[tuple[Project, dict[str, Any]]] = []
-            project_ids: list[str] = []
-            for spec in manifest["projects"].get("projects") or []:
-                project, was_created = _ensure_project(workspace, spec, operator)
-                projects.append((project, spec))
-                project_ids.append(str(project.id))
-                projects_created += int(was_created)
-                projects_existing += int(not was_created)
+                projects_created = 0
+                projects_existing = 0
+                projects_tombstoned = 0
+                project_members_created = 0
+                projects: list[tuple[Project, dict[str, Any]]] = []
+                project_ids: list[str] = []
+                for spec in manifest["projects"].get("projects") or []:
+                    project, was_created, tombstoned = _ensure_project(
+                        workspace,
+                        spec,
+                        operator,
+                    )
+                    if tombstoned:
+                        projects_tombstoned += 1
+                        continue
+                    project_ids.append(str(project.id))
+                    projects.append((project, spec))
+                    projects_created += int(was_created)
+                    projects_existing += int(not was_created)
+                    project_members_created += _ensure_project_members(
+                        workspace,
+                        project,
+                        spec,
+                        member_ids,
+                    )
+                report["project_members_created"] = project_members_created
+                report["projects_tombstoned"] = projects_tombstoned
 
-            roster_report, agent_ids = _ensure_roster(workspace, profiles, operator, project_ids)
-            report.update(roster_report)
+                roster_report, agent_ids = _ensure_roster(workspace, profiles, operator, project_ids)
+                report.update(roster_report)
 
-            # A work item may be assigned to a person or to an agent, so the two
-            # maps are merged only after both exist. A key in both is a manifest
-            # mistake rather than a merge to resolve silently.
-            if overlap := set(member_ids) & set(agent_ids):
-                raise BaselineError(f"these keys name both a member and a profile: {sorted(overlap)}")
-            assignee_ids = {**member_ids, **agent_ids}
+                # A work item may be assigned to a person or to an agent, so the two
+                # maps are merged only after both exist. A key in both is a manifest
+                # mistake rather than a merge to resolve silently.
+                if overlap := set(member_ids) & set(agent_ids):
+                    raise BaselineError(f"these keys name both a member and a profile: {sorted(overlap)}")
+                assignee_ids = {**member_ids, **agent_ids}
 
-            label_ids, labels_created = _ensure_labels(workspace, manifest["projects"], operator)
-            report["labels_created"] = labels_created
+                label_ids, labels_created = _ensure_labels(workspace, manifest["projects"], operator)
+                report["labels_created"] = labels_created
 
-            # Conversations are workspace-scoped and name no project, so they are
-            # applied once rather than per project.
-            channels_created, messages_created = _ensure_conversations(workspace, manifest["projects"], operator)
-            report["channels_created"] = channels_created
-            report["messages_created"] = messages_created
+                # Conversations are workspace-scoped and name no project, so they are
+                # applied once rather than per project.
+                channels_created, messages_created = _ensure_conversations(workspace, manifest["projects"], operator)
+                report["channels_created"] = channels_created
+                report["messages_created"] = messages_created
 
-            items_created = 0
-            items_existing = 0
-            assignments_created = 0
-            labels_applied = 0
-            cycles_created = 0
-            modules_created = 0
-            pages_created = 0
-            work_maps_created = 0
-            bindings_created = 0
-            intakes_created = 0
-            intake_items_created = 0
-            for project, spec in projects:
-                cycle_ids, made_cycles = _ensure_cycles(workspace, project, spec, operator)
-                module_ids, made_modules = _ensure_modules(workspace, project, spec, operator, member_ids)
-                cycles_created += made_cycles
-                modules_created += made_modules
-                pages_created += _ensure_pages(workspace, project, spec, operator)
-                # Work items and intake submissions come before the work maps,
-                # because a map binds its cards to work items and modules by
-                # name. Resolving a binding against a project whose items do not
-                # exist yet fails, and an idempotent re-run over populated data
-                # hides that: the items are already there from the first pass.
-                made, present, assigned, labelled = _ensure_work_items(
-                    workspace,
-                    project,
-                    spec,
-                    operator,
-                    assignee_ids,
-                    label_ids,
-                    cycle_ids,
-                    module_ids,
-                )
-                intakes, submitted = _ensure_intake(workspace, project, spec, operator)
-                maps, binds = _ensure_work_maps(workspace, project, spec, operator)
-                items_created += made
-                items_existing += present
-                assignments_created += assigned
-                labels_applied += labelled
-                intakes_created += intakes
-                intake_items_created += submitted
-                work_maps_created += maps
-                bindings_created += binds
-            report["projects_created"] = projects_created
-            report["projects_existing"] = projects_existing
-            report["cycles_created"] = cycles_created
-            report["modules_created"] = modules_created
-            report["pages_created"] = pages_created
-            report["work_maps_created"] = work_maps_created
-            report["work_map_bindings_created"] = bindings_created
-            report["intakes_created"] = intakes_created
-            report["intake_items_created"] = intake_items_created
-            report["work_items_created"] = items_created
-            report["work_items_existing"] = items_existing
-            report["assignments_created"] = assignments_created
-            report["labels_applied"] = labels_applied
+                items_created = 0
+                items_existing = 0
+                assignments_created = 0
+                labels_applied = 0
+                cycles_created = 0
+                modules_created = 0
+                pages_created = 0
+                work_maps_created = 0
+                bindings_created = 0
+                intakes_created = 0
+                intake_items_created = 0
+                for project, spec in projects:
+                    cycle_ids, made_cycles = _ensure_cycles(workspace, project, spec, operator)
+                    module_ids, made_modules = _ensure_modules(workspace, project, spec, operator, member_ids)
+                    cycles_created += made_cycles
+                    modules_created += made_modules
+                    pages_created += _ensure_pages(workspace, project, spec, operator)
+                    # Work items and intake submissions come before the work maps,
+                    # because a map binds its cards to work items and modules by
+                    # name. Resolving a binding against a project whose items do not
+                    # exist yet fails, and an idempotent re-run over populated data
+                    # hides that: the items are already there from the first pass.
+                    made, present, assigned, labelled = _ensure_work_items(
+                        workspace,
+                        project,
+                        spec,
+                        operator,
+                        assignee_ids,
+                        label_ids,
+                        cycle_ids,
+                        module_ids,
+                    )
+                    intakes, submitted = _ensure_intake(workspace, project, spec, operator)
+                    maps, binds = _ensure_work_maps(workspace, project, spec, operator)
+                    items_created += made
+                    items_existing += present
+                    assignments_created += assigned
+                    labels_applied += labelled
+                    intakes_created += intakes
+                    intake_items_created += submitted
+                    work_maps_created += maps
+                    bindings_created += binds
+                report["projects_created"] = projects_created
+                report["projects_existing"] = projects_existing
+                report["cycles_created"] = cycles_created
+                report["modules_created"] = modules_created
+                report["pages_created"] = pages_created
+                report["work_maps_created"] = work_maps_created
+                report["work_map_bindings_created"] = bindings_created
+                report["intakes_created"] = intakes_created
+                report["intake_items_created"] = intake_items_created
+                report["work_items_created"] = items_created
+                report["work_items_existing"] = items_existing
+                report["assignments_created"] = assignments_created
+                report["labels_applied"] = labels_applied
 
         report["status"] = "passed"
         self.stdout.write(json.dumps(report, indent=2, sort_keys=True))
