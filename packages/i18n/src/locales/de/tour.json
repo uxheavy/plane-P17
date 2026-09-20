@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Anfragen mit Intake optimieren",
-        "description": "Eine Plane-exklusive Funktion, mit der Gäste Arbeitselemente für Fehler, Anfragen oder Tickets erstellen können."
+        "description": "Eine Company Runner-exklusive Funktion, mit der Gäste Arbeitselemente für Fehler, Anfragen oder Tickets erstellen können."
       },
       "step_one": {
         "title": "Offene/geschlossene Intake-Anfragen",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Schluss mit dem Wechseln zwischen Tabs. Verbinden Sie Ihre Welt.",
-        "description": "Verknüpfen Sie GitHub und Slack, um PRs zu verfolgen und Chats direkt in Plane AI zusammenzufassen."
+        "description": "Verknüpfen Sie GitHub und Slack, um PRs zu verfolgen und Chats direkt in Company Runner AI zusammenzufassen."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Seite erstellen"
         },
         "item_5": {
-          "title": "Plane AI-Chat ausprobieren"
+          "title": "Company Runner AI-Chat ausprobieren"
         },
         "item_6": {
           "title": "Integrationen verknüpfen"

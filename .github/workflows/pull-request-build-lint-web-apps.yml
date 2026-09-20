@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check generated identity exports
+        run: pnpm brand:check
+
       - name: Check formatting
         run: pnpm turbo run check:format --affected
 

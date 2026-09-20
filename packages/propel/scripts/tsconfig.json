@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@plane/constants": ["../../constants/src/metadata.ts"]
+    },
+    "composite": false,
+    "incremental": false
+  },
+  "include": ["./*.ts"]
+}

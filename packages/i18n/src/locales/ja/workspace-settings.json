@@ -3,7 +3,7 @@
     "label": "ワークスペース設定",
     "page_label": "{workspace} - 一般設定",
     "key_created": "キーが作成されました",
-    "copy_key": "このシークレットキーをコピーしてPlaneページに保存してください。閉じた後はこのキーを見ることができません。キーを含むCSVファイルがダウンロードされました。",
+    "copy_key": "このシークレットキーをコピーしてCompany Runnerページに保存してください。閉じた後はこのキーを見ることができません。キーを含むCSVファイルがダウンロードされました。",
     "token_copied": "トークンがクリップボードにコピーされました。",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "プロジェクトの状態",
         "heading": "すべてのプロジェクトの進捗概要を確認します。",
-        "description": "プロジェクトステータスは、任意のプロジェクトプロパティでプロジェクトの進捗を追跡するためのPlane専用の機能です。",
+        "description": "プロジェクトステータスは、任意のプロジェクトプロパティでプロジェクトの進捗を追跡するためのCompany Runner専用の機能です。",
         "go_to_settings": "設定へ移動"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "あなたの作業がより知能的で速くなるように、ネイティブに接続されたAIを使用してください。"
       },
       "runners": {

@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Semplifica le richieste con l intake",
-        "description": "Una funzionalità esclusiva di Plane che consente agli Ospiti di creare elementi di lavoro per bug, richieste o ticket."
+        "description": "Una funzionalità esclusiva di Company Runner che consente agli Ospiti di creare elementi di lavoro per bug, richieste o ticket."
       },
       "step_one": {
         "title": "Richieste di intake aperte/chiuse",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Smetti di cambiare scheda. Connetti il tuo mondo.",
-        "description": "Collega GitHub, Slack per tracciare le PR e riassumere le chat direttamente in Plane AI."
+        "description": "Collega GitHub, Slack per tracciare le PR e riassumere le chat direttamente in Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Crea una pagina"
         },
         "item_5": {
-          "title": "Prova la chat Plane AI"
+          "title": "Prova la chat Company Runner AI"
         },
         "item_6": {
           "title": "Collega Integrazioni"

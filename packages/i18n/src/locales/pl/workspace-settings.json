@@ -3,7 +3,7 @@
     "label": "Ustawienia przestrzeni roboczej",
     "page_label": "{workspace} - Ustawienia ogólne",
     "key_created": "Klucz utworzony",
-    "copy_key": "Skopiuj i zapisz ten klucz w Plane Pages. Po zamknięciu nie będzie widoczny ponownie. Plik CSV z kluczem został pobrany.",
+    "copy_key": "Skopiuj i zapisz ten klucz w Company Runner Publish. Po zamknięciu nie będzie widoczny ponownie. Plik CSV z kluczem został pobrany.",
     "token_copied": "Token skopiowano do schowka.",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "Stany projektu",
         "heading": "Zobacz przegląd postępu dla wszystkich projektów.",
-        "description": "Stany projektów to funkcja Plane służąca do śledzenia postępu wszystkich projektów według dowolnej właściwości projektu.",
+        "description": "Stany projektów to funkcja Company Runner służąca do śledzenia postępu wszystkich projektów według dowolnej właściwości projektu.",
         "go_to_settings": "Przejdź do ustawień"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Twoja praca staje się inteligentniejsza i szybsza dzięki AI, która jest natywnie połączona z Twoją pracą i bazą wiedzy."
       },
       "runners": {

@@ -3,7 +3,7 @@
     "label": "工作區設定",
     "page_label": "{workspace} - 一般設定",
     "key_created": "金鑰已建立",
-    "copy_key": "複製並儲存此金鑰到 Plane Pages。關閉後您將無法看到此金鑰。已下載包含金鑰的 CSV 檔案。",
+    "copy_key": "複製並儲存此金鑰到 Company Runner Publish。關閉後您將無法看到此金鑰。已下載包含金鑰的 CSV 檔案。",
     "token_copied": "權杖已複製到剪貼簿。",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "專案狀態",
         "heading": "查看所有專案的進度概覽。",
-        "description": "專案狀態是 Plane 獨有的功能，可依任何專案屬性追蹤所有專案的進度。",
+        "description": "專案狀態是 Company Runner 獨有的功能，可依任何專案屬性追蹤所有專案的進度。",
         "go_to_settings": "前往設定"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "使用與您的工作和知識庫原生連接的 AI，讓您的任務變得更智能、更快速。"
       },
       "runners": {

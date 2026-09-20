@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Zefektivněte požadavky s příjmem",
-        "description": "Funkce pouze v Plane, která umožňuje hostům vytvářet pracovní položky pro chyby, požadavky nebo tikety."
+        "description": "Funkce pouze v Company Runner, která umožňuje hostům vytvářet pracovní položky pro chyby, požadavky nebo tikety."
       },
       "step_one": {
         "title": "Otevřené/uzavřené požadavky příjmu",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Přestaňte přepínat záložky. Propojte svůj svět.",
-        "description": "Propojte GitHub, Slack pro sledování PR a shrnutí chatů přímo v Plane AI."
+        "description": "Propojte GitHub, Slack pro sledování PR a shrnutí chatů přímo v Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Vytvořit stránku"
         },
         "item_5": {
-          "title": "Vyzkoušet Plane AI chat"
+          "title": "Vyzkoušet Company Runner AI chat"
         },
         "item_6": {
           "title": "Propojit integrace"

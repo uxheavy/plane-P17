@@ -18,7 +18,9 @@
     "check:format": "turbo run check:format",
     "check:types": "turbo run check:types",
     "prepare": "husky",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "npx react-doctor@latest",
+    "brand:generate": "pnpm --filter @plane/propel brand:generate",
+    "brand:check": "pnpm --filter @plane/propel brand:check"
   },
   "devDependencies": {
     "@oxlint/plugins": "catalog:",

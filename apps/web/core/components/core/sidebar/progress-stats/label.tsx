@@ -8,7 +8,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 // assets
-import emptyLabel from "@/app/assets/empty-state/empty_label.svg?url";
+import emptyLabel from "@/app/assets/empty-state/empty_label.webp?url";
 // components
 import { SingleProgressStats } from "@/components/core/sidebar/single-progress-stats";
 

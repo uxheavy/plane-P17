@@ -41,7 +41,7 @@ export function AuthHeader(props: TAuthHeader) {
 
     return {
       header: "Comment or react to work items",
-      subHeader: "Use plane to add your valuable inputs to features.",
+      subHeader: "Use Company Runner to add your valuable inputs to features.",
     };
   };
 

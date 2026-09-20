@@ -3,7 +3,7 @@
     "label": "Workspace settings",
     "page_label": "{workspace} - General settings",
     "key_created": "Key created",
-    "copy_key": "Copy and save this secret key in Plane Pages. You can't see this key after you hit Close. A CSV file containing the key has been downloaded.",
+    "copy_key": "Copy and save this secret key in Company Runner Publish. You can't see this key after you hit Close. A CSV file containing the key has been downloaded.",
     "token_copied": "Token copied to clipboard.",
     "settings": {
       "general": {
@@ -331,7 +331,7 @@
       "project_states": {
         "title": "Project states",
         "heading": "See progress overview for all projects.",
-        "description": "Project States is a Plane-only feature for tracking progress of all your projects by any project property.",
+        "description": "Project States is a Company Runner-only feature for tracking progress of all your projects by any project property.",
         "go_to_settings": "Go to settings"
       },
       "projects": {
@@ -548,8 +548,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "See your work get smarter and faster with AI that is natively connected to your work and knowledge base. "
       },
       "runners": {

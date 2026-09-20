@@ -8,7 +8,7 @@ import { observer } from "mobx-react";
 // plane imports
 import { cn } from "@plane/utils";
 // assets
-import emptyCycle from "@/app/assets/empty-state/cycle.svg?url";
+import emptyCycle from "@/app/assets/empty-state/cycle.webp?url";
 // components
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHead } from "@/components/core/page-title";

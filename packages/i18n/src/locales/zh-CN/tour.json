@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "使用接收简化请求",
-        "description": "Plane专有功能，允许访客为错误、请求或工单创建工作项。"
+        "description": "Company Runner专有功能，允许访客为错误、请求或工单创建工作项。"
       },
       "step_one": {
         "title": "打开/关闭接收请求",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "告别标签页切换。连接您的世界。",
-        "description": "连接 GitHub、Slack，直接在 Plane AI 中跟踪 PR 并总结聊天内容。"
+        "description": "连接 GitHub、Slack，直接在 Company Runner AI 中跟踪 PR 并总结聊天内容。"
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "创建页面"
         },
         "item_5": {
-          "title": "试用Plane AI聊天"
+          "title": "试用Company Runner AI聊天"
         },
         "item_6": {
           "title": "链接集成"

@@ -99,6 +99,7 @@ services:
       - exec npx turbo run dev --filter=web -- --host 0.0.0.0
     volumes:
       - ./apps/web:/app/apps/web
+      - ./packages:/app/packages
       - web_node_modules:/app/apps/web/node_modules
     depends_on:
       - api

@@ -8,7 +8,7 @@ import Link from "next/link";
 // ui
 import { Button } from "@plane/propel/button";
 // images
-import Image404 from "@/app/assets/404.svg?url";
+import Image404 from "@/app/assets/404.webp?url";
 // types
 import type { Route } from "./+types/not-found";
 

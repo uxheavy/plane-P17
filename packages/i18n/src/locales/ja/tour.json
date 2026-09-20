@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "インテークでリクエストを効率化",
-        "description": "ゲストがバグ、リクエスト、またはチケットの作業項目を作成できるPlane専用の機能です。"
+        "description": "ゲストがバグ、リクエスト、またはチケットの作業項目を作成できるCompany Runner専用の機能です。"
       },
       "step_one": {
         "title": "開いている/閉じているインテークリクエスト",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "タブ切り替えをやめて、あなたの世界をつなげましょう。",
-        "description": "GitHubやSlackをリンクして、Plane AIで直接PRを追跡したりチャットを要約したりできます。"
+        "description": "GitHubやSlackをリンクして、Company Runner AIで直接PRを追跡したりチャットを要約したりできます。"
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "ページを作成"
         },
         "item_5": {
-          "title": "Plane AIチャットを試す"
+          "title": "Company Runner AIチャットを試す"
         },
         "item_6": {
           "title": "統合をリンク"

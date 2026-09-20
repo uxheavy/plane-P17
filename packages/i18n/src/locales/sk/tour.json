@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Zjednodušte žiadosti s príjmom",
-        "description": "Funkcia exkluzívne pre Plane, ktorá umožňuje Hostiam vytvárať pracovné položky pre chyby, žiadosti alebo tikety."
+        "description": "Funkcia exkluzívne pre Company Runner, ktorá umožňuje Hostiam vytvárať pracovné položky pre chyby, žiadosti alebo tikety."
       },
       "step_one": {
         "title": "Otvorené/zatvorené žiadosti o príjem",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Prestaňte prepínať medzi kartami. Prepojte svoj svet.",
-        "description": "Prepojte GitHub a Slack, aby ste mohli sledovať PR a sumarizovať chaty priamo v Plane AI."
+        "description": "Prepojte GitHub a Slack, aby ste mohli sledovať PR a sumarizovať chaty priamo v Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Vytvoriť stránku"
         },
         "item_5": {
-          "title": "Vyskúšať Plane AI chat"
+          "title": "Vyskúšať Company Runner AI chat"
         },
         "item_6": {
           "title": "Prepojiť integrácie"

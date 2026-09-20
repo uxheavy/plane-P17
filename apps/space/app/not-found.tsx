@@ -5,7 +5,7 @@
  */
 
 // assets
-import SomethingWentWrongImage from "@/app/assets/something-went-wrong.svg?url";
+import SomethingWentWrongImage from "@/app/assets/something-went-wrong.webp?url";
 
 function NotFound() {
   return (
