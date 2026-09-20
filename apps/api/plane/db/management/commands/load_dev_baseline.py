@@ -623,12 +623,12 @@ def _ensure_pages(
     spec: dict[str, Any],
     actor: User,
 ) -> int:
-    """Ensure the declared brief pages exist and are linked to the project.
+    """Ensure project-scoped brief pages without rewriting existing content.
 
-    ``Page`` inherits ``Document`` through a one-to-one primary key, so a single
-    ``Page`` create writes both rows. Creating the parent ``Document`` first as
-    well inserts the same primary key twice, which fails as a duplicate key. The
-    link row is separate, and it is what makes the page visible in the project.
+    ``Page`` inherits ``Document`` through a one-to-one primary key, while the
+    ``DocumentProject`` link owns project identity. Equal names in different
+    projects therefore create distinct pages; active or tombstoned links in the
+    same project remain authoritative user state.
     """
 
     created = 0
@@ -636,34 +636,30 @@ def _ensure_pages(
         name = entry.get("name")
         if not name:
             raise BaselineError(f"project {project.identifier!r} has a page without a name")
-        page, tombstoned = _find_active_or_tombstoned(
-            Page,
+        document_links = DocumentProject.all_objects.filter(
             workspace=workspace,
-            name=name,
+            project=project,
+            document__workspace=workspace,
+            document__kind=Document.Kind.PAGE,
+            document__name=name,
         )
-        if tombstoned:
+        if document_links.exists():
             continue
-        if page is None:
-            page = Page.objects.create(
-                workspace=workspace,
-                kind=Document.Kind.PAGE,
-                name=name,
-                owned_by=actor,
-                created_by=actor,
-                description_html=entry.get("body", "<p></p>"),
-            )
-            created += 1
-        if not DocumentProject.all_objects.filter(
+        page = Page.objects.create(
+            workspace=workspace,
+            kind=Document.Kind.PAGE,
+            name=name,
+            owned_by=actor,
+            created_by=actor,
+            description_html=entry.get("body", "<p></p>"),
+        )
+        DocumentProject.objects.create(
             document_id=page.id,
             project=project,
             workspace=workspace,
-        ).exists():
-            DocumentProject.objects.create(
-                document_id=page.id,
-                project=project,
-                workspace=workspace,
-                created_by=actor,
-            )
+            created_by=actor,
+        )
+        created += 1
     return created
 
 
@@ -993,6 +989,7 @@ def _resolve_bindings(
     """
 
     target_ids: dict[str, tuple[str, str]] = {}
+    scene_cards = {str(card) for lane in work_map.get("lanes") or [] for card in lane.get("cards") or []}
     resolvers: dict[str, Any] = {
         WorkMapBinding.SourceKind.WORK_ITEM: Issue,
         WorkMapBinding.SourceKind.MODULE: Module,
@@ -1006,6 +1003,9 @@ def _resolve_bindings(
             raise BaselineError(
                 f"work map {work_map.get('name')!r} has a binding missing a card, source_kind, or source_name"
             )
+        card = str(card)
+        if card not in scene_cards:
+            raise BaselineError(f"work map {work_map.get('name')!r} binds card {card!r}, which no lane declares")
         model = resolvers.get(source_kind)
         if model is None:
             raise BaselineError(
