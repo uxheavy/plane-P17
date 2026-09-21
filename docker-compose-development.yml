@@ -4,9 +4,8 @@
 # supplies the allocated host ports):
 #   python3 -m development up
 #
-# Or directly:
-#   varlock run -- docker compose -p company-runner-development \
-#     -f docker-compose-local.yml -f docker-compose-development.yml up
+# The lifecycle derives the worktree-owned Compose project name and allocated
+# ports. Direct Compose invocation bypasses that ownership boundary (ADR-0013).
 #
 # Each service reads an env file that the lifecycle resolves from the tracked
 # .env.schema beside it, so the tracked schema is the only source of values
@@ -41,8 +40,6 @@ services:
       - ./apps/api/.env
     environment:
       DEBUG: "1"
-      WEB_URL: http://localhost:3000
-      APP_BASE_URL: http://localhost:3000
       AWS_S3_ENDPOINT_URL: http://plane-minio:9000
       USE_MINIO: "1"
     volumes:
@@ -57,8 +54,6 @@ services:
       - ./apps/api/.env
     environment:
       DEBUG: "1"
-      WEB_URL: http://localhost:3000
-      APP_BASE_URL: http://localhost:3000
       AWS_S3_ENDPOINT_URL: http://plane-minio:9000
       USE_MINIO: "1"
   migrator:
@@ -99,6 +94,10 @@ services:
       - exec npx turbo run dev --filter=web -- --host 0.0.0.0
     volumes:
       - ./apps/web:/app/apps/web
+      # The client imports the workspace packages by path. Without this mount
+      # they are compiled from the image layer, so an edited package source is
+      # invisible to a running stack and the container serves stale code: the
+      # build succeeds and only the browser console shows the failure.
       - ./packages:/app/packages
       - web_node_modules:/app/apps/web/node_modules
     depends_on:
@@ -106,5 +105,80 @@ services:
     ports:
       - "127.0.0.1:${DEV_WEB_PORT}:3000"
 
+  # The instance administration client, which owns first-run setup. The
+  # workspace client refuses to render a workspace until setup has completed,
+  # so without this service the stack serves the welcome screen and nothing
+  # reconciled into the database is reachable through the UI.
+  #
+  # It is a separate application rather than a route in the web client: the
+  # admin app owns /god-mode, and GOD_MODE_URL points at APP_BASE_URL when
+  # VITE_ADMIN_BASE_URL is empty.
+  admin:
+    build:
+      context: .
+      dockerfile: ./apps/admin/Dockerfile.dev
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: unless-stopped
+    networks:
+      - dev_env
+    env_file: !override
+      - ./apps/admin/.env
+    environment:
+      # The container must bind its own interface for the published port to
+      # reach the dev server; the schema default is loopback for host runs.
+      DEV_SERVER_HOST: 0.0.0.0
+    # The admin dev task resolves its bind host before reading the Vite config,
+    # so the host is also given on the command line. Turbo builds the
+    # workspace packages this app imports first, as it does for web.
+    command:
+      - sh
+      - -c
+      - exec npx turbo run dev --filter=admin -- --host 0.0.0.0
+    volumes:
+      - ./apps/admin:/app/apps/admin
+      # See the note on the web service: the client compiles workspace packages
+      # from this checkout rather than from the image layer.
+      - ./packages:/app/packages
+      - admin_node_modules:/app/apps/admin/node_modules
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${DEV_ADMIN_PORT}:3001"
+
+  # The collaboration relay. It terminates the websocket a work map opens. The
+  # workspace client asks it whether the map is editable and never receives an
+  # answer without it, so the editor resolves to read-only while the canvas
+  # still renders: the map looks present but cannot be changed.
+  #
+  # The browser dials this service directly on its allocated port, so the port
+  # is published on loopback and the client is told the same origin through
+  # VITE_LIVE_BASE_URL. Publishing it is what makes the socket reachable; a
+  # client left to guess would dial its own origin and retry against nothing.
+  live:
+    build:
+      context: .
+      dockerfile: ./apps/live/Dockerfile.dev
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: unless-stopped
+    networks:
+      - dev_env
+    env_file: !override
+      - ./apps/live/.env
+    volumes:
+      - ./apps/live:/app/apps/live
+      # See the note on the web service: the relay compiles workspace packages
+      # from this checkout rather than from the image layer.
+      - ./packages:/app/packages
+      - live_node_modules:/app/apps/live/node_modules
+    depends_on:
+      - api
+      - plane-redis
+    ports:
+      - "127.0.0.1:${DEV_LIVE_PORT}:3003"
+
 volumes:
   web_node_modules:
+  admin_node_modules:
+  live_node_modules:
