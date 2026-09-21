@@ -109,16 +109,8 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
                 Let Company Runner collect anonymous usage data
               </div>
               <div className="text-11 leading-5 font-regular text-tertiary">
-                No PII is collected.This anonymized data is used to understand how you use Company Runner and build new
-                features in line with{" "}
-                <a
-                  href="https://developers.plane.so/self-hosting/telemetry"
-                  target="_blank"
-                  className="text-accent-primary hover:underline"
-                  rel="noreferrer"
-                >
-                  our Telemetry Policy.
-                </a>
+                No PII is collected. This anonymized data helps us understand how you use Company Runner and build new
+                features.
               </div>
             </div>
           </div>

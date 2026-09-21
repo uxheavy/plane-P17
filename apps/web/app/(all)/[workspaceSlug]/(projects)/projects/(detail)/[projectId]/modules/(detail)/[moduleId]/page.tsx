@@ -9,7 +9,7 @@ import useSWR from "swr";
 // plane imports
 import { cn } from "@plane/utils";
 // assets
-import emptyModule from "@/app/assets/empty-state/module.svg?url";
+import emptyModule from "@/app/assets/empty-state/module.webp?url";
 // components
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHead } from "@/components/core/page-title";

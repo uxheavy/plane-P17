@@ -7,6 +7,9 @@
 import { useTheme } from "next-themes";
 // plane imports
 import { useTranslation } from "@plane/i18n";
+// assets
+import EstimatesDark from "@/app/assets/empty-state/project-settings/estimates-dark.webp?url";
+import EstimatesLight from "@/app/assets/empty-state/project-settings/estimates-light.webp?url";
 // components
 import { DetailedEmptyState } from "@/components/empty-state/detailed-empty-state-root";
 
@@ -21,7 +24,7 @@ export function EstimateEmptyScreen(props: TEstimateEmptyScreen) {
 
   const { t } = useTranslation();
 
-  const resolvedPath = `/empty-state/project-settings/estimates-${resolvedTheme === "light" ? "light" : "dark"}.png`;
+  const resolvedPath = resolvedTheme === "light" ? EstimatesLight : EstimatesDark;
   return (
     <DetailedEmptyState
       title={""}

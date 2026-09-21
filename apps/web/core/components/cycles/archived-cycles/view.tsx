@@ -6,8 +6,8 @@
 
 import { observer } from "mobx-react";
 // assets
-import AllFiltersImage from "@/app/assets/empty-state/cycle/all-filters.svg?url";
-import NameFilterImage from "@/app/assets/empty-state/cycle/name-filter.svg?url";
+import AllFiltersImage from "@/app/assets/empty-state/cycle/all-filters.webp?url";
+import NameFilterImage from "@/app/assets/empty-state/cycle/name-filter.webp?url";
 // components
 import { CyclesList } from "@/components/cycles/list";
 // ui

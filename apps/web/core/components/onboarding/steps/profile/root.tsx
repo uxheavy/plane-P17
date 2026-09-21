@@ -67,7 +67,7 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
     control,
     watch,
     setValue,
-    formState: { errors, isSubmitting, isValid },
+    formState: { errors, isSubmitting },
   } = useForm<TProfileSetupFormValues>({
     defaultValues: {
       ...defaultValues,
@@ -141,7 +141,10 @@ export const ProfileSetupStep = observer(function ProfileSetupStep({ handleStepC
 
   // Check for all available fields validation and if password field is available, then checks for password validation (strength + confirmation).
   // Also handles the condition for optional password i.e if password field is optional it only checks for above validation if it's not empty.
-  const isButtonDisabled = !isSubmitting && isValid ? !(isPasswordAlreadySetup ? false : isValidPassword) : true;
+  const isButtonDisabled =
+    isSubmitting ||
+    validatePersonName(watch("first_name") ?? "") !== true ||
+    (!isPasswordAlreadySetup && !isValidPassword);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-10">

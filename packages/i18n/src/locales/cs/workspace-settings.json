@@ -3,7 +3,7 @@
     "label": "Nastavení pracovního prostoru",
     "page_label": "{workspace} - Obecná nastavení",
     "key_created": "Klíč vytvořen",
-    "copy_key": "Zkopírujte a uložte tento klíč do Plane Pages. Po zavření jej neuvidíte. CSV soubor s klíčem byl stažen.",
+    "copy_key": "Zkopírujte a uložte tento klíč do Company Runner Publish. Po zavření jej neuvidíte. CSV soubor s klíčem byl stažen.",
     "token_copied": "Token zkopírován do schránky.",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "Stavy projektů",
         "heading": "Zobrazit přehled pokroku pro všechny projekty.",
-        "description": "Stavy projektů jsou funkce výhradně Plane pro sledování pokroku všech vašich projektů podle libovolné vlastnosti projektu.",
+        "description": "Stavy projektů jsou funkce výhradně Company Runner pro sledování pokroku všech vašich projektů podle libovolné vlastnosti projektu.",
         "go_to_settings": "Přejít do nastavení"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Sledujte, jak se vaše práce stává chytřejší a rychlejší s AI, která je nativně propojena s vaší prací a znalostní základnou."
       },
       "runners": {

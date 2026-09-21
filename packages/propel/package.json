@@ -51,6 +51,8 @@
     "./styles/react-day-picker": "./dist/styles/react-day-picker.css"
   },
   "scripts": {
+    "brand:generate": "tsx --tsconfig scripts/tsconfig.json scripts/brand.ts generate",
+    "brand:check": "tsc --noEmit -p scripts/tsconfig.json && tsx --tsconfig scripts/tsconfig.json scripts/brand.ts check",
     "dev": "tsdown --watch --no-clean",
     "build": "tsdown",
     "check:lint": "oxlint --max-warnings=3605 .",
@@ -90,8 +92,11 @@
     "@storybook/react-vite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "fontkit": "2.0.4",
+    "sharp": "catalog:",
     "storybook": "catalog:",
     "tsdown": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }

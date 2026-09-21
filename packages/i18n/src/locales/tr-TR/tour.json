@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Alımla istekleri kolaylaştırın",
-        "description": "Konukların hatalar, istekler veya biletler için çalışma öğeleri oluşturmasına olanak tanıyan Plane a özel bir özellik."
+        "description": "Konukların hatalar, istekler veya biletler için çalışma öğeleri oluşturmasına olanak tanıyan Company Runner a özel bir özellik."
       },
       "step_one": {
         "title": "Açık/kapalı alım istekleri",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Sekmeler arası geçişi bırakın. Dünyanızı bağlayın.",
-        "description": "PR'ları takip etmek ve sohbetleri doğrudan Plane AI'da özetlemek için GitHub ve Slack'i bağlayın."
+        "description": "PR'ları takip etmek ve sohbetleri doğrudan Company Runner AI'da özetlemek için GitHub ve Slack'i bağlayın."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Bir sayfa oluşturun"
         },
         "item_5": {
-          "title": "Plane AI sohbetini deneyin"
+          "title": "Company Runner AI sohbetini deneyin"
         },
         "item_6": {
           "title": "Entegrasyonları bağlayın"

@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Rationalisez les demandes avec la réception",
-        "description": "Une fonctionnalité exclusive de Plane qui permet aux Invités de créer des éléments de travail pour les bugs, demandes ou tickets."
+        "description": "Une fonctionnalité exclusive de Company Runner qui permet aux Invités de créer des éléments de travail pour les bugs, demandes ou tickets."
       },
       "step_one": {
         "title": "Demandes de réception ouvertes/fermées",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Arrêtez de changer d’onglet. Connectez votre monde.",
-        "description": "Liez GitHub et Slack pour suivre les PR et résumer les discussions directement dans Plane AI."
+        "description": "Liez GitHub et Slack pour suivre les PR et résumer les discussions directement dans Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Créer une page"
         },
         "item_5": {
-          "title": "Essayer le chat Plane AI"
+          "title": "Essayer le chat Company Runner AI"
         },
         "item_6": {
           "title": "Lier les intégrations"

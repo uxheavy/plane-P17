@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Optimiza solicitudes con recepción",
-        "description": "Una característica exclusiva de Plane que permite a los Invitados crear elementos de trabajo para errores, solicitudes o tickets."
+        "description": "Una característica exclusiva de Company Runner que permite a los Invitados crear elementos de trabajo para errores, solicitudes o tickets."
       },
       "step_one": {
         "title": "Solicitudes de recepción abiertas/cerradas",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Deja de cambiar de pestañas. Conecta tu mundo.",
-        "description": "Vincula GitHub y Slack para rastrear PRs y resumir chats directamente en Plane AI."
+        "description": "Vincula GitHub y Slack para rastrear PRs y resumir chats directamente en Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Crear una página"
         },
         "item_5": {
-          "title": "Probar el chat de Plane AI"
+          "title": "Probar el chat de Company Runner AI"
         },
         "item_6": {
           "title": "Vincular Integraciones"

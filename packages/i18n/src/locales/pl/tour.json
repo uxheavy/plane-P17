@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Usprawnij zgłoszenia dzięki przyjmowaniu",
-        "description": "Funkcja dostępna tylko w Plane, która pozwala Gościom tworzyć elementy pracy dla błędów, zgłoszeń lub biletów."
+        "description": "Funkcja dostępna tylko w Company Runner, która pozwala Gościom tworzyć elementy pracy dla błędów, zgłoszeń lub biletów."
       },
       "step_one": {
         "title": "Otwarte/zamknięte zgłoszenia przyjmowania",
@@ -113,7 +113,7 @@
     "mcp_connectors": {
       "step_zero": {
         "title": "Przestań przełączać karty. Połącz swój świat.",
-        "description": "Połącz GitHub, Slack, aby śledzić PR-y i podsumowywać czaty bezpośrednio w Plane AI."
+        "description": "Połącz GitHub, Slack, aby śledzić PR-y i podsumowywać czaty bezpośrednio w Company Runner AI."
       }
     },
     "navigation": {
@@ -172,7 +172,7 @@
           "title": "Utwórz stronę"
         },
         "item_5": {
-          "title": "Wypróbuj czat Plane AI"
+          "title": "Wypróbuj czat Company Runner AI"
         },
         "item_6": {
           "title": "Połącz integracje"

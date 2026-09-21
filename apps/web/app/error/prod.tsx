@@ -8,28 +8,10 @@ import { useTheme } from "next-themes";
 // plane imports
 import { Button } from "@plane/propel/button";
 // assets
-import maintenanceModeDarkModeImage from "@/app/assets/instance/maintenance-mode-dark.svg?url";
-import maintenanceModeLightModeImage from "@/app/assets/instance/maintenance-mode-light.svg?url";
+import maintenanceModeDarkModeImage from "@/app/assets/instance/maintenance-mode-dark.webp?url";
+import maintenanceModeLightModeImage from "@/app/assets/instance/maintenance-mode-light.webp?url";
 // layouts
 import DefaultLayout from "@/layouts/default-layout";
-
-const linkMap = [
-  {
-    key: "mail_to",
-    label: "Contact Support",
-    value: "mailto:support@plane.so",
-  },
-  {
-    key: "status",
-    label: "Status Page",
-    value: "https://status.plane.so/",
-  },
-  {
-    key: "twitter_handle",
-    label: "@planepowers",
-    value: "https://x.com/planepowers",
-  },
-];
 
 // Production Error Component
 interface ProdErrorComponentProps {
@@ -60,23 +42,8 @@ export function ProdErrorComponent({ onGoHome }: ProdErrorComponentProps) {
             <h1 className="text-left text-18 font-semibold text-primary">&#x1F6A7; Looks like something went wrong!</h1>
             <span className="text-left text-14 font-medium text-secondary">
               We track these errors automatically and working on getting things back up and running. If the problem
-              persists feel free to contact us. In the meantime, try refreshing.
+              persists, try refreshing or contact your workspace administrator.
             </span>
-          </div>
-
-          <div className="mt-1 flex items-center justify-start gap-6">
-            {linkMap.map((link) => (
-              <div key={link.key}>
-                <a
-                  href={link.value}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-13 text-accent-primary hover:underline"
-                >
-                  {link.label}
-                </a>
-              </div>
-            ))}
           </div>
 
           <div className="flex items-center justify-start gap-6">

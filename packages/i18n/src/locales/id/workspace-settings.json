@@ -3,7 +3,7 @@
     "label": "Pengaturan ruang kerja",
     "page_label": "{workspace} - Pengaturan Umum",
     "key_created": "Kunci dibuat",
-    "copy_key": "Salin dan simpan kunci rahasia ini di Halaman Plane. Anda tidak dapat melihat kunci ini setelah Anda menekan Tutup. File CSV yang berisi kunci telah diunduh.",
+    "copy_key": "Salin dan simpan kunci rahasia ini di Halaman Company Runner. Anda tidak dapat melihat kunci ini setelah Anda menekan Tutup. File CSV yang berisi kunci telah diunduh.",
     "token_copied": "Token disalin ke clipboard.",
     "settings": {
       "general": {
@@ -258,7 +258,7 @@
       "project_states": {
         "title": "Status proyek",
         "heading": "Lihat ikhtisar kemajuan untuk semua proyek.",
-        "description": "Status Proyek adalah fitur khusus Plane untuk melacak kemajuan semua proyek Anda berdasarkan properti proyek apa pun.",
+        "description": "Status Proyek adalah fitur khusus Company Runner untuk melacak kemajuan semua proyek Anda berdasarkan properti proyek apa pun.",
         "go_to_settings": "Pergi ke pengaturan"
       },
       "projects": {
@@ -475,8 +475,8 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Company Runner AI",
+        "heading": "Company Runner AI",
         "description": "Lihat pekerjaan Anda menjadi lebih cerdas dan lebih cepat dengan AI yang terhubung secara native ke pekerjaan dan basis pengetahuan Anda."
       },
       "runners": {
