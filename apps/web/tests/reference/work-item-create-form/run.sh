@@ -15,6 +15,7 @@ fixture="$repo_root/apps/web/tests/reference/work-item-create-form/fixture.py"
 audit_dir=${PLANE_REFERENCE_AUDIT_DIR:-$repo_root/output/playwright}
 correlation_id="work-item-create-form-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 audit_log="$audit_dir/$correlation_id.jsonl"
+preview_log="$audit_dir/$correlation_id-preview.log"
 reference_run_id=${PLANE_REFERENCE_RUN_ID:-$correlation_id}
 reference_email=${PLANE_REFERENCE_EMAIL:-$reference_run_id@example.test}
 reference_password=${PLANE_REFERENCE_PASSWORD:-PickerReference-2026}
@@ -162,7 +163,7 @@ if [[ $external_web == 0 ]]; then
   (
     cd "$repo_root/apps/web"
     exec ./node_modules/.bin/vite preview --host 127.0.0.1 --port "$web_port" --strictPort
-  ) >/tmp/plane-reference-preview.log 2>&1 &
+  ) >"$preview_log" 2>&1 &
   preview_pid=$!
   for _ in {1..60}; do
     curl -fsS "$web_url" >/dev/null 2>&1 && break
